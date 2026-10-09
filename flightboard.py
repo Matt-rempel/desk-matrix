@@ -23,6 +23,7 @@ from dataclasses import dataclass
 from zoneinfo import ZoneInfo
 
 from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings, rgb
+from screens import resolve_screen
 
 SOURCE = "https://opendata.adsb.fi"
 METADATA_SOURCE = "https://api.adsbdb.com/v0"
@@ -304,11 +305,21 @@ def scroll_offset(text: str, elapsed: float, width: int = 32) -> int:
     return -min(overflow, max(0, int((elapsed - 2.0) * 8)))
 
 
-def clock_lines(settings: Settings, now: datetime | None = None) -> tuple[str, str]:
-    """Return 24-hour time and a short date in the selected time zone."""
+def clock_rows(settings: Settings, now: datetime | None = None) -> list[tuple[str, str]]:
+    """Resolve the selected clock layout to text and row colors."""
     zone = ZoneInfo(settings.timezone)
     local = (now or datetime.now(zone)).astimezone(zone)
-    return local.strftime("%H:%M"), f"{local:%a %b} {local.day}".upper()
+    values = {"time": local.strftime("%H:%M"),
+              "date": f"{local:%a %b} {local.day}".upper(),
+              "weekday": local.strftime("%A").upper()}
+    screen = resolve_screen(settings.clock_screen_id, settings.custom_screens,
+                            settings.top_color, settings.bottom_color)
+    return [(values[row["content"]], row["color"]) for row in screen["rows"]]
+
+
+def clock_lines(settings: Settings, now: datetime | None = None) -> tuple[str, str]:
+    rows = clock_rows(settings, now)
+    return rows[0][0], rows[1][0] if len(rows) > 1 else ""
 
 
 def clock_scroll_period(date_text: str) -> float:
@@ -325,6 +336,18 @@ def text_pixels(text: str, x: int, y: int, color: tuple[int, int, int], min_x: i
                 if bit == "1" and min_x <= x + dx < 32 and 0 <= y + dy < 16:
                     yield (x + dx, y + dy, color)
         x += 6
+
+
+def clock_frame(rows: list[tuple[str, str]], elapsed: float = 0):
+    """Draw a selected one- or two-row clock layout on the 32x16 panel."""
+    pixels = [(0, 0, 0)] * (32 * 16)
+    for index, (value, color) in enumerate(rows):
+        width = text_width(value)
+        x = (32 - width) // 2 if width <= 32 else scroll_offset(value, elapsed)
+        y = 4 if len(rows) == 1 else index * 8
+        for px, py, pixel_color in text_pixels(value, x, y, rgb(color)):
+            pixels[py * 32 + px] = pixel_color
+    return pixels
 
 
 def frame(top: str, bottom: str, elapsed: float = 0, error: bool = False,
@@ -486,10 +509,11 @@ def main() -> int:
 
     def show(top: str, bottom: str, elapsed: float, *, error: bool = False,
              dots: int = 0, active_dot: int = 0, progress: float | None = None,
-             icon: str | None = None):
+             icon: str | None = None, clock: list[tuple[str, str]] | None = None):
         nonlocal canvas
-        pixels = frame(top, bottom, elapsed, error, settings, dots, active_dot, progress,
-                       icon)
+        pixels = (clock_frame(clock, elapsed) if clock is not None else
+                  frame(top, bottom, elapsed, error, settings, dots, active_dot, progress,
+                        icon))
         for y in range(16):
             for x in range(32):
                 canvas.SetPixel(x, y, *pixels[y * 32 + x])
@@ -517,6 +541,7 @@ def main() -> int:
     screen_dots = screen_active_dot = 0
     screen_progress = None
     screen_icon = None
+    clock_static_signature = None
     next_credit = time.monotonic() + 60
     index = 0
     nearby_failed = False
@@ -636,9 +661,14 @@ def main() -> int:
             failed = (track_failed if settings.mode == "flight" else
                       nearby_failed if settings.mode == "nearby" else False)
             if settings.mode == "clock":
-                clock_top, clock_bottom = clock_lines(settings)
-                if screen_bottom != clock_bottom or screen_end == 0:
+                current_clock_rows = clock_rows(settings)
+                clock_top = current_clock_rows[0][0]
+                clock_bottom = current_clock_rows[1][0] if len(current_clock_rows) > 1 else ""
+                static_signature = tuple(value for value, _ in current_clock_rows
+                                         if ":" not in value)
+                if static_signature != clock_static_signature or screen_end == 0:
                     screen_start = now
+                clock_static_signature = static_signature
                 if screen_top != clock_top or screen_bottom != clock_bottom:
                     next_status = 0
                 screen_top, screen_bottom = clock_top, clock_bottom
@@ -697,10 +727,12 @@ def main() -> int:
             if settings.display_enabled:
                 display_elapsed = now - screen_start
                 if settings.mode == "clock":
-                    display_elapsed %= clock_scroll_period(screen_bottom)
+                    display_elapsed %= max(clock_scroll_period(value)
+                                           for value, _ in current_clock_rows)
                 show(screen_top, screen_bottom, display_elapsed,
                      error=screen_bottom == "API DELAY", dots=screen_dots,
-                     active_dot=screen_active_dot, progress=screen_progress, icon=screen_icon)
+                     active_dot=screen_active_dot, progress=screen_progress, icon=screen_icon,
+                     clock=current_clock_rows if settings.mode == "clock" else None)
             if now >= next_status:
                 next_status = now + 5
                 try:

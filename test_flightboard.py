@@ -155,6 +155,23 @@ class FlightboardTests(unittest.TestCase):
         self.assertLess(app.scroll_offset(bottom, app.clock_scroll_period(bottom) - 2), 0)
         self.assertEqual(app.scroll_offset(bottom, 0), 0)
 
+    def test_custom_clock_rows_and_colors(self):
+        custom = {"id": "custom-" + "a" * 32, "name": "Weekday focus",
+                  "rows": [{"content": "weekday", "color": "#33aaff"}]}
+        settings = validate_settings({"mode": "clock", "custom_screens": [custom],
+                                      "clock_screen_id": custom["id"]})
+        instant = datetime(2026, 10, 9, 18, 7, tzinfo=timezone.utc)
+        rows = app.clock_rows(settings, instant)
+        self.assertEqual(rows, [("FRIDAY", "#33AAFF")])
+        pixels = app.clock_frame(rows)
+        self.assertTrue(any(pixel == (51, 170, 255) for pixel in pixels[4 * 32:11 * 32]))
+        self.assertTrue(all(pixel == (0, 0, 0) for pixel in pixels[:4 * 32]))
+        self.assertEqual(app.clock_lines(settings, instant), ("FRIDAY", ""))
+        legacy = validate_settings({"mode": "clock", "bottom_color": "#0056D6"})
+        self.assertEqual(app.clock_rows(legacy, instant)[1][1], "#0056D6")
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            validate_settings({"clock_screen_id": "custom-" + "b" * 32})
+
     def test_progress_icon_and_dots(self):
         plane = app.Aircraft("ACA150", "c00001", 10, 25000, 400,
                              lat=0, lon=5)

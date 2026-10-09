@@ -11,6 +11,57 @@ import web_server
 
 
 class WebServerTests(unittest.TestCase):
+    def test_clock_screen_library_lifecycle(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            token_path = Path(directory) / "web-token"
+            token_path.write_text("a" * 64)
+            with (patch.object(web_server, "DEFAULT_PATH", path),
+                  patch.object(web_server, "TOKEN_PATH", token_path)):
+                server = web_server.BoundedHTTPServer(("127.0.0.1", 0), web_server.Handler)
+                thread = Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                base = f"http://127.0.0.1:{server.server_port}"
+
+                def post(endpoint, value):
+                    request = Request(base + endpoint, json.dumps(value).encode(),
+                                      {"Content-Type": "application/json", "Origin": base,
+                                       "X-Flightboard-Key": "a" * 64})
+                    with urlopen(request) as response:
+                        return json.load(response)
+
+                try:
+                    request = Request(base + "/api/screens",
+                                      headers={"X-Flightboard-Key": "a" * 64})
+                    with urlopen(request) as response:
+                        self.assertEqual(len(json.load(response)["builtins"]), 3)
+                    cloned = post("/api/screens", {"action": "clone", "source_id": "clock-classic"})
+                    custom_id = cloned["clock_screen_id"]
+                    self.assertEqual(cloned["mode"], "clock")
+                    self.assertEqual(len(cloned["custom_screens"]), 1)
+                    screen = {"id": custom_id, "name": "Weekday", "rows": [
+                        {"content": "weekday", "color": "#33aaff"}]}
+                    saved = post("/api/screens", {"action": "save", "screen": screen})
+                    self.assertEqual(saved["custom_screens"][0]["rows"][0]["color"], "#33AAFF")
+                    post("/api/settings", {"brightness": 70})
+                    with urlopen(request) as response:
+                        self.assertEqual(json.load(response)["custom"][0]["name"], "Weekday")
+                    with self.assertRaises(HTTPError) as rejected:
+                        post("/api/screens", {"action": "save", "screen": {
+                            "id": custom_id, "name": "Bad", "rows": [
+                                {"content": "weather", "color": "#FFFFFF"}]}})
+                    self.assertEqual(rejected.exception.code, 400)
+                    with self.assertRaises(HTTPError) as rejected:
+                        post("/api/screens", {"action": "delete", "screen_id": "clock-classic"})
+                    self.assertEqual(rejected.exception.code, 400)
+                    deleted = post("/api/screens", {"action": "delete", "screen_id": custom_id})
+                    self.assertEqual(deleted["clock_screen_id"], "clock-classic")
+                    self.assertEqual(deleted["custom_screens"], [])
+                finally:
+                    server.shutdown()
+                    server.server_close()
+                    thread.join(timeout=2)
+
     def test_settings_api_validates_and_persists(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "settings.json"

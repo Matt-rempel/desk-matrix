@@ -47,7 +47,7 @@
             <form id="settings-form">
               <div class="section-head"><div><h2 id="mode-title">Choose a screen</h2><p>One screen mode runs on the matrix at a time.</p></div><span class="section-symbol" aria-hidden="true">▦</span></div>
               <div class="mode-grid">
-                <label class="mode-option"><input type="radio" name="mode" value="clock"><span class="mode-glyph" aria-hidden="true">12:34</span><span><strong>Clock &amp; date</strong><small>Local time above a scrolling date.</small></span></label>
+                <label class="mode-option"><input type="radio" name="mode" value="clock"><span class="mode-glyph" aria-hidden="true">12:34</span><span><strong>Clock screens</strong><small>Choose a preset or your own layout below.</small></span></label>
                 <label class="mode-option"><input type="radio" name="mode" value="nearby" checked><span class="mode-glyph" aria-hidden="true">✈</span><span><strong>Nearby flights</strong><small>Cycle through planes around you.</small></span></label>
                 <label class="mode-option"><input type="radio" name="mode" value="flight"><span class="mode-glyph" aria-hidden="true">→</span><span><strong>Track a flight</strong><small>Keep one flight on screen.</small></span></label>
               </div>
@@ -63,7 +63,7 @@
 
               <section class="settings-group" aria-labelledby="appearance-title">
                 <div class="section-head"><div><h3 id="appearance-title">Look &amp; brightness</h3><p>Make the display comfortable on your desk.</p></div></div>
-                <div class="color-row"><label>Top line <input id="top_color" name="top_color" type="color"></label><label>Bottom line <input id="bottom_color" name="bottom_color" type="color"></label><label>Indicator <input id="accent_color" name="accent_color" type="color"></label></div>
+                <div class="color-row" id="flight-colors"><label>Top line <input id="top_color" name="top_color" type="color"></label><label>Bottom line <input id="bottom_color" name="bottom_color" type="color"></label><label>Indicator <input id="accent_color" name="accent_color" type="color"></label></div>
                 <div class="field"><label for="brightness">Day brightness <output id="brightness-value">85%</output></label><input id="brightness" name="brightness" type="range" min="1" max="100"></div>
                 <label class="toggle" id="icons-toggle"><input id="icons_enabled" name="icons_enabled" type="checkbox"><span><strong>Show small flight icons</strong><small>Adds a 7 × 7 pixel mark beside aircraft names.</small></span></label>
                 <label class="toggle"><input id="night_enabled" name="night_enabled" type="checkbox"><span><strong>Dim at night</strong><small>Automatically uses a lower brightness during the hours you choose.</small></span></label>
@@ -77,6 +77,22 @@
 
               <div class="save-row"><button id="save" type="submit">Save settings</button><span id="message" role="status" aria-live="polite"></span></div>
             </form>
+          </section>
+
+          <section class="panel screen-workshop" id="clock-workshop" aria-labelledby="clock-workshop-title" hidden>
+            <div class="section-head"><div><h2 id="clock-workshop-title">Clock screen library</h2><p>Start with a preset, then clone it to make a screen of your own.</p></div><span class="section-symbol" aria-hidden="true">◫</span></div>
+            <h3 class="library-heading">Built-in screens</h3>
+            <div id="builtin-screens" class="screen-library"></div>
+            <h3 class="library-heading">Your screens</h3>
+            <div id="custom-screens" class="screen-library"></div>
+            <div id="screen-editor" class="screen-editor" hidden>
+              <div class="section-head"><div><h3>Edit your screen</h3><p>Changes appear on the matrix after you save.</p></div></div>
+              <div class="field"><label for="screen-name">Screen name</label><input id="screen-name" type="text" maxlength="32" required></div>
+              <div class="field"><label for="row-count">Rows on the matrix</label><select id="row-count"><option value="1">One centered row</option><option value="2">Two rows</option></select></div>
+              <div class="clock-row-editor" id="row-1"><span class="row-label">Row 1</span><label>Show <select class="row-content"><option value="time">Time</option><option value="date">Date</option><option value="weekday">Weekday</option></select></label><label>Color <input class="row-color" type="color"></label></div>
+              <div class="clock-row-editor" id="row-2"><span class="row-label">Row 2</span><label>Show <select class="row-content"><option value="time">Time</option><option value="date">Date</option><option value="weekday">Weekday</option></select></label><label>Color <input class="row-color" type="color"></label></div>
+              <div class="editor-actions"><button id="save-screen" type="button" class="primary-button">Save screen</button><button id="delete-screen" type="button" class="quiet-button">Delete screen</button><span id="screen-message" role="status" aria-live="polite"></span></div>
+            </div>
           </section>
 
           <section class="future-section" aria-labelledby="future-title">

@@ -11,6 +11,8 @@ import re
 import tempfile
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from screens import validate_library
+
 STATE_DIR = Path(os.environ.get("FLIGHTBOARD_STATE_DIR", Path(__file__).parent))
 DEFAULT_PATH = STATE_DIR / "settings.json"
 CALGARY_TIME = ZoneInfo("America/Edmonton")
@@ -37,6 +39,8 @@ class Settings:
     bottom_color: str = "#FFFF00"
     accent_color: str = "#FF7A35"
     icons_enabled: bool = True
+    clock_screen_id: str = "clock-classic"
+    custom_screens: tuple[dict, ...] = ()
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -92,6 +96,8 @@ def validate_settings(data: dict) -> Settings:
     for name in ("display_enabled", "night_enabled", "icons_enabled"):
         if not isinstance(merged[name], bool):
             raise ValueError(f"{name} must be on or off")
+    custom_screens, clock_screen_id = validate_library(
+        merged["custom_screens"], merged["clock_screen_id"])
     return Settings(
         label=label.strip().upper(),
         lat=_number(merged["lat"], -90, 90, "Latitude"),
@@ -109,6 +115,8 @@ def validate_settings(data: dict) -> Settings:
         night_brightness=_number(merged["night_brightness"], 1, 100, "Night brightness", True),
         timezone=timezone,
         icons_enabled=merged["icons_enabled"],
+        clock_screen_id=clock_screen_id,
+        custom_screens=custom_screens,
         **colors,
     )
 

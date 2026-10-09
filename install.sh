@@ -26,7 +26,7 @@ if ! command -v apt-get >/dev/null 2>&1 || ! command -v systemctl >/dev/null 2>&
   printf 'Raspberry Pi OS or another Debian system with systemd is required.\n' >&2
   exit 1
 fi
-for file in flightboard.py settings.py web_server.py index.html app.css app.js flightboard.service flightboard-web.service; do
+for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js flightboard.service flightboard-web.service; do
   if [ ! -f "$SOURCE_DIR/$file" ]; then
     printf 'Missing %s; run the installer from a complete checkout.\n' "$file" >&2
     exit 1
@@ -86,7 +86,7 @@ fi
 # Back up the small application files and units. The virtual environment and
 # saved settings stay in place across updates.
 backup=$(mktemp -d)
-for file in flightboard.py settings.py web_server.py index.html app.css app.js; do
+for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js; do
   if [ -f "$CODE_DIR/$file" ]; then cp -p "$CODE_DIR/$file" "$backup/$file"; fi
 done
 for unit in flightboard.service flightboard-web.service; do
@@ -98,7 +98,7 @@ on_exit() {
   trap - EXIT
   if [ "$result" -ne 0 ] && [ "$rollback" -eq 1 ]; then
     printf '\nInstall failed; restoring the previous application and services.\n' >&2
-    for file in flightboard.py settings.py web_server.py index.html app.css app.js; do
+    for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js; do
       if [ -f "$backup/$file" ]; then
         sudo install -o root -g root -m 0644 "$backup/$file" "$CODE_DIR/$file"
       else
@@ -123,7 +123,7 @@ on_exit() {
 }
 trap 'on_exit $?' EXIT
 
-for file in flightboard.py settings.py web_server.py index.html app.css app.js; do
+for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js; do
   sudo install -o root -g root -m 0644 "$SOURCE_DIR/$file" "$CODE_DIR/$file"
 done
 sudo chown -hR root:root "$CODE_DIR"

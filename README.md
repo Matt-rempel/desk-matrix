@@ -2,9 +2,10 @@
 
 Desk Matrix turns a Raspberry Pi and a 32×16 HUB75 RGB matrix into a
 configurable desk display. It currently shows a clock and date, cycles through
-nearby aircraft, or follows one flight. Two 5×7 text rows scroll long details
-across the panel. A private HTTPS settings page lets you change modes,
-location, colors, brightness, and screen timing from a phone or computer.
+nearby aircraft, or follows one flight. Clock screens can use one centered
+5×7 text row or two rows; long details scroll across the panel. A private
+HTTPS settings page lets you change modes, location, colors, brightness, and
+screen timing from a phone or computer.
 
 The application files and Linux services still use the `flightboard` name so
 existing installations can update without moving settings or changing units.
@@ -128,10 +129,14 @@ flight numbers may need the exact ADS-B callsign, such as `ACA150`. If the
 flight is not broadcasting a recent position or the feed lacks coverage, the
 display shows `WAITING`.
 
-Clock & date mode shows 24-hour local time on the top row and scrolls the
-weekday, month, and day across the bottom row. It uses the configured time
-zone and does not request flight data while selected. The display updates at
-the next minute or date change without a service restart.
+Clock mode starts with three built-in screens: clock and date, time only, and
+time with weekday. Select a preset under **Clock screen library**, or choose
+**Clone & edit** to save a custom screen. Each custom screen has a name, one
+or two rows, and an independent color and content choice (time, date, or
+weekday) for each row. Built-ins stay available as starting points. Time uses
+24-hour format; date includes abbreviated weekday, month, and day. The clock
+uses the configured time zone and does not request flight data while selected.
+Up to 20 custom screens are saved on the Pi with the rest of the settings.
 
 The settings page controls nearby/follow/clock mode, location and radius,
 number of planes, screen time, colors, icons, day brightness, and optional night dimming

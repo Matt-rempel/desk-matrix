@@ -13,6 +13,7 @@ import threading
 from urllib.parse import urlsplit
 
 from settings import DEFAULT_PATH, STATE_DIR, load_settings, save_settings, validate_settings
+from screens import BUILTIN_SCREENS, MAX_CUSTOM_SCREENS, builtins_with_legacy_colors, resolve_screen
 
 HERE = Path(__file__).parent
 STATUS_PATH = STATE_DIR / "status.json"
@@ -95,6 +96,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, load_settings(DEFAULT_PATH).to_dict())
             except (ValueError, json.JSONDecodeError) as exc:
                 self._json(500, {"error": f"Settings file is invalid: {exc}"})
+        elif self.path == "/api/screens":
+            try:
+                settings = load_settings(DEFAULT_PATH)
+                self._json(200, {"builtins": builtins_with_legacy_colors(
+                                     settings.top_color, settings.bottom_color),
+                                 "custom": settings.custom_screens,
+                                 "active_id": settings.clock_screen_id})
+            except (ValueError, json.JSONDecodeError) as exc:
+                self._json(500, {"error": f"Settings file is invalid: {exc}"})
         elif self.path == "/api/status":
             try:
                 self._json(200, json.loads(STATUS_PATH.read_text()))
@@ -104,7 +114,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path not in ("/api/settings", "/api/display"):
+        if self.path not in ("/api/settings", "/api/display", "/api/screens"):
             self._json(404, {"error": "Not found"})
             return
         if not self._authorized():
@@ -139,12 +149,16 @@ class Handler(BaseHTTPRequestHandler):
                             or not isinstance(data["display_enabled"], bool)):
                         raise ValueError("Send display_enabled as on or off")
                     settings = replace(current, display_enabled=data["display_enabled"])
+                elif self.path == "/api/screens":
+                    settings = change_screens(current, data)
                 else:
                     if not isinstance(data, dict):
                         raise ValueError("Settings must be an object")
                     # The separate power button owns this flag. Saving other
                     # form edits must not turn the panel back on.
-                    settings = validate_settings({**data,
+                    settings = validate_settings({**current.to_dict(), **data,
+                                                  "clock_screen_id": current.clock_screen_id,
+                                                  "custom_screens": current.custom_screens,
                                                   "display_enabled": current.display_enabled})
                 save_settings(settings, DEFAULT_PATH)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
@@ -157,6 +171,53 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         print("flightboard web:", format % args, flush=True)
+
+
+def change_screens(current, data):
+    """Apply one authenticated screen-library edit to the current settings."""
+    if not isinstance(data, dict):
+        raise ValueError("Screen request must be an object")
+    action = data.get("action")
+    library = list(current.custom_screens)
+    selected = current.clock_screen_id
+    mode = current.mode
+    if action == "clone" and set(data) == {"action", "source_id"}:
+        source_id = data["source_id"]
+        if not isinstance(source_id, str) or source_id not in {
+                screen["id"] for screen in (*BUILTIN_SCREENS, *library)}:
+            raise ValueError("Source screen does not exist")
+        if len(library) >= MAX_CUSTOM_SCREENS:
+            raise ValueError("Save at most 20 custom screens")
+        source = resolve_screen(source_id, tuple(library),
+                                current.top_color, current.bottom_color)
+        selected = "custom-" + secrets.token_hex(16)
+        library.append({"id": selected,
+                        "name": (source["name"] + " copy")[:32],
+                        "rows": [dict(row) for row in source["rows"]]})
+        mode = "clock"
+    elif action == "save" and set(data) == {"action", "screen"}:
+        screen = data["screen"]
+        if not isinstance(screen, dict):
+            raise ValueError("Screen must be an object")
+        index = next((i for i, item in enumerate(library)
+                      if item["id"] == screen.get("id")), None)
+        if index is None:
+            raise ValueError("Clone a built-in screen before editing it")
+        library[index] = screen
+    elif action == "select" and set(data) == {"action", "screen_id"}:
+        selected = data["screen_id"]
+        mode = "clock"
+    elif action == "delete" and set(data) == {"action", "screen_id"}:
+        target = data["screen_id"]
+        if target not in {screen["id"] for screen in library}:
+            raise ValueError("Only custom screens can be deleted")
+        library = [screen for screen in library if screen["id"] != target]
+        if selected == target:
+            selected = "clock-classic"
+    else:
+        raise ValueError("Unknown screen action")
+    return validate_settings({**current.to_dict(), "custom_screens": library,
+                              "clock_screen_id": selected, "mode": mode})
 
 
 def main():
