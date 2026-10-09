@@ -26,6 +26,7 @@ class Settings:
     flight: str = ""
     max_planes: int = 3
     rotate: int = 10
+    display_enabled: bool = True
     brightness: int = 85
     night_enabled: bool = False
     night_start: str = "22:00"
@@ -88,7 +89,7 @@ def validate_settings(data: dict) -> Settings:
         ZoneInfo(timezone)
     except (ValueError, ZoneInfoNotFoundError):
         raise ValueError("Time zone must be an IANA name such as America/Edmonton") from None
-    for name in ("night_enabled", "icons_enabled"):
+    for name in ("display_enabled", "night_enabled", "icons_enabled"):
         if not isinstance(merged[name], bool):
             raise ValueError(f"{name} must be on or off")
     return Settings(
@@ -100,6 +101,7 @@ def validate_settings(data: dict) -> Settings:
         flight=flight,
         max_planes=_number(merged["max_planes"], 1, 5, "Plane count", True),
         rotate=_number(merged["rotate"], 8, 30, "Screen time", True),
+        display_enabled=merged["display_enabled"],
         brightness=_number(merged["brightness"], 1, 100, "Brightness", True),
         night_enabled=merged["night_enabled"],
         night_start=merged["night_start"],

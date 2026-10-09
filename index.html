@@ -56,7 +56,13 @@
         </section>
       </div>
       <aside class="side-column">
-        <section class="card live-card" aria-labelledby="live-title"><p class="eyebrow">RIGHT NOW</p><h2 id="live-title">On your display</h2><div class="status-display"><span id="active-title">Starting…</span><small id="active-detail">Waiting for the Pi</small><div id="flight-progress" hidden><progress id="progress-bar" max="100" value="0"></progress><small id="progress-caption"></small></div></div><p id="freshness" class="hint"></p></section>
+        <section class="card live-card" aria-labelledby="live-title">
+          <p class="eyebrow">RIGHT NOW</p><h2 id="live-title">On your display</h2>
+          <div class="status-display"><span id="active-title">Starting…</span><small id="active-detail">Waiting for the Pi</small><div id="flight-progress" hidden><progress id="progress-bar" max="100" value="0"></progress><small id="progress-caption"></small></div></div>
+          <p id="freshness" class="hint"></p>
+          <div class="save-row"><button id="power-button" type="button" disabled>Turn display off</button><span id="power-message" role="status" aria-live="polite"></span></div>
+          <p class="hint">Off blanks the LEDs. The Pi and this settings page stay online.</p>
+        </section>
         <section class="card" aria-labelledby="nearby-title"><p class="eyebrow">AROUND YOUR LOCATION</p><h2 id="nearby-title">Nearby planes</h2><p class="hint">Tap Follow to pin one on the matrix.</p><div id="planes" class="plane-list"><p class="empty">Looking for aircraft…</p></div></section>
         <p class="source-note">Positions: <a href="https://adsb.fi/" target="_blank" rel="noopener noreferrer">adsb.fi</a> · Route data: <a href="https://www.adsbdb.com/" target="_blank" rel="noopener noreferrer">ADSBdb</a><br>Route progress is an estimate from live position and airport coordinates. Settings are private to your Tailscale network.</p>
       </aside>

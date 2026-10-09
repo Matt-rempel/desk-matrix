@@ -76,6 +76,38 @@ class WebServerTests(unittest.TestCase):
                                        "X-Flightboard-Key": "a" * 64})
                     with urlopen(proxied) as response:
                         self.assertEqual(response.status, 200)
+                    power_payload = json.dumps({"display_enabled": False}).encode()
+                    power_request = Request(base + "/api/display", power_payload,
+                                            {"Content-Type": "application/json",
+                                             "Origin": secure_origin,
+                                             "X-Flightboard-Key": "a" * 64})
+                    with urlopen(power_request) as response:
+                        powered_off = json.load(response)
+                    self.assertFalse(powered_off["display_enabled"])
+                    self.assertEqual(powered_off["flight"], "ACA150")
+                    self.assertFalse(json.loads(path.read_text())["display_enabled"])
+                    # Saving unrelated form fields cannot undo a power toggle.
+                    with urlopen(valid) as response:
+                        self.assertFalse(json.load(response)["display_enabled"])
+                    bad_power = Request(base + "/api/display", b'{"display_enabled":"off"}',
+                                        {"Content-Type": "application/json",
+                                         "Origin": base, "X-Flightboard-Key": "a" * 64})
+                    with self.assertRaises(HTTPError) as rejected:
+                        urlopen(bad_power)
+                    self.assertEqual(rejected.exception.code, 400)
+                    bad_power_origin = Request(base + "/api/display", power_payload,
+                                               {"Content-Type": "application/json",
+                                                "Origin": "http://evil.example",
+                                                "X-Flightboard-Key": "a" * 64})
+                    with self.assertRaises(HTTPError) as rejected:
+                        urlopen(bad_power_origin)
+                    self.assertEqual(rejected.exception.code, 403)
+                    power_on = Request(base + "/api/display",
+                                       json.dumps({"display_enabled": True}).encode(),
+                                       {"Content-Type": "application/json",
+                                        "Origin": base, "X-Flightboard-Key": "a" * 64})
+                    with urlopen(power_on) as response:
+                        self.assertTrue(json.load(response)["display_enabled"])
                 finally:
                     server.shutdown()
                     server.server_close()

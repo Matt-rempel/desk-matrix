@@ -124,6 +124,10 @@ class FlightboardTests(unittest.TestCase):
             save_settings(value, path)
             self.assertEqual(load_settings(path).flight, "ACA150")
             self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o640)
+            save_settings(validate_settings({"display_enabled": False}), path)
+            self.assertFalse(load_settings(path).display_enabled)
+            path.write_text('{"brightness": 55}')  # Settings saved before the power button existed.
+            self.assertTrue(load_settings(path).display_enabled)
         self.assertEqual(effective_brightness(value, datetime(2026, 10, 8, 23, 0,
                                                               tzinfo=CALGARY_TIME)), 30)
         self.assertEqual(effective_brightness(value, datetime(2026, 10, 8, 12, 0,
@@ -133,6 +137,9 @@ class FlightboardTests(unittest.TestCase):
                                                                tzinfo=CALGARY_TIME)), 30)
         with self.assertRaisesRegex(ValueError, "Time zone"):
             validate_settings({"timezone": "../bad"})
+        self.assertFalse(validate_settings({"display_enabled": False}).display_enabled)
+        with self.assertRaisesRegex(ValueError, "display_enabled"):
+            validate_settings({"display_enabled": "off"})
         with self.assertRaisesRegex(ValueError, "Flight must"):
             validate_settings({"mode": "flight", "flight": "../etc"})
 

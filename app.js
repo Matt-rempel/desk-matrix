@@ -2,6 +2,8 @@ const form = document.querySelector('#settings-form');
 const message = document.querySelector('#message');
 const pairing = document.querySelector('#pairing');
 const controls = document.querySelector('#controls');
+const powerButton = document.querySelector('#power-button');
+const powerMessage = document.querySelector('#power-message');
 let key = sessionStorage.getItem('flightboard-key') || '';
 let savedSettings = null;
 if (/^#[0-9a-fA-F]{64}$/.test(location.hash)) {
@@ -21,6 +23,10 @@ function setMessage(text, error = false) {
   message.textContent = text;
   message.classList.toggle('error', error);
 }
+function showPowerState(enabled) {
+  powerButton.textContent = enabled ? 'Turn display off' : 'Turn display on';
+  powerButton.disabled = false;
+}
 
 function mode() { return form.querySelector('input[name="mode"]:checked').value; }
 function showConditionalFields() {
@@ -33,6 +39,7 @@ function applySettings(data) {
   form.querySelector(`input[name="mode"][value="${data.mode}"]`).checked = true;
   form.elements.night_enabled.checked = data.night_enabled;
   form.elements.icons_enabled.checked = data.icons_enabled;
+  showPowerState(data.display_enabled);
   showConditionalFields();
 }
 function collectSettings() {
@@ -58,6 +65,26 @@ async function saveSettings(settings) {
 
 form.addEventListener('change', showConditionalFields);
 form.elements.brightness.addEventListener('input', showConditionalFields);
+powerButton.addEventListener('click', async () => {
+  if (!savedSettings) return;
+  powerButton.disabled = true;
+  powerMessage.textContent = 'Updating…';
+  try {
+    const response = await apiFetch('/api/display', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({display_enabled: !savedSettings.display_enabled}),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Could not change display power');
+    savedSettings.display_enabled = data.display_enabled;
+    showPowerState(data.display_enabled);
+    powerMessage.textContent = data.display_enabled ? 'Display is on.' : 'Display is off.';
+  } catch (error) {
+    powerMessage.textContent = error.message;
+  } finally {
+    powerButton.disabled = false;
+  }
+});
 form.addEventListener('submit', async event => {
   event.preventDefault();
   const button = document.querySelector('#save');
@@ -76,12 +103,13 @@ async function refreshStatus() {
     if (!response.ok) throw new Error('Status unavailable');
     const fresh = data.updated_at && Date.now() - new Date(data.updated_at).getTime() < 45000;
     document.querySelector('#connection').textContent = !fresh ? 'Display starting' :
-      data.state === 'delayed' ? 'Feed delayed' : 'Pi online';
-    document.querySelector('#connection').classList.toggle('online', fresh && data.state === 'live');
+      data.state === 'off' ? 'Display off' : data.state === 'delayed' ? 'Feed delayed' : 'Pi online';
+    document.querySelector('#connection').classList.toggle('online', fresh &&
+      (data.state === 'live' || data.state === 'off'));
     document.querySelector('#active-title').textContent = data.title || 'Starting…';
     document.querySelector('#active-detail').textContent = data.detail || 'Waiting for flight data';
     const progress = document.querySelector('#flight-progress');
-    progress.hidden = data.mode !== 'flight' || data.progress_percent == null;
+    progress.hidden = data.state === 'off' || data.mode !== 'flight' || data.progress_percent == null;
     if (!progress.hidden) {
       document.querySelector('#progress-bar').value = data.progress_percent;
       document.querySelector('#progress-caption').textContent = `${data.progress_percent}% of route · approximate`;

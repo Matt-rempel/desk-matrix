@@ -506,7 +506,10 @@ def main() -> int:
     index = 0
     nearby_failed = False
     track_failed = False
-    show(screen_top, screen_bottom, 0)
+    if settings.display_enabled:
+        show(screen_top, screen_bottom, 0)
+    else:
+        matrix.Clear()
     try:
         while running:
             now = time.monotonic()
@@ -520,8 +523,11 @@ def main() -> int:
                         if updated != settings:
                             old = settings
                             settings = updated
+                            if old.display_enabled and not settings.display_enabled:
+                                matrix.Clear()
                             index = 0
                             screen_end = 0
+                            next_status = 0
                             location_changed = ((old.lat, old.lon, old.radius) !=
                                                 (settings.lat, settings.lon, settings.radius))
                             target_changed = ((old.mode, old.flight) !=
@@ -657,19 +663,23 @@ def main() -> int:
                                text_width(screen_bottom) - 32)
                 screen_end = now + max(settings.rotate, 4 + max(0, overflow) / 8)
 
-            show(screen_top, screen_bottom, now - screen_start,
-                 error=screen_bottom == "API DELAY", dots=screen_dots,
-                 active_dot=screen_active_dot, progress=screen_progress, icon=screen_icon)
+            if settings.display_enabled:
+                show(screen_top, screen_bottom, now - screen_start,
+                     error=screen_bottom == "API DELAY", dots=screen_dots,
+                     active_dot=screen_active_dot, progress=screen_progress, icon=screen_icon)
             if now >= next_status:
                 next_status = now + 5
                 try:
                     _write_status({
-                        "state": "delayed" if failed else "live",
+                        "state": ("off" if not settings.display_enabled else
+                                  "delayed" if failed else "live"),
+                        "display_enabled": settings.display_enabled,
                         "mode": settings.mode,
-                        "title": screen_top,
-                        "detail": screen_bottom,
+                        "title": screen_top if settings.display_enabled else "DISPLAY OFF",
+                        "detail": screen_bottom if settings.display_enabled else "Turn on in settings",
                         "progress_percent": (round(screen_progress * 100)
-                                             if screen_progress is not None else None),
+                                             if settings.display_enabled and screen_progress is not None
+                                             else None),
                         "updated_at": datetime.now(timezone.utc).isoformat(),
                         "nearby": [{"callsign": item.callsign, "distance_nm": item.distance_nm,
                                     "altitude_ft": item.altitude_ft}

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -17,6 +18,7 @@ HERE = Path(__file__).parent
 STATUS_PATH = STATE_DIR / "status.json"
 TOKEN_PATH = STATE_DIR / "web-token"
 PUBLIC_HOST_PATH = STATE_DIR / "public-host"
+SETTINGS_WRITE_LOCK = threading.Lock()
 
 
 class BoundedHTTPServer(ThreadingHTTPServer):
@@ -58,7 +60,7 @@ class Handler(BaseHTTPRequestHandler):
             return False
         supplied = self.headers.get("X-Flightboard-Key", "")
         if len(supplied) != 64 or not secrets.compare_digest(supplied, expected):
-            self._json(401, {"error": "Enter the pairing key shown during activation"})
+            self._json(401, {"error": "Enter the pairing key shown during installation"})
             return False
         return True
 
@@ -102,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json(404, {"error": "Not found"})
 
     def do_POST(self):
-        if self.path != "/api/settings":
+        if self.path not in ("/api/settings", "/api/display"):
             self._json(404, {"error": "Not found"})
             return
         if not self._authorized():
@@ -130,8 +132,21 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < length <= 8192:
                 raise ValueError("Settings request is too large or empty")
             data = json.loads(self.rfile.read(length))
-            settings = validate_settings(data)
-            save_settings(settings, DEFAULT_PATH)
+            with SETTINGS_WRITE_LOCK:
+                current = load_settings(DEFAULT_PATH)
+                if self.path == "/api/display":
+                    if (not isinstance(data, dict) or set(data) != {"display_enabled"}
+                            or not isinstance(data["display_enabled"], bool)):
+                        raise ValueError("Send display_enabled as on or off")
+                    settings = replace(current, display_enabled=data["display_enabled"])
+                else:
+                    if not isinstance(data, dict):
+                        raise ValueError("Settings must be an object")
+                    # The separate power button owns this flag. Saving other
+                    # form edits must not turn the panel back on.
+                    settings = validate_settings({**data,
+                                                  "display_enabled": current.display_enabled})
+                save_settings(settings, DEFAULT_PATH)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._json(400, {"error": str(exc)})
             return

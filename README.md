@@ -128,7 +128,10 @@ display shows `WAITING`.
 
 The settings page controls nearby/follow mode, location and radius, number of
 planes, screen time, colors, icons, day brightness, and optional night dimming
-in the configured time zone. Changes are applied without restarting.
+in the configured time zone. Its **Turn display off/on** button blanks or
+restores the LEDs immediately while the Pi and web page stay available. The
+choice survives a restart; off does not disconnect electrical power from the
+Pi or panel. Other settings changes are applied without restarting.
 
 ## Data and limits
 
