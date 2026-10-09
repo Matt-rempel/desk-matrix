@@ -80,9 +80,17 @@ function optionField(blockId, name, spec, options, set) {
     let choices = spec.choices || [];
     if (!choices.length && name === 'name') choices = state.catalog?.icons || [];
     const reflow = name === 'source';
+    // Long lists (world clock cities) read better as a dropdown with full names.
+    if (choices.length > 12) {
+      const id = nextId('opt');
+      const select = h('select', { id, class: 'input' },
+        choices.map((c) => h('option', { value: c, selected: c === value || null }, spec.labels?.[c] || choiceLabel(c))));
+      select.addEventListener('change', () => set(select.value, reflow));
+      return h('div', { class: 'field' }, h('label', { class: 'field-label', for: id }, label), select);
+    }
     return h('div', { class: 'field' },
       h('div', { class: 'field-label', id: nextId('lbl') }, label),
-      chips({ label, value, choices: choices.map((c) => ({ id: c, label: choiceLabel(c) })), onChange: (v) => set(v, reflow) }));
+      chips({ label, value, choices: choices.map((c) => ({ id: c, label: spec.labels?.[c] || choiceLabel(c) })), onChange: (v) => set(v, reflow) }));
   }
   if (type === 'date') {
     const id = nextId('opt');

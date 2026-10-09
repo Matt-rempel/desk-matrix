@@ -8,6 +8,7 @@ import zlib
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable, NamedTuple
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import catalog
 from render import ICONS, fit_text, hex_color, jround, measure, mix, rasterize
@@ -248,6 +249,47 @@ def _weekday_strings(now: datetime, width: int) -> list[str]:
 
 def b_weekday(s: Slot) -> list[dict]:
     return [T(s.rect, _weekday_strings(s.ctx.now, s.rect.w), s.color)]
+
+
+NIGHT_BLUE = "#7CB8FF"
+
+
+def city_time(code: str, now: datetime) -> tuple[datetime, list[str]] | None:
+    """Local time in a catalog city and its offset from the device, as candidate
+    strings from longest to shortest ("+7H"; "+5:30" or "+5.5")."""
+    city = catalog.CITIES.get(code)
+    if not city:
+        return None
+    try:
+        there = now.astimezone(ZoneInfo(city[1]))
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+    minutes = round((there.utcoffset() - now.utcoffset()).total_seconds() / 60)
+    sign = "-" if minutes < 0 else "+"
+    hours, rest = divmod(abs(minutes), 60)
+    if not rest:
+        return there, [f"{sign}{hours}H"]
+    return there, [f"{sign}{hours}:{rest:02d}", f"{sign}{abs(minutes) / 60:.1f}"]
+
+
+def b_world(s: Slot) -> list[dict]:
+    r, code = s.rect, s.opt("city")
+    found = city_time(code, s.ctx.now)
+    if not found:
+        return s.placeholder(["SET UP", "SET"])
+    there, offset = found
+    label = (s.opt("label") or code).strip().upper()[:4] or code
+    value = clock_text(there, s.opt("h24"))
+    night = there.hour < 6 or there.hour >= 20
+    color = s.accent(NIGHT_BLUE) if night else s.color
+    if there.date() != s.ctx.now.date():
+        offset = [WEEKDAYS[there.weekday()][:3]]
+    if r.full:
+        label_w = measure(label, "3x5")[0]
+        return [T(r.sub(0, 0, r.w, 10), [value], color),
+                T(r.sub(0, 11, label_w, 5), [label], s.color, a="l"),
+                T(r.sub(label_w + 2, 11, r.w - label_w - 2, 5), offset, dim(s.color, .7), a="r")]
+    return [T(r, [f"{label} {value}", value], color)]
 
 
 def b_analog(s: Slot) -> list[dict]:
@@ -965,7 +1007,7 @@ RENDERERS: dict[str, Callable[[Slot], list[dict]]] = {
     "plane_count": b_plane_count, "countdown": b_countdown, "timer": b_timer, "text": b_text,
     "progress": b_progress, "spark": b_spark, "icon": b_icon, "art": b_art, "feed": b_feed,
     "calendar_next": b_calendar, "metar": b_metar, "iss": b_iss, "health": b_health,
-    "analog_clock": b_analog, "fuzzy_time": b_fuzzy, "radar": b_radar, "sun_arc": b_sun_arc,
+    "world_clock": b_world, "analog_clock": b_analog, "fuzzy_time": b_fuzzy, "radar": b_radar, "sun_arc": b_sun_arc,
     "hourly_graph": b_hourly, "habit_week": b_habit, "life": b_life, "fire": b_fire, "none": b_none,
 }
 

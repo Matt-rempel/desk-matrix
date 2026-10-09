@@ -96,6 +96,26 @@ def _block(name, glyph, category, options=None, min_w=8, min_h=5, needs=()):
 
 ICON_NAMES = list(ICONS)
 
+# World clock cities: short code shown on the panel, name for the settings page.
+CITIES = {
+    "HNL": ("Honolulu", "Pacific/Honolulu"), "ANC": ("Anchorage", "America/Anchorage"),
+    "VAN": ("Vancouver", "America/Vancouver"), "LAX": ("Los Angeles", "America/Los_Angeles"),
+    "CGY": ("Calgary", "America/Edmonton"), "DEN": ("Denver", "America/Denver"),
+    "MEX": ("Mexico City", "America/Mexico_City"), "CHI": ("Chicago", "America/Chicago"),
+    "TOR": ("Toronto", "America/Toronto"), "NYC": ("New York", "America/New_York"),
+    "HFX": ("Halifax", "America/Halifax"), "SAO": ("São Paulo", "America/Sao_Paulo"),
+    "UTC": ("UTC", "UTC"), "LDN": ("London", "Europe/London"), "LIS": ("Lisbon", "Europe/Lisbon"),
+    "PAR": ("Paris", "Europe/Paris"), "BER": ("Berlin", "Europe/Berlin"), "ROM": ("Rome", "Europe/Rome"),
+    "ATH": ("Athens", "Europe/Athens"), "IST": ("Istanbul", "Europe/Istanbul"),
+    "CAI": ("Cairo", "Africa/Cairo"), "NBO": ("Nairobi", "Africa/Nairobi"),
+    "JNB": ("Johannesburg", "Africa/Johannesburg"), "DXB": ("Dubai", "Asia/Dubai"),
+    "DEL": ("Delhi", "Asia/Kolkata"), "BKK": ("Bangkok", "Asia/Bangkok"),
+    "SIN": ("Singapore", "Asia/Singapore"), "HKG": ("Hong Kong", "Asia/Hong_Kong"),
+    "SHA": ("Shanghai", "Asia/Shanghai"), "SEL": ("Seoul", "Asia/Seoul"),
+    "TYO": ("Tokyo", "Asia/Tokyo"), "SYD": ("Sydney", "Australia/Sydney"),
+    "AKL": ("Auckland", "Pacific/Auckland"),
+}
+
 BLOCKS = {
     "time": _block("Time", "10:24", "time", {
         "h24": _bool(True), "colon_blink": _bool(False),
@@ -148,6 +168,10 @@ BLOCKS = {
         "accent": _color(), "icon_color": _color()}, 11, 5, ["iss"]),
     "health": _block("Pi health", "48°", "data", {
         "field": _enum("cpu", "cpu", "net", "feed"), "accent": _color()}, 11, 5, ["health"]),
+    "world_clock": _block("World clock", "LDN", "time", {
+        "city": {"type": "enum", "default": "LDN", "choices": list(CITIES),
+                 "labels": {code: name for code, (name, _) in CITIES.items()}},
+        "label": _str("", 4), "h24": _bool(True), "accent": _color()}, 17, 5),
     "analog_clock": _block("Analog clock", "◷", "time", {
         "accent": _color(), "face": _color()}, 15, 15),
     "fuzzy_time": _block("Time in words", "HALF", "time", {"accent": _color()}, 32, 16),
@@ -190,6 +214,13 @@ BUILTIN_SCREENS = [
         "dial", "Dial · weekday", "Offline"),
     _screen("time-words", "In words", "full", [
         _slot("fuzzy_time", INK, accent=AMBER)], "words", "Fuzzy time", "Offline"),
+    _screen("time-world", "World clocks", "three", [
+        _slot("world_clock", INK, city="LDN"), _slot("world_clock", INK, city="NYC"),
+        _slot("world_clock", INK, city="TYO")],
+        "world", "Three cities", "Offline"),
+    _screen("time-world-one", "World clock", "full", [
+        _slot("world_clock", INK, city="TYO", accent="#7CB8FF")],
+        "world", "One city, big", "Offline"),
     _screen("time-daybar", "Day progress", "two", [
         _slot("time", INK), _slot("progress", "#7CD8FF", source="day")],
         "clock", "How much day is left", "Offline"),
@@ -265,7 +296,8 @@ BUILTINS = {screen["id"]: screen for screen in BUILTIN_SCREENS}
 SHELVES = [
     {"id": "time", "title": "Time", "source": "Offline",
      "blurb": "Clocks that read from across the room.",
-     "items": ["time-big", "time-classic", "time-analog", "time-words", "time-daybar", "night-clock"]},
+     "items": ["time-big", "time-classic", "time-analog", "time-words", "time-world",
+               "time-world-one", "time-daybar", "night-clock"]},
     {"id": "sky", "title": "Sky", "source": "adsb.fi · ADSBdb",
      "blurb": "Planes, the ISS, and the sun from your spot on the map.",
      "items": ["sky-nearby", "sky-follow", "sky-radar", "sky-iss", "sky-sun"]},

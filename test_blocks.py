@@ -144,6 +144,26 @@ class BlockBehaviourTests(unittest.TestCase):
         ctx = RenderContext(**{**self.ctx.__dict__, **changes})
         return render_screen(item, ctx, strict=True)
 
+    def test_world_clock(self):
+        morning = datetime(2026, 10, 9, 8, 24, tzinfo=MDT)
+        london = self.render(one("world_clock", city="LDN"), now=morning)
+        self.assertEqual(texts(london), [["15:24"], ["LDN"], ["+7H"]])
+        self.assertEqual(london[0]["c"], "#FFFFFF")  # daytime in London
+        # Half-hour zones fall back to a decimal when the label leaves no room.
+        delhi = self.render(one("world_clock", city="DEL", label="mum"), now=morning)
+        self.assertEqual(texts(delhi), [["19:54"], ["MUM"], ["+11:30", "+11.5"]])
+        # A different date shows its weekday; night uses the accent (soft blue by default).
+        tokyo = self.render(one("world_clock", city="TYO", h24=False), now=morning)
+        self.assertEqual(texts(tokyo), [["11:24"], ["TYO"], ["+15H"]])
+        self.assertEqual(tokyo[0]["c"], blocks.NIGHT_BLUE)  # 23:24 there
+        afternoon = morning.replace(hour=16)
+        tomorrow = self.render(one("world_clock", city="TYO"), now=afternoon)
+        self.assertEqual(texts(tomorrow), [["07:24"], ["TYO"], ["SAT"]])
+        row = self.render(screen("three", ("world_clock", "#FFFFFF", {"city": "NYC"}),
+                                 ("none", None, {}), ("none", None, {})), now=morning)
+        self.assertEqual(texts(row), [["NYC 10:24", "10:24"]])
+        self.assertIsNone(blocks.city_time("XXX", morning))
+
     def test_time_options(self):
         afternoon = datetime(2026, 10, 9, 16, 24, 1, tzinfo=MDT)
         self.assertEqual(texts(self.render(one("time", h24=False), now=afternoon)), [["4:24"]])

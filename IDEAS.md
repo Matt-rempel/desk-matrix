@@ -24,6 +24,7 @@ rows. Longer details can scroll, but a glance should still make sense.
 | Sports score | Fair | Team choice and licensed/live feed | Done via a custom JSON feed |
 | ISS overhead pass | Good | Location and orbital data, refreshed periodically | Partly: current distance and direction; pass prediction needs SGP4 |
 | Market price | Fair | Ticker and market feed; numbers can change quickly | Done via a custom JSON feed with sparkline |
+| World clocks | Excellent | Offline; 33 built-in cities and the Pi's time zone database | Done: World clocks (three cities), World clock (one city), world clock block |
 
 ## Still open
 
