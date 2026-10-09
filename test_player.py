@@ -1,13 +1,12 @@
 import unittest
 from datetime import datetime
-from types import SimpleNamespace
 from zoneinfo import ZoneInfo
 
-import blocks
 import catalog
 import player
 from player import Player, apply_motion, blend, in_window, resolve_screen, timer_at
 from render import BLACK, mix, parse_color
+from settings import validate_settings
 
 UTC = ZoneInfo("UTC")
 # Friday 2026-10-09 12:00 UTC
@@ -15,10 +14,8 @@ FRIDAY_NOON = datetime(2026, 10, 9, 12, 0, tzinfo=UTC).timestamp()
 
 
 def settings(**extra):
-    base = dict(timezone="UTC", night_start="22:00", night_end="07:00", night_palette=False,
-                temp_unit="C", distance_unit="nm")
-    base.update(extra)
-    return SimpleNamespace(**base)
+    return validate_settings({"timezone": "UTC", "night_start": "22:00", "night_end": "07:00",
+                              **extra})
 
 
 def text_screen(sid, text, color="#FFFFFF", motion="still"):
@@ -75,15 +72,15 @@ class HelperTests(unittest.TestCase):
     def test_timer_phases_roll_from_ends_at(self):
         timer = {"state": "running", "phase": "work", "work_min": 25, "break_min": 5,
                  "ends_at": 1000.0, "remaining_s": None, "cycles": 2}
-        self.assertEqual(timer_at(timer, 999), (timer, []))
+        self.assertEqual(timer_at(timer, 999)[1], None)
         current, ended = timer_at(timer, 1010)
         self.assertEqual((current["phase"], current["ends_at"], current["cycles"]), ("break", 1300.0, 3))
-        self.assertEqual(ended, [1000.0])
+        self.assertEqual(ended, 1000.0)
         current, ended = timer_at(timer, 1400)
-        self.assertEqual((current["state"], current["phase"], current["ends_at"]), ("idle", "work", None))
-        self.assertEqual(ended, [1000.0, 1300.0])
+        self.assertEqual((current["state"], current["phase"], current["ends_at"]), ("running", "work", 2800.0))
+        self.assertEqual(ended, 1300.0)
         paused = {**timer, "state": "paused", "remaining_s": 60}
-        self.assertEqual(timer_at(paused, 5000)[1], [])
+        self.assertEqual(timer_at(paused, 5000), (paused, None))
 
 
 class PlaylistTests(unittest.TestCase):
@@ -246,13 +243,14 @@ class EffectTests(unittest.TestCase):
         lib = library(always=[("time-classic", 10)])
         day = Player(lib, settings(), now_fn=clock).tick(0, {})[0]
         self.assertIn(parse_color(catalog.INK), day)
-        night = Player(lib, settings(night_palette=True), now_fn=clock).tick(0, {})[0]
+        self.assertEqual(Player(lib, settings(night_enabled=True), now_fn=clock).tick(0, {})[0], day)
+        night = Player(lib, settings(night_palette=True, night_enabled=True), now_fn=clock).tick(0, {})[0]
         red = parse_color(catalog.PALETTES["night"]["primary"])
         self.assertIn(red, night)
         for pixel in night:
             self.assertTrue(pixel == BLACK or (pixel[0] >= pixel[1] and pixel[0] >= pixel[2]), pixel)
         clock.value = FRIDAY_NOON
-        noon = Player(lib, settings(night_palette=True), now_fn=clock).tick(0, {})[0]
+        noon = Player(lib, settings(night_palette=True, night_enabled=True), now_fn=clock).tick(0, {})[0]
         self.assertIn(parse_color(catalog.INK), noon)
 
 
@@ -336,7 +334,7 @@ class InterruptTests(unittest.TestCase):
 
     def test_timer_that_ended_long_ago_does_not_flash(self):
         timers = {"focus-pomodoro": {"state": "running", "phase": "work", "work_min": 25,
-                                     "break_min": 5, "ends_at": FRIDAY_NOON - 3600,
+                                     "break_min": 5, "ends_at": FRIDAY_NOON - 3500,  # last phase ended 1400 s ago
                                      "remaining_s": None, "cycles": 0}}
         p, _ = self.make({"timer_done": {"enabled": True}}, timers=timers)
         self.assertIsNone(p.tick(0, {})[1]["interrupt"])

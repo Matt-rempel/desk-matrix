@@ -415,6 +415,16 @@ class RunLoopTests(unittest.TestCase):
         self.assertEqual(status["pinned"], {"screen_id": "sky-sun", "until": None})
         self.assertEqual(status["detail"], "Pinned")
 
+    def test_real_library_is_migrated_on_first_run(self):
+        save_settings(validate_settings({"mode": "clock"}), self.settings_path)
+        matrix = FakeMatrix()
+        aircraft = app.AircraftProvider(Settings(), executor=InlineExecutor())
+        app.run(matrix, self.args(), stop_after=3, state_dir=self.dir, providers=FakeProviders(),
+                aircraft=aircraft, monotonic=Ticker(0.05), sleep=lambda _s: None)
+        self.assertTrue(self.library_path.exists())
+        status = json.loads((self.dir / "status.json").read_text())
+        self.assertEqual(status["screen_id"], "time-classic")
+
     def test_build_status_shapes(self):
         info = {"screen_id": "sky-follow", "screen_name": "Follow a flight", "moment": "Morning",
                 "pinned": False, "pin": None, "interrupt": None, "moment_brightness": 50}

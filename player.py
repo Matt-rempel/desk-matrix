@@ -16,6 +16,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import blocks
 import catalog
+import library
+from settings import is_night
 from render import BLACK, HEIGHT, WIDTH, jround, mix, parse_color
 
 PIXELS = WIDTH * HEIGHT
@@ -38,8 +40,7 @@ TIMER_SHOW_S = 5
 TIMER_LATE_S = 120  # a phase that ended longer ago (e.g. while powered off) does not flash
 INTERRUPT_NEEDS = {"plane_overhead": {"aircraft:nearby"}, "rain_soon": {"weather"},
                    "iss_overhead": {"iss"}, "timer_done": set()}
-INTERRUPT_DEFAULTS = {"plane_overhead": {"radius_nm": 3, "max_alt_ft": 10000, "seconds": 15},
-                      "rain_soon": {"minutes": 30}}
+INTERRUPT_DEFAULTS = library.INTERRUPT_DEFAULTS
 WIPE_ORDER = tuple(random.Random(0x5EED).sample(range(PIXELS), PIXELS))
 WHITE = (255, 255, 255)
 
@@ -102,30 +103,24 @@ def _seconds(value) -> float:
     return max(MIN_SECONDS, min(MAX_SECONDS, float(value)))
 
 
-def timer_at(timer: dict, now: float) -> tuple[dict, list[float]]:
-    """The timer as it stands at `now`, plus the phase end times that have passed.
+def timer_at(timer: dict, now: float) -> tuple[dict, float | None]:
+    """The timer as it stands at `now` and, if a phase has ended, when the latest one ended.
 
-    A running work phase rolls into its break (counting a cycle), and a
-    finished break leaves the timer idle and ready for the next cycle.
+    Phases roll work -> break -> work via `library.advance_timer`.
     """
     current = dict(timer) if isinstance(timer, dict) else {}
-    ended: list[float] = []
-    for _ in range(2):
-        ends = current.get("ends_at")
-        if (current.get("state") != "running" or isinstance(ends, bool)
-                or not isinstance(ends, (int, float)) or ends > now):
-            break
-        ended.append(float(ends))
-        if current.get("phase", "work") != "break":
-            cycles = current.get("cycles")
-            current["cycles"] = (cycles if isinstance(cycles, int) else 0) + 1
-            rest = current.get("break_min")
-            rest = rest if isinstance(rest, (int, float)) and not isinstance(rest, bool) else 5
-            if rest > 0:
-                current.update(phase="break", ends_at=ends + rest * 60, remaining_s=None)
-                continue
-        current.update(state="idle", phase="work", ends_at=None, remaining_s=None)
-    return current, ended
+    ends = current.get("ends_at")
+    if (current.get("state") != "running" or isinstance(ends, bool)
+            or not isinstance(ends, (int, float))):
+        return current, None
+    try:
+        current = library.advance_timer(current, now)
+        if ends > now:
+            return current, None
+        minutes = current["work_min"] if current["phase"] == "work" else current["break_min"]
+        return current, float(current["ends_at"] - minutes * 60)
+    except (KeyError, TypeError, ValueError, ZeroDivisionError):
+        return dict(timer), None
 
 
 # --- pixel effects -------------------------------------------------------------------
@@ -230,7 +225,7 @@ class Player:
 
     # -- time ----------------------------------------------------------------------
     def _local(self, now: float) -> datetime:
-        name = getattr(self.settings, "timezone", "UTC") or "UTC"
+        name = self.settings.timezone
         if name != self._zone_name:
             try:
                 self._zone = ZoneInfo(name)
@@ -239,9 +234,8 @@ class Player:
             self._zone_name = name
         return datetime.fromtimestamp(now, self._zone)
 
-    def is_night(self, local: datetime) -> bool:
-        return in_window(getattr(self.settings, "night_start", "22:00"),
-                         getattr(self.settings, "night_end", "07:00"), local)
+    def night_palette(self, local: datetime) -> bool:
+        return self.settings.night_palette and is_night(self.settings, local)
 
     # -- playlist --------------------------------------------------------------------
     @property
@@ -320,12 +314,11 @@ class Player:
         # timer_done preempts any other interruption; its bookkeeping runs even when off
         done = None
         for timer_id, timer in self._timers_raw().items():
-            for ends in timer_at(timer, now)[1]:
-                key = (timer_id, ends)
-                if key not in self._timer_seen:
-                    self._timer_seen.add(key)
-                    if now - ends <= TIMER_LATE_S:
-                        done = timer_id
+            ended = timer_at(timer, now)[1]
+            if ended is not None and (timer_id, ended) not in self._timer_seen:
+                self._timer_seen.add((timer_id, ended))
+                if now - ended <= TIMER_LATE_S:
+                    done = timer_id
         self._timer_seen = {key for key in self._timer_seen if now - key[1] < 86400}
         iss = data.get("iss") if isinstance(data.get("iss"), dict) else None
         iss_new_pass = False
@@ -383,8 +376,7 @@ class Player:
         habits = self.library.get("habits")
         return blocks.RenderContext(
             now=local, elapsed=elapsed, data=data,
-            units={"temp": getattr(self.settings, "temp_unit", "C") or "C",
-                   "distance": getattr(self.settings, "distance_unit", "nm") or "nm"},
+            units={"temp": self.settings.temp_unit, "distance": self.settings.distance_unit},
             art=art, habits=habits if isinstance(habits, dict) else {},
             timers={k: timer_at(v, now)[0] for k, v in self._timers_raw().items()})
 
@@ -469,7 +461,7 @@ class Player:
             self._transition_started = mono
 
         elapsed = max(0.0, mono - self._screen_started)
-        night = bool(getattr(self.settings, "night_palette", False)) and self.is_night(local)
+        night = self.night_palette(local)
         if flashing:
             pixels = self._flash(screen, mono - interrupt["started"], night)
         else:

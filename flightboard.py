@@ -25,6 +25,7 @@ import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 
+import library
 import render
 from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings
 
@@ -587,13 +588,6 @@ def build_status(settings, info: dict, pixels, data: dict, now: float | None = N
     }
 
 
-def brightness_for(settings, moment_brightness: int | None) -> int:
-    try:
-        return effective_brightness(settings, moment_brightness=moment_brightness)
-    except TypeError:  # settings.py from before the lineup
-        return effective_brightness(settings)
-
-
 # --- main loop ----------------------------------------------------------------------------
 
 FRAME_S = 0.05
@@ -606,7 +600,7 @@ DATA_S = 30.0
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--settings", type=Path, default=DEFAULT_PATH)
-    parser.add_argument("--library", type=Path, help="library.json (default: next to settings)")
+    parser.add_argument("--library", type=Path, help="library.json (default: in the state directory)")
     parser.add_argument("--lat", type=float)
     parser.add_argument("--lon", type=float)
     parser.add_argument("--label")
@@ -636,22 +630,11 @@ def configured(args) -> Settings:
 
 
 def library_path(args) -> Path:
-    if getattr(args, "library", None):
-        return args.library
-    try:
-        import library
-        return Path(library.LIBRARY_PATH)
-    except (ImportError, AttributeError):
-        return STATE_DIR / "library.json"
+    return getattr(args, "library", None) or library.LIBRARY_PATH
 
 
 def load_library(path: Path, settings) -> dict:
-    """library.load_library when available (validates and migrates); raises on bad files."""
-    try:
-        import library
-    except ImportError:
-        _log("library.py is missing; playing the default lineup")
-        return {}
+    """Validated library.json, migrated from settings on first run; ValueError when invalid."""
     return library.load_library(path, settings)
 
 
@@ -738,7 +721,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
             except Exception as exc:  # noqa: BLE001 - one bad screen must not stop the panel
                 _log(f"render error: {exc}")
             if settings.display_enabled:
-                wanted = brightness_for(settings, info.get("moment_brightness"))
+                wanted = effective_brightness(settings, moment_brightness=info.get("moment_brightness"))
                 if wanted != brightness:
                     brightness = matrix.brightness = wanted
                     shown = None  # brightness applies when pixels are set
