@@ -269,7 +269,10 @@ export function render(root, { id, go }) {
     const s = state.settings || {};
     const nightRow = toggleRow({
       title: 'Night look',
-      detail: `Switch to Night red from ${s.night_start || '22:00'} to ${s.night_end || '07:00'} (all screens)`,
+      // The player only applies it during night hours, which need Device › Dim at night.
+      detail: s.night_enabled
+        ? `Switch to Night red from ${s.night_start || '22:00'} to ${s.night_end || '07:00'} (all screens)`
+        : 'Switch to Night red during night hours (turn on Device › Dim at night to set them)',
       pressed: !!s.night_palette,
       onChange: async (v) => {
         try { await saveSettings({ night_palette: v }); toast(v ? 'Night look on.' : 'Night look off.'); }

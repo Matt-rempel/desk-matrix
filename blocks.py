@@ -1055,3 +1055,21 @@ def sample_context(now: datetime | None = None, elapsed: float = 0.0) -> RenderC
     return RenderContext(now=now or datetime.fromisoformat(catalog.SAMPLE_NOW), elapsed=elapsed,
                          data=catalog.sample_data(), art=dict(catalog.BUILTIN_ART),
                          habits=dict(catalog.SAMPLE_HABITS), timers=dict(catalog.SAMPLE_TIMERS))
+
+
+def ascii_preview(screen: dict, ctx: RenderContext | None = None) -> str:
+    """16 lines of 32 characters ('#' lit, '.' dark) for reviewing a screen in a terminal."""
+    pixels = frame(screen, ctx or sample_context())
+    return "\n".join("".join("#" if any(pixels[y * 32 + x]) else "." for x in range(32))
+                     for y in range(16))
+
+
+if __name__ == "__main__":
+    # python3 blocks.py [screen id ...]: print built-in screens with the sample data.
+    import sys
+    wanted = sys.argv[1:] or [s["id"] for s in catalog.BUILTIN_SCREENS]
+    by_id = {s["id"]: s for s in catalog.BUILTIN_SCREENS}
+    for screen_id in wanted:
+        if screen_id not in by_id:
+            raise SystemExit(f"Unknown screen id: {screen_id}")
+        print(f"{screen_id} ({by_id[screen_id]['name']})\n{ascii_preview(by_id[screen_id])}\n")

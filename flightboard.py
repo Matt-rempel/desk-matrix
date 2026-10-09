@@ -585,6 +585,9 @@ def build_status(settings, info: dict, pixels, data: dict, now: float | None = N
         "pinned": pin,
         "data_age": data_ages(data, now),
         "feed_age_s": health.get("feed_age_s"),
+        # Device › Custom JSON feeds shows each feed's last error and age.
+        "feeds": {feed_id: {"error": feed.get("error"), "age_s": _age_s(feed.get("updated_at"), now)}
+                  for feed_id, feed in (data.get("feeds") or {}).items() if isinstance(feed, dict)},
     }
 
 

@@ -43,6 +43,8 @@ function route() {
     return;
   }
   if (cleanup) { try { cleanup(); } catch { /* ignore */ } cleanup = null; }
+  // A sheet left open (e.g. browser Back while it is showing) would cover the new view.
+  for (const dialog of document.querySelectorAll('dialog.sheet[open]')) dialog.close();
   const r = parseRoute();
   main.replaceChildren();
   document.body.dataset.route = r.name;

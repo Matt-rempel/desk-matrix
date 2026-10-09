@@ -201,7 +201,7 @@ BUILTIN_SCREENS = [
         "sky", "Route progress", "adsb.fi · ADSBdb"),
     _screen("sky-radar", "Radar", "full", [_slot("radar", "#7CFF8A")],
             "sky", "Planes in range", "adsb.fi"),
-    _screen("sky-iss", "ISS pass", "full", [
+    _screen("sky-iss", "ISS now", "full", [
         _slot("iss", INK, accent=MUTED, icon_color="#C9D2FF")],
         "sky", "Where the station is", "wheretheiss.at"),
     _screen("sky-sun", "Sun arc", "full", [_slot("sun_arc", AMBER)],

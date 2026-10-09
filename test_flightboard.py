@@ -432,7 +432,9 @@ class RunLoopTests(unittest.TestCase):
                                          "route": "YYC>YVR", "icon": "plane"}],
                              "tracked": {"progress": 0.42}, "updated_at": "2026-10-09T16:00:00+00:00",
                              "error": None},
-                "health": {"net_ok": True, "feed_age_s": 3}}
+                "health": {"net_ok": True, "feed_age_s": 3},
+                "feeds": {"feed-0a1b2c3d": {"value": "5 MIN", "updated_at": "2026-10-09T16:00:00Z",
+                                            "error": "HTTP 404"}}}
         now = datetime(2026, 10, 9, 16, 0, 30, tzinfo=timezone.utc).timestamp()
         status = app.build_status(Settings(), info, [(255, 0, 0)] * 512, data, now)
         self.assertEqual(status["progress_percent"], 42)
@@ -443,6 +445,8 @@ class RunLoopTests(unittest.TestCase):
         self.assertEqual(status["data_age"], {"aircraft": 30, "weather": None, "metar": None,
                                               "iss": None, "calendar": None})
         self.assertEqual(status["frame"][:6], "ff0000")
+        # web/view-device.js reads status.feeds[<id>].error for each custom feed row.
+        self.assertEqual(status["feeds"], {"feed-0a1b2c3d": {"error": "HTTP 404", "age_s": 30}})
         pinned = app.build_status(Settings(), {**info, "pinned": True,
                                                "pin": {"screen_id": "x", "until": None}}, [], {}, now)
         self.assertIsNone(pinned["moment"])

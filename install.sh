@@ -7,6 +7,11 @@ CODE_DIR=/opt/flightboard
 STATE_DIR=/var/lib/flightboard
 DRIVER_COMMIT=51d3231e370593b60952b2c3b18d2e3802329f18
 SHOW_PAIRING=1
+# Python modules installed into $CODE_DIR; the web UI is copied to $CODE_DIR/web.
+APP_FILES="flightboard.py settings.py screens.py render.py catalog.py blocks.py providers.py library.py player.py web_server.py"
+WEB_REQUIRED="index.html app.css app.js"
+# The settings page before the screen gallery redesign kept these in $CODE_DIR.
+OBSOLETE_FILES="index.html app.css app.js"
 
 if [ "${1:-}" = "--no-pairing-link" ] && [ "$#" -eq 1 ]; then
   SHOW_PAIRING=0
@@ -26,9 +31,15 @@ if ! command -v apt-get >/dev/null 2>&1 || ! command -v systemctl >/dev/null 2>&
   printf 'Raspberry Pi OS or another Debian system with systemd is required.\n' >&2
   exit 1
 fi
-for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js flightboard.service flightboard-web.service; do
+for file in $APP_FILES flightboard.service flightboard-web.service; do
   if [ ! -f "$SOURCE_DIR/$file" ]; then
     printf 'Missing %s; run the installer from a complete checkout.\n' "$file" >&2
+    exit 1
+  fi
+done
+for file in $WEB_REQUIRED; do
+  if [ ! -f "$SOURCE_DIR/web/$file" ]; then
+    printf 'Missing web/%s; run the installer from a complete checkout.\n' "$file" >&2
     exit 1
   fi
 done
@@ -83,12 +94,13 @@ if [ -z "$dns_name" ]; then
   exit 1
 fi
 
-# Back up the small application files and units. The virtual environment and
-# saved settings stay in place across updates.
+# Back up the small application files, the web directory and units. The
+# virtual environment and saved settings stay in place across updates.
 backup=$(mktemp -d)
-for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js; do
+for file in $APP_FILES $OBSOLETE_FILES; do
   if [ -f "$CODE_DIR/$file" ]; then cp -p "$CODE_DIR/$file" "$backup/$file"; fi
 done
+if [ -d "$CODE_DIR/web" ]; then cp -Rp "$CODE_DIR/web" "$backup/web"; fi
 for unit in flightboard.service flightboard-web.service; do
   if [ -f "/etc/systemd/system/$unit" ]; then cp -p "/etc/systemd/system/$unit" "$backup/$unit"; fi
 done
@@ -98,13 +110,19 @@ on_exit() {
   trap - EXIT
   if [ "$result" -ne 0 ] && [ "$rollback" -eq 1 ]; then
     printf '\nInstall failed; restoring the previous application and services.\n' >&2
-    for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js; do
+    for file in $APP_FILES $OBSOLETE_FILES; do
       if [ -f "$backup/$file" ]; then
         sudo install -o root -g root -m 0644 "$backup/$file" "$CODE_DIR/$file"
       else
         sudo rm -f "$CODE_DIR/$file"
       fi
     done
+    sudo rm -rf "$CODE_DIR/web" "$CODE_DIR/web.new"
+    if [ -d "$backup/web" ]; then
+      sudo cp -R "$backup/web" "$CODE_DIR/web"
+      sudo chown -hR root:root "$CODE_DIR/web"
+      sudo chmod -R go-w "$CODE_DIR/web"
+    fi
     for unit in flightboard.service flightboard-web.service; do
       if [ -f "$backup/$unit" ]; then
         sudo install -o root -g root -m 0644 "$backup/$unit" "/etc/systemd/system/$unit"
@@ -123,8 +141,21 @@ on_exit() {
 }
 trap 'on_exit $?' EXIT
 
-for file in flightboard.py settings.py screens.py web_server.py index.html app.css app.js; do
+for file in $APP_FILES; do
   sudo install -o root -g root -m 0644 "$SOURCE_DIR/$file" "$CODE_DIR/$file"
+done
+# Stage the web UI beside the old one, then swap the whole directory.
+sudo rm -rf "$CODE_DIR/web.new"
+sudo install -d -o root -g root -m 0755 "$CODE_DIR/web.new"
+for path in "$SOURCE_DIR"/web/*; do
+  if [ -f "$path" ]; then
+    sudo install -o root -g root -m 0644 "$path" "$CODE_DIR/web.new/$(basename "$path")"
+  fi
+done
+sudo rm -rf "$CODE_DIR/web"
+sudo mv "$CODE_DIR/web.new" "$CODE_DIR/web"
+for file in $OBSOLETE_FILES; do
+  sudo rm -f "$CODE_DIR/$file"
 done
 sudo chown -hR root:root "$CODE_DIR"
 sudo chmod -R go-w "$CODE_DIR"
@@ -140,7 +171,10 @@ sudo chmod 0600 "$STATE_DIR/web-token"
 sudo -u flightboard test ! -w "$CODE_DIR/flightboard.py"
 sudo -u flightboard test -w "$STATE_DIR"
 sudo -u flightboard env FLIGHTBOARD_STATE_DIR="$STATE_DIR" \
-  "$CODE_DIR/.venv/bin/python" -c 'import sys; sys.path.insert(0,"/opt/flightboard"); import rgbmatrix, flightboard, web_server; from settings import Settings,validate_settings; validate_settings(Settings().to_dict())'
+  "$CODE_DIR/.venv/bin/python" -c 'import sys; sys.path.insert(0,"/opt/flightboard"); import rgbmatrix, flightboard, player, providers, web_server; from settings import Settings,validate_settings; validate_settings(Settings().to_dict())'
+sudo -u flightboard env FLIGHTBOARD_STATE_DIR="$STATE_DIR" \
+  /usr/bin/python3 -c 'import sys; sys.path.insert(0,"/opt/flightboard"); import web_server'
+sudo -u flightboard test -r "$CODE_DIR/web/index.html"
 
 for unit in flightboard.service flightboard-web.service; do
   sudo install -o root -g root -m 0644 "$SOURCE_DIR/$unit" "/etc/systemd/system/$unit"

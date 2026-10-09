@@ -35,6 +35,14 @@ def texts(layers):
 
 
 class CatalogTests(unittest.TestCase):
+    def test_ascii_preview_shape(self):
+        # CONTRIBUTING.md asks for this preview when a screen is added to catalog.py.
+        screen = next(s for s in catalog.BUILTIN_SCREENS if s["id"] == "time-classic")
+        lines = blocks.ascii_preview(screen).splitlines()
+        self.assertEqual(len(lines), 16)
+        self.assertTrue(all(len(line) == 32 and set(line) <= {"#", "."} for line in lines))
+        self.assertIn("#", "".join(lines))
+
     def test_builtins_are_valid_screens(self):
         self.assertTrue(PLAN_IDS <= set(catalog.BUILTINS))
         for item in catalog.BUILTIN_SCREENS:

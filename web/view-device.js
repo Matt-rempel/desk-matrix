@@ -53,7 +53,9 @@ export function render(root) {
         h('div', { class: 'field' }, h('label', { class: 'field-label', for: 'night-end' }, 'Until'), until)),
       h('div', { class: 'row row-sub' }, h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, 'Night brightness')),
         stepper({ label: 'night brightness', value: s().night_brightness ?? 30, min: 1, max: 100, step: 1, format: (v) => `${v}%`,
-          onChange: debounceSave((v) => quick({ night_brightness: v }, bMsg, 'Night brightness saved.')) })));
+          onChange: debounceSave((v) => quick({ night_brightness: v }, bMsg, 'Night brightness saved.')) })),
+      toggleRow({ title: 'Night red look', detail: 'Every screen switches to the Night red palette during these hours', pressed: !!s().night_palette,
+        onChange: (v) => quick({ night_palette: v }, bMsg, v ? 'Night look on.' : 'Night look off.') }));
   };
   renderNight();
   root.append(group('Brightness', 'bri-h',
@@ -276,8 +278,9 @@ export function render(root) {
   let lastAgeKey = '';
   const unsubscribe = subscribe((what) => {
     if (what === 'status' || what === 'settings') updateDevice();
-    if (what === 'status') {
-      const key = JSON.stringify([state.status?.data_age, state.status?.feeds]);
+    if (what === 'status' || what === 'settings' || what === 'library') {
+      // The calendar state and the feed count live in these rows too.
+      const key = JSON.stringify([state.status?.data_age, state.status?.feeds, s().calendar_ics_url, (state.library?.feeds || []).length]);
       if (key !== lastAgeKey && !feedsHost.querySelector('form') && !calForm.contains(document.activeElement)) { lastAgeKey = key; renderSources(); }
     }
     if (what === 'library') renderFeeds();

@@ -173,7 +173,12 @@ export function render(root, { params }) {
     const endId = nextId('end');
     const nameInput = h('input', { id: nameId, class: 'input', value: m.name, maxlength: '24' });
     nameInput.addEventListener('input', () => { m.name = nameInput.value; syncBar(); });
-    nameInput.addEventListener('change', () => renderMoments());
+    // Update the card title in place: re-rendering here would run inside another
+    // render's replaceChildren() when the change fires on blur (removing the input).
+    nameInput.addEventListener('change', () => {
+      const title = document.getElementById(`mt-${m.id}`);
+      if (title) title.textContent = m.name || 'Untitled';
+    });
     const start = h('input', { id: startId, type: 'time', class: 'input', value: m.start, required: true });
     const end = h('input', { id: endId, type: 'time', class: 'input', value: m.end, required: true });
     start.addEventListener('change', () => { if (start.value) { m.start = start.value; changed(); } });
