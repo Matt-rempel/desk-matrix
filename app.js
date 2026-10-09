@@ -30,7 +30,11 @@ function showPowerState(enabled) {
 
 function mode() { return form.querySelector('input[name="mode"]:checked').value; }
 function showConditionalFields() {
-  document.querySelector('#flight-field').hidden = mode() !== 'flight';
+  const selected = mode();
+  document.querySelector('#flight-field').hidden = selected !== 'flight';
+  form.elements.flight.required = selected === 'flight';
+  document.querySelector('#flight-settings').hidden = selected === 'clock';
+  document.querySelector('#icons-toggle').hidden = selected === 'clock';
   document.querySelector('#night-fields').hidden = !form.elements.night_enabled.checked;
   document.querySelector('#brightness-value').textContent = `${form.elements.brightness.value}%`;
 }
@@ -107,7 +111,9 @@ async function refreshStatus() {
     document.querySelector('#connection').classList.toggle('online', fresh &&
       (data.state === 'live' || data.state === 'off'));
     document.querySelector('#active-title').textContent = data.title || 'Starting…';
-    document.querySelector('#active-detail').textContent = data.detail || 'Waiting for flight data';
+    document.querySelector('#active-detail').textContent = data.detail || 'Waiting for the display';
+    document.querySelector('#preview-top').textContent = data.title || 'DESK';
+    document.querySelector('#preview-bottom').textContent = data.detail || 'MATRIX';
     const progress = document.querySelector('#flight-progress');
     progress.hidden = data.state === 'off' || data.mode !== 'flight' || data.progress_percent == null;
     if (!progress.hidden) {

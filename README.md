@@ -8,6 +8,8 @@ location, colors, brightness, and screen timing from a phone or computer.
 
 The application files and Linux services still use the `flightboard` name so
 existing installations can update without moving settings or changing units.
+The control page also shows weather and timer concepts as planned screens;
+they are not active modes yet.
 
 The first installation uses WinSport in Calgary as a sample location. **Change
 the location and time zone in settings for your own desk.**
