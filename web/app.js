@@ -82,9 +82,51 @@ function shellHeader() {
   powerEl.addEventListener('click', togglePower);
   const el = h('header', { class: 'topbar' },
     h('a', { class: 'brand', href: '#/', 'aria-label': 'Desk Matrix home' }, logo(), h('span', { class: 'brand-name' }, 'desk matrix')),
-    h('div', { class: 'topbar-right' }, pillEl, powerEl));
+    h('div', { class: 'topbar-right' }, pillEl, themeButton(), powerEl));
   updateShell();
   return el;
+}
+
+// ---- Theme toggle: System → Light → Dark ----------------------------------------
+const THEME_NAMES = { system: 'System', light: 'Light', dark: 'Dark' };
+const THEME_ICONS = {
+  system: ['M3 5h18v11H3z', 'M8 20h8', 'M12 16v4'],
+  light: ['M12 8a4 4 0 1 0 0 8a4 4 0 1 0 0-8', 'M12 2v2', 'M12 20v2', 'M4.9 4.9l1.4 1.4', 'M17.7 17.7l1.4 1.4', 'M2 12h2', 'M20 12h2', 'M4.9 19.1l1.4-1.4', 'M17.7 6.3l1.4-1.4'],
+  dark: ['M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5'],
+};
+
+function themeButton() {
+  const theme = window.deskTheme;
+  if (!theme) return null;
+  const btn = h('button', { type: 'button', class: 'icon-btn theme-btn' });
+  const sync = () => {
+    const current = theme.choice();
+    const next = theme.choices[(theme.choices.indexOf(current) + 1) % theme.choices.length];
+    btn.replaceChildren(svgIcon(THEME_ICONS[current]));
+    btn.setAttribute('aria-label', `Theme: ${THEME_NAMES[current]}. Switch to ${THEME_NAMES[next]}`);
+    btn.title = `Theme: ${THEME_NAMES[current]}`;
+    btn.dataset.next = next;
+  };
+  btn.addEventListener('click', () => {
+    const chosen = btn.dataset.next;
+    theme.set(chosen);
+    sync();
+    toast(chosen === 'system' ? `Theme follows your system (${document.documentElement.dataset.theme} now).` : `${THEME_NAMES[chosen]} theme.`);
+  });
+  sync();
+  return btn;
+}
+
+function svgIcon(paths) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 24 24', width: '18', height: '18', 'aria-hidden': 'true', fill: 'none', stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round', 'stroke-linejoin': 'round' })) svg.setAttribute(k, v);
+  for (const d of paths) {
+    const path = document.createElementNS(ns, 'path');
+    path.setAttribute('d', d);
+    svg.append(path);
+  }
+  return svg;
 }
 
 function powerIcon() {
