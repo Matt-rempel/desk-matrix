@@ -1,0 +1,25 @@
+[Unit]
+Description=Flightboard local settings page
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=flightboard
+Group=flightboard
+WorkingDirectory=/opt/flightboard
+Environment=FLIGHTBOARD_STATE_DIR=/var/lib/flightboard
+Environment=FLIGHTBOARD_BIND_HOST=127.0.0.1
+ExecStart=/usr/bin/python3 /opt/flightboard/web_server.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flightboard
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

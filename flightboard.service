@@ -1,0 +1,20 @@
+[Unit]
+Description=Flightboard aircraft display on HUB75 matrix
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/flightboard
+Environment=FLIGHTBOARD_STATE_DIR=/var/lib/flightboard
+ExecStart=/opt/flightboard/.venv/bin/python /opt/flightboard/flightboard.py
+Restart=on-failure
+RestartSec=10
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/flightboard
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

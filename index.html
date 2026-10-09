@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>Flightboard · Control</title>
+  <link rel="stylesheet" href="/app.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="header">
+      <div class="brand-mark" aria-hidden="true">✈</div>
+      <div><p class="eyebrow">LIVE AIRCRAFT DISPLAY</p><h1>Flightboard</h1></div>
+      <span class="connection" id="connection">Connecting</span>
+    </header>
+
+    <section class="hero" aria-labelledby="hero-title">
+      <div><p class="eyebrow">YOUR MATRIX</p><h2 id="hero-title">Make the sky yours.</h2>
+        <p>Set what appears on the Pi, then watch it update in a few seconds.</p></div>
+      <div class="matrix" aria-hidden="true"><span>✈ &nbsp;ACA150</span><span>YYC–YYZ</span><i></i></div>
+    </section>
+
+    <section class="card pairing" id="pairing" aria-labelledby="pairing-title">
+      <p class="eyebrow">PRIVATE CONTROL</p><h2 id="pairing-title">Pair this browser</h2>
+      <p>Paste the pairing key shown in the Pi installation terminal. It stays in this browser tab.</p>
+      <form id="pairing-form"><label for="pairing-key">Pairing key</label><input id="pairing-key" type="password" autocomplete="off" spellcheck="false" required><button type="submit">Connect</button></form>
+      <p id="pairing-error" role="alert"></p>
+    </section>
+    <div class="grid" id="controls" hidden>
+      <div class="main-column">
+        <section class="card" aria-labelledby="mode-title">
+          <div class="card-heading"><span class="step">01</span><div><h2 id="mode-title">What to show</h2><p>Choose nearby planes or follow one flight.</p></div></div>
+          <form id="settings-form">
+            <div class="mode-grid">
+              <label class="mode-option"><input type="radio" name="mode" value="nearby" checked><span><strong>Nearby planes</strong><small>Cycle through aircraft around your location.</small></span></label>
+              <label class="mode-option"><input type="radio" name="mode" value="flight"><span><strong>Follow a flight</strong><small>Keep one callsign on screen, with route progress when available.</small></span></label>
+            </div>
+            <div class="field" id="flight-field"><label for="flight">Flight number or ADS-B callsign</label><input id="flight" name="flight" maxlength="10" placeholder="e.g. ACA150" autocapitalize="characters" spellcheck="false"><p class="hint">Use the callsign shown in Nearby planes for the most reliable match. Flights outside your nearby area can be tracked.</p></div>
+            <div class="divider"></div>
+            <div class="card-heading compact"><span class="step">02</span><div><h2>Nearby area</h2><p>Used when cycling nearby planes.</p></div></div>
+            <div class="field-row"><div class="field"><label for="label">Short label</label><input id="label" name="label" maxlength="8" required></div><div class="field"><label for="radius">Radius · nautical miles</label><input id="radius" name="radius" type="number" min="1" max="250" required></div></div>
+            <div class="field-row"><div class="field"><label for="lat">Latitude</label><input id="lat" name="lat" type="number" min="-90" max="90" step="any" required></div><div class="field"><label for="lon">Longitude</label><input id="lon" name="lon" type="number" min="-180" max="180" step="any" required></div></div>
+            <div class="field-row"><div class="field"><label for="max_planes">Planes in rotation</label><input id="max_planes" name="max_planes" type="number" min="1" max="5" required></div><div class="field"><label for="rotate">Seconds per screen</label><input id="rotate" name="rotate" type="number" min="8" max="30" required></div></div>
+            <div class="divider"></div>
+            <div class="card-heading compact"><span class="step">03</span><div><h2>Appearance</h2><p>Text, indicator, and brightness.</p></div></div>
+            <div class="color-row"><label>Top line <input id="top_color" name="top_color" type="color"></label><label>Bottom line <input id="bottom_color" name="bottom_color" type="color"></label><label>Indicator <input id="accent_color" name="accent_color" type="color"></label></div>
+            <div class="field"><label for="brightness">Day brightness <output id="brightness-value">85%</output></label><input id="brightness" name="brightness" type="range" min="1" max="100"></div>
+            <label class="toggle"><input id="icons_enabled" name="icons_enabled" type="checkbox"><span><strong>Show tiny aircraft and airline icons</strong><small>Uses a 7×7 pixel mark beside the flight number.</small></span></label>
+            <label class="toggle"><input id="night_enabled" name="night_enabled" type="checkbox"><span><strong>Dim at night</strong><small>Uses the time zone below.</small></span></label>
+            <div class="field"><label for="timezone">Time zone</label><input id="timezone" name="timezone" type="text" maxlength="64" placeholder="America/Edmonton" autocomplete="off" spellcheck="false" required><p class="hint">Use an IANA time zone name, such as America/Edmonton or Europe/London.</p></div>
+            <div id="night-fields" class="field-row three"><div class="field"><label for="night_start">Start</label><input id="night_start" name="night_start" type="time"></div><div class="field"><label for="night_end">End</label><input id="night_end" name="night_end" type="time"></div><div class="field"><label for="night_brightness">Night %</label><input id="night_brightness" name="night_brightness" type="number" min="1" max="100"></div></div>
+            <div class="save-row"><button id="save" type="submit">Save to display <span aria-hidden="true">→</span></button><span id="message" role="status" aria-live="polite"></span></div>
+          </form>
+        </section>
+      </div>
+      <aside class="side-column">
+        <section class="card live-card" aria-labelledby="live-title"><p class="eyebrow">RIGHT NOW</p><h2 id="live-title">On your display</h2><div class="status-display"><span id="active-title">Starting…</span><small id="active-detail">Waiting for the Pi</small><div id="flight-progress" hidden><progress id="progress-bar" max="100" value="0"></progress><small id="progress-caption"></small></div></div><p id="freshness" class="hint"></p></section>
+        <section class="card" aria-labelledby="nearby-title"><p class="eyebrow">AROUND YOUR LOCATION</p><h2 id="nearby-title">Nearby planes</h2><p class="hint">Tap Follow to pin one on the matrix.</p><div id="planes" class="plane-list"><p class="empty">Looking for aircraft…</p></div></section>
+        <p class="source-note">Positions: <a href="https://adsb.fi/" target="_blank" rel="noopener noreferrer">adsb.fi</a> · Route data: <a href="https://www.adsbdb.com/" target="_blank" rel="noopener noreferrer">ADSBdb</a><br>Route progress is an estimate from live position and airport coordinates. Settings are private to your Tailscale network.</p>
+      </aside>
+    </div>
+  </main>
+</body>
+</html>
