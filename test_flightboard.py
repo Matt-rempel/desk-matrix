@@ -1,27 +1,26 @@
 import io
 import json
+import os
 import stat
 from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 import threading
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 
 import flightboard as app
+import render
 from settings import CALGARY_TIME, Settings, effective_brightness, load_settings, save_settings, validate_settings
 
 
 class FlightboardTests(unittest.TestCase):
-    def test_font_and_scrolling_fit_panel(self):
+    def test_font_is_shared_with_renderer(self):
         self.assertTrue(all(len(rows) == 7 and all(len(row) == 5 for row in rows)
                             for rows in app.FONT.values()))
-        self.assertEqual(app.scroll_offset("WJA1162", 0), 0)
-        self.assertEqual(app.scroll_offset("WJA1162", 10),
-                         32 - app.text_width("WJA1162"))
-        self.assertEqual(len(app.frame("WJA1162", "04NM 6KFT", 5)), 512)
+        self.assertIs(app.FONT, render.FONT)
 
     def test_feed_keeps_airborne_recent_aircraft(self):
         data = {"ac": [
@@ -143,48 +142,13 @@ class FlightboardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Flight must"):
             validate_settings({"mode": "flight", "flight": "../etc"})
 
-    def test_clock_uses_selected_timezone_and_fits_two_rows(self):
-        settings = validate_settings({"mode": "clock", "timezone": "America/Edmonton"})
-        instant = datetime(2026, 10, 9, 5, 7, tzinfo=timezone.utc)
-        top, bottom = app.clock_lines(settings, instant)
-        self.assertEqual((top, bottom), ("23:07", "THU OCT 8"))
-        self.assertLessEqual(app.text_width(top), 32)
-        self.assertGreater(app.text_width(bottom), 32)
-        self.assertEqual(len(app.frame(top, bottom)), 512)
-        self.assertNotEqual(tuple(app.FONT[":"]), tuple(app.FONT[" "]))
-        self.assertLess(app.scroll_offset(bottom, app.clock_scroll_period(bottom) - 2), 0)
-        self.assertEqual(app.scroll_offset(bottom, 0), 0)
-
-    def test_custom_clock_rows_and_colors(self):
-        custom = {"id": "custom-" + "a" * 32, "name": "Weekday focus",
-                  "rows": [{"content": "weekday", "color": "#33aaff"}]}
-        settings = validate_settings({"mode": "clock", "custom_screens": [custom],
-                                      "clock_screen_id": custom["id"]})
-        instant = datetime(2026, 10, 9, 18, 7, tzinfo=timezone.utc)
-        rows = app.clock_rows(settings, instant)
-        self.assertEqual(rows, [("FRIDAY", "#33AAFF")])
-        pixels = app.clock_frame(rows)
-        self.assertTrue(any(pixel == (51, 170, 255) for pixel in pixels[4 * 32:11 * 32]))
-        self.assertTrue(all(pixel == (0, 0, 0) for pixel in pixels[:4 * 32]))
-        self.assertEqual(app.clock_lines(settings, instant), ("FRIDAY", ""))
-        legacy = validate_settings({"mode": "clock", "bottom_color": "#0056D6"})
-        self.assertEqual(app.clock_rows(legacy, instant)[1][1], "#0056D6")
-        with self.assertRaisesRegex(ValueError, "does not exist"):
-            validate_settings({"clock_screen_id": "custom-" + "b" * 32})
-
-    def test_progress_icon_and_dots(self):
+    def test_progress_and_icon(self):
         plane = app.Aircraft("ACA150", "c00001", 10, 25000, 400,
                              lat=0, lon=5)
         info = app.Metadata(route="AAA-BBB", origin_position=(0, 0),
                             destination_position=(0, 10))
         self.assertAlmostEqual(app.route_progress(plane, info), .5, places=2)
         self.assertEqual(app.icon_for(plane, info), "maple")
-        pixels = app.frame("ACA150", "AAA-BBB", 0, settings=Settings(),
-                           progress=.5, icon="maple")
-        self.assertEqual(pixels[15 * 32], app.rgb(Settings().accent_color))
-        self.assertNotEqual(pixels[15 * 32 + 20], app.rgb(Settings().accent_color))
-        dots = app.frame("ACA150", "AAA-BBB", 0, dots=3, active_dot=1)
-        self.assertEqual(sum(pixel != (0, 0, 0) for pixel in dots[15 * 32:]), 6)
 
     def test_tracked_flight_query_uses_global_callsign(self):
         data = {"ac": [{"flight": "ACA150", "hex": "c00001", "lat": 50.0,
@@ -197,6 +161,282 @@ class FlightboardTests(unittest.TestCase):
         self.assertEqual(found.callsign, "ACA150")
         self.assertEqual(alias, "ACA150")
         self.assertIn("/v2/callsign/ACA150", get.call_args.args[0].full_url)
+
+
+
+class InlineExecutor:
+    """Runs submitted work immediately so tests need no threads or network."""
+
+    def __init__(self):
+        self.calls = []
+
+    def submit(self, fn, *args):
+        self.calls.append(fn)
+        future = Future()
+        try:
+            future.set_result(fn(*args))
+        except Exception as exc:  # noqa: BLE001
+            future.set_exception(exc)
+        return future
+
+    def shutdown(self, **_kwargs):
+        pass
+
+
+class Ticker:
+    def __init__(self, step=0.0, start=1000.0):
+        self.value, self.step = start, step
+
+    def __call__(self):
+        self.value += self.step
+        return self.value
+
+
+class AircraftProviderTests(unittest.TestCase):
+    HOME = (51.0, -114.0)
+
+    def provider(self, clock=None, **settings):
+        base = {"lat": self.HOME[0], "lon": self.HOME[1], "radius": 25, "max_planes": 2}
+        base.update(settings)
+        self.successes = 0
+
+        def ok():
+            self.successes += 1
+
+        self.executor = InlineExecutor()
+        return app.AircraftProvider(validate_settings(base), 20, executor=self.executor,
+                                    monotonic_fn=clock or Ticker(), now_fn=lambda: 1_760_000_000.0,
+                                    on_success=ok)
+
+    def test_bearing_math(self):
+        lat, lon = self.HOME
+        self.assertAlmostEqual(app.bearing_deg(lat, lon, lat + 0.1, lon), 0, places=3)
+        self.assertAlmostEqual(app.bearing_deg(lat, lon, lat, lon + 0.1), 90, delta=0.1)
+        self.assertAlmostEqual(app.bearing_deg(lat, lon, lat - 0.1, lon), 180, places=3)
+        self.assertAlmostEqual(app.bearing_deg(lat, lon, lat, lon - 0.1), 270, delta=0.1)
+        self.assertAlmostEqual(app.bearing_deg(0, 0, 1, 1), 45, delta=0.1)
+
+    def test_nearby_snapshot_shape_and_cadence(self):
+        lat, lon = self.HOME
+        planes = [app.Aircraft("CGABC", "c00001", 2.0, 4000, 110, None, lat, lon + 0.05),
+                  app.Aircraft("WJA123", "c00002", 5.04, 12000, 250, "B738", lat + 0.08, lon)]
+        meta = app.Metadata(route="YYC-YVR", iata_callsign="WS123")
+        clock = Ticker()
+        provider = self.provider(clock)
+        self.assertIsNone(provider.snapshot())
+        with patch("flightboard.fetch_aircraft", return_value=planes) as fetch, \
+                patch("flightboard.lookup_metadata", return_value=meta) as lookup:
+            provider.update({"aircraft:nearby", "weather"})
+            provider.update({"aircraft:nearby"})
+            self.assertEqual(fetch.call_count, 1)
+            fetch.assert_called_with(lat, lon, 25)
+            self.assertEqual(lookup.call_count, 1)
+            clock.value += 21
+            provider.update({"aircraft:nearby"})
+            self.assertEqual(fetch.call_count, 2)
+            self.assertEqual(lookup.call_count, 2)
+        snap = provider.snapshot()
+        self.assertEqual(set(snap), {"nearby", "tracked", "follow", "updated_at", "error"})
+        self.assertIsNone(snap["tracked"])
+        self.assertIsNone(snap["error"])
+        first, second = snap["nearby"]
+        self.assertEqual(first["callsign"], "CGABC")
+        self.assertEqual(round(first["bearing_deg"]), 90)
+        self.assertEqual(first["route"], "YYC>YVR")
+        self.assertEqual(second, {"callsign": "WJA123", "route": "YYC>YVR", "distance_nm": 5.0,
+                                  "altitude_ft": 12000, "speed_kt": 250, "icon": "westjet",
+                                  "bearing_deg": 0.0})
+        self.assertEqual(self.successes, 2)
+        json.dumps(snap)
+
+    def test_follow_snapshot_and_errors(self):
+        plane = app.Aircraft("ACA150", "c00003", 300, 34000, 450, "A320", 0.0, 5.0)
+        meta = app.Metadata(route="AAA-BBB", iata_callsign="AC150",
+                            origin_position=(0.0, 0.0), destination_position=(0.0, 10.0))
+        provider = self.provider()
+        with patch("flightboard.fetch_tracked_aircraft", return_value=(plane, "ACA150")) as track, \
+                patch("flightboard.lookup_metadata", return_value=meta):
+            provider.update({"aircraft:follow:AC150"})
+        track.assert_called_once_with("AC150", *self.HOME)
+        snap = provider.snapshot()
+        tracked = snap["tracked"]
+        self.assertEqual(snap["follow"], {"AC150": tracked})
+        self.assertEqual((tracked["callsign"], tracked["icao"], tracked["origin"],
+                          tracked["destination"], tracked["icon"]),
+                         ("AC150", "ACA150", "AAA", "BBB", "maple"))
+        self.assertAlmostEqual(tracked["progress"], 0.5, places=2)
+        self.assertAlmostEqual(tracked["remaining_min"], 300 / 450 * 60, delta=2)
+        self.assertIsNone(snap["nearby"])
+        failing = self.provider()
+        with patch("flightboard.fetch_aircraft", side_effect=OSError("down")):
+            failing.update({"aircraft:nearby"})
+        snap = failing.snapshot()
+        self.assertEqual((snap["nearby"], snap["error"]), (None, "down"))
+        self.assertEqual(self.successes, 0)
+
+    def test_location_change_discards_nearby(self):
+        provider = self.provider()
+        with patch("flightboard.fetch_aircraft", return_value=[]), \
+                patch("flightboard.lookup_metadata", return_value=None):
+            provider.update({"aircraft:nearby"})
+        self.assertEqual(provider.snapshot()["nearby"], [])
+        provider.set_settings(validate_settings({"lat": 10, "lon": 10}))
+        self.assertIsNone(provider.snapshot())
+
+
+class FakeCanvas:
+    def __init__(self):
+        self.pixels = {}
+
+    def SetPixel(self, x, y, r, g, b):
+        self.pixels[(x, y)] = (r, g, b)
+
+
+class FakeMatrix:
+    def __init__(self):
+        self.brightness = 100
+        self.swaps = 0
+        self.clears = 0
+        self.canvas = FakeCanvas()
+
+    def CreateFrameCanvas(self):
+        return self.canvas
+
+    def SwapOnVSync(self, canvas):
+        self.swaps += 1
+        return canvas
+
+    def Clear(self):
+        self.clears += 1
+
+
+class FakeProviders:
+    def __init__(self):
+        self.updates = []
+
+    def update(self, needs, feeds):
+        self.updates.append((set(needs), list(feeds)))
+
+    def snapshot(self):
+        return {"health": {"cpu_temp_c": 40.0, "net_ok": True, "feed_age_s": 7},
+                "weather": {"temp_c": 3.0, "age_s": 120}}
+
+    def set_settings(self, settings):
+        self.settings = settings
+
+    def mark_network_ok(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class RunLoopTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        self.settings_path = self.dir / "settings.json"
+        self.library_path = self.dir / "library.json"
+        self.libraries = []
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def args(self):
+        return app.parse_args(["--settings", str(self.settings_path),
+                               "--library", str(self.library_path)])
+
+    def fake_load(self, path, settings):
+        return self.libraries.pop(0) if len(self.libraries) > 1 else self.libraries[0]
+
+    def run_loop(self, frames, sleep=lambda _s: None, step=0.05):
+        matrix = FakeMatrix()
+        aircraft = app.AircraftProvider(Settings(), executor=InlineExecutor())
+        with patch("flightboard.load_library", side_effect=self.fake_load):
+            app.run(matrix, self.args(), stop_after=frames, state_dir=self.dir,
+                    providers=FakeProviders(), aircraft=aircraft,
+                    monotonic=Ticker(step), sleep=sleep)
+        return matrix
+
+    @staticmethod
+    def lineup(screen_id, **extra):
+        return {"lineup": {"always": [{"screen_id": screen_id, "seconds": 10}], "moments": [],
+                           "transition": "cut", "interrupts": {}}, "pinned": None, **extra}
+
+    def test_loop_pushes_changed_frames_and_writes_status_and_data(self):
+        save_settings(validate_settings({"brightness": 40}), self.settings_path)
+        self.libraries = [self.lineup("time-classic")]
+        matrix = self.run_loop(700, step=0.05)  # ~35 s of frames
+        self.assertGreaterEqual(matrix.swaps, 1)
+        self.assertLess(matrix.swaps, 10)  # a still clock is only redrawn when it changes
+        self.assertEqual(matrix.brightness, 40)
+        self.assertTrue(any(value != (0, 0, 0) for value in matrix.canvas.pixels.values()))
+        status = json.loads((self.dir / "status.json").read_text())
+        self.assertEqual(status["mode"], "lineup")
+        self.assertEqual(status["state"], "live")
+        self.assertEqual((status["screen_id"], status["title"]), ("time-classic", "Classic"))
+        self.assertEqual(status["detail"], "Always on")
+        self.assertIsNone(status["pinned"])
+        self.assertIsNone(status["moment"])
+        self.assertEqual(len(status["frame"]), 3072)
+        self.assertEqual(status["frame"], status["frame"].lower())
+        self.assertEqual(status["data_age"]["weather"], 120)
+        self.assertEqual(status["nearby"], [])
+        data = json.loads((self.dir / "data.json").read_text())
+        self.assertEqual(data["health"]["feed_age_s"], 7)
+        self.assertEqual(stat.S_IMODE((self.dir / "data.json").stat().st_mode), 0o640)
+
+    def test_display_off_blanks_and_reports_off(self):
+        save_settings(validate_settings({"display_enabled": False}), self.settings_path)
+        self.libraries = [self.lineup("time-classic")]
+        matrix = self.run_loop(5)
+        self.assertEqual(matrix.swaps, 0)
+        self.assertGreaterEqual(matrix.clears, 1)
+        status = json.loads((self.dir / "status.json").read_text())
+        self.assertEqual((status["state"], status["title"]), ("off", "DISPLAY OFF"))
+        self.assertEqual(status["frame"], "0" * 3072)
+
+    def test_library_reload_on_change(self):
+        save_settings(Settings(), self.settings_path)
+        self.library_path.write_text("{}")
+        pinned = self.lineup("time-classic", pinned={"screen_id": "sky-sun", "until": None})
+        self.libraries = [self.lineup("time-classic"), pinned]
+        calls = []
+
+        def sleep(_seconds):
+            calls.append(1)
+            if len(calls) == 3:
+                stamp = self.library_path.stat().st_mtime_ns + 5_000_000_000
+                os.utime(self.library_path, ns=(stamp, stamp))
+
+        self.run_loop(80, sleep=sleep, step=0.1)
+        status = json.loads((self.dir / "status.json").read_text())
+        self.assertEqual(status["screen_id"], "sky-sun")
+        self.assertEqual(status["pinned"], {"screen_id": "sky-sun", "until": None})
+        self.assertEqual(status["detail"], "Pinned")
+
+    def test_build_status_shapes(self):
+        info = {"screen_id": "sky-follow", "screen_name": "Follow a flight", "moment": "Morning",
+                "pinned": False, "pin": None, "interrupt": None, "moment_brightness": 50}
+        data = {"aircraft": {"nearby": [{"callsign": "WJA1", "distance_nm": 3.0, "altitude_ft": 9000,
+                                         "route": "YYC>YVR", "icon": "plane"}],
+                             "tracked": {"progress": 0.42}, "updated_at": "2026-10-09T16:00:00+00:00",
+                             "error": None},
+                "health": {"net_ok": True, "feed_age_s": 3}}
+        now = datetime(2026, 10, 9, 16, 0, 30, tzinfo=timezone.utc).timestamp()
+        status = app.build_status(Settings(), info, [(255, 0, 0)] * 512, data, now)
+        self.assertEqual(status["progress_percent"], 42)
+        self.assertEqual(status["detail"], "Morning")
+        self.assertEqual(status["moment"], "Morning")
+        self.assertEqual(status["nearby"], [{"callsign": "WJA1", "distance_nm": 3.0,
+                                             "altitude_ft": 9000, "route": "YYC>YVR"}])
+        self.assertEqual(status["data_age"], {"aircraft": 30, "weather": None, "metar": None,
+                                              "iss": None, "calendar": None})
+        self.assertEqual(status["frame"][:6], "ff0000")
+        pinned = app.build_status(Settings(), {**info, "pinned": True,
+                                               "pin": {"screen_id": "x", "until": None}}, [], {}, now)
+        self.assertIsNone(pinned["moment"])
+        self.assertEqual(pinned["pinned"], {"screen_id": "x", "until": None})
 
 
 if __name__ == "__main__":
