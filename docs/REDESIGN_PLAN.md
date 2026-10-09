@@ -317,3 +317,45 @@ ISS pass prediction (needs SGP4), GTFS-realtime protobuf transit feeds
 (use a JSON feed), full RFC 5545 recurrence, streaming-service
 integrations for "Now playing" (use a JSON feed, e.g. from a home
 automation server).
+
+## Implementation notes from wave 1 (binding for later waves)
+
+**Engine (`render.py`, `catalog.py`, `blocks.py`)**
+
+- `catalog_json()` returns `layouts`, `palettes`, `blocks`, `motions`,
+  `transitions` as dicts keyed by id (display order; each value also has
+  `id`); `builtins` and `shelves` are lists (shelf = `{id, title, source,
+  blurb, items: [screen ids]}`); `icons` maps name → rows; extra keys
+  `colors` (Builder swatches), `legacy_ids`, `art` (built-in art list).
+  Palette = `{id, name, primary: "#…" | [from, to], secondary, glow}`.
+- Extra block `rain` (options `accent`, `icon_color`; needs `weather`).
+  Extra options: `time.font` (auto/big/5x7/3x5), `date.style` adds
+  `stack`, `temp.which` adds `sky`, `progress.callsign`,
+  `sun_time.h24`/`calendar_next.h24` (default false), `habit_week.label`,
+  `feed.label`/`feed.icon`, and `color`-type options (default null)
+  `accent`, `icon_color`, `analog_clock.face`. Validation must accept
+  exactly what `catalog.BLOCKS[...]["options"]` declares.
+- Slot `color` may be `null`, `"#RRGGBB"` or a 2-color gradient list.
+  `render_screen/frame(screen, ctx, palette=None)`: passing a palette id
+  forces it over every color (player's night mode). `render.tint()` also
+  exists.
+- Timers are keyed by **screen id** (`ctx.timers[screen["id"]]`), habits
+  by `habit_id` or the screen id. Built-in art ids: `builtin-pet`,
+  `builtin-heart`. Hidden builtins `time-simple`, `time-weekday` back
+  `LEGACY_IDS`.
+- Previews: `blocks.sample_context(now=None, elapsed=0.0)` gives the
+  sample snapshot, timers, habits and built-in art. Real previews should
+  merge `data.json` over `catalog.sample_data()` and real timers/habits/art
+  over the samples.
+- Nearby aircraft entries may include `bearing_deg` (radar uses it; the
+  aircraft provider should add it).
+
+**Providers (`providers.py`)**
+
+- `Providers(settings, state_dir=None, *, executor=None, now_fn,
+  monotonic_fn, cpu_path)`; `update(needs, feeds)`; `snapshot()`;
+  `set_settings(settings)`; `mark_network_ok()` (the aircraft provider
+  calls it after a good fetch); `close()`. Loads values from
+  `state_dir/data.json` when < 30 min old.
+- Snapshot extras: `calendar.next.all_day`, `sun.polar`; keys are absent
+  (not `None`) when no data, except `sun` and `health`.
