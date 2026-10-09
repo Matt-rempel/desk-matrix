@@ -30,7 +30,7 @@ details can scroll, but a glance should still make sense.
    general screen rotation.
 2. **Weather now**: a strong desk companion once we select a source and decide
    how to show stale data.
-3. **Aircraft count/closest**: uses the feed already in Flightboard.
+3. **Aircraft count/closest**: uses the feed already in Desk Matrix.
 4. **Timer**: local and private, with controls in the settings page.
 5. **Compact METAR**: especially fitting for an aviation display; show the
    observation time and avoid squeezing a full report onto the panel.

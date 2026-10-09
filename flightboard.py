@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configurable aircraft display for a 32x16 HUB75 RGB matrix."""
+"""Configurable desk display for a 32x16 HUB75 RGB matrix."""
 
 from __future__ import annotations
 

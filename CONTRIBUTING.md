@@ -1,6 +1,6 @@
 # Contributing
 
-This is a small Raspberry Pi project shared through a public GitHub
+Desk Matrix is a small Raspberry Pi project shared through a public GitHub
 repository. Please keep changes easy to test on the 32×16 panel. Anyone can
 clone it; pushing a branch requires write access or a fork.
 

@@ -1,10 +1,13 @@
-# Flightboard
+# Desk Matrix
 
-Flightboard turns a Raspberry Pi and a 32×16 HUB75 RGB matrix into a small
-flight tracker. It cycles through nearby aircraft or follows one callsign.
-The two 5×7 text rows scroll long details across the panel. A private HTTPS
-settings page lets you change the location, flight, colors, brightness, and
-screen timing from a phone or computer.
+Desk Matrix turns a Raspberry Pi and a 32×16 HUB75 RGB matrix into a
+configurable desk display. It currently shows a clock and date, cycles through
+nearby aircraft, or follows one flight. Two 5×7 text rows scroll long details
+across the panel. A private HTTPS settings page lets you change modes,
+location, colors, brightness, and screen timing from a phone or computer.
+
+The application files and Linux services still use the `flightboard` name so
+existing installations can update without moving settings or changing units.
 
 The first installation uses WinSport in Calgary as a sample location. **Change
 the location and time zone in settings for your own desk.**
@@ -40,14 +43,13 @@ the Pi's GPIO header.
    ```sh
    sudo apt-get update
    sudo apt-get install -y git
-   git clone 'https://github.com/YOUR_USERNAME/flightboard.git' flightboard
-   cd flightboard
+   git clone 'https://github.com/Matt-rempel/desk-matrix.git'
+   cd desk-matrix
    sh install.sh
    ```
 
-   Replace `YOUR_USERNAME` with the repository owner. Cloning a public repo
-   does not require a GitHub login. The Pi user needs `sudo`; the installer
-   asks for that password in the Pi terminal.
+   Cloning a public repo does not require a GitHub login. The Pi user needs
+   `sudo`; the installer asks for that password in the Pi terminal.
    It installs build packages, compiles a pinned version of
    [rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix), creates
    a dedicated `flightboard` service account if needed, and installs the
@@ -140,7 +142,7 @@ Pi or panel. Other settings changes are applied without restarting.
 
 Live aircraft positions come from [adsb.fi](https://adsb.fi/) through its
 [open data API](https://github.com/adsbfi/opendata). Its public API is for
-personal, non-commercial use and allows one request per second. Flightboard
+personal, non-commercial use and allows one request per second. Desk Matrix
 spaces nearby and global callsign requests at least 1.1 seconds apart and
 refreshes positions about every 20 seconds by default. Coverage and
 callsigns depend on available receivers. This is an aircraft position display,

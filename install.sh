@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install or update Flightboard on Raspberry Pi OS Lite. Run as a login user.
+# Install or update Desk Matrix on Raspberry Pi OS Lite. Run as a login user.
 set -eu
 
 SOURCE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
@@ -154,7 +154,7 @@ systemctl is-active --quiet flightboard.service
 curl --connect-timeout 3 --max-time 5 -fsS http://127.0.0.1:8765/ -o /dev/null
 rollback=0
 
-printf '\nFlightboard is running. Settings: https://%s/\n' "$dns_name"
+printf '\nDesk Matrix is running. Settings: https://%s/\n' "$dns_name"
 if [ "$SHOW_PAIRING" -eq 1 ]; then
   token=$(sudo cat "$STATE_DIR/web-token")
   printf 'Private pairing link (keep it out of screenshots and chat):\nhttps://%s/#%s\n' "$dns_name" "$token"
