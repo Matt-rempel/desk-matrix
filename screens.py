@@ -1,4 +1,8 @@
-"""Clock screen presets and validation for saved screen layouts."""
+"""Legacy clock screens (pre-library settings), kept for validation and migration.
+
+library.py replaces this module; settings.json still stores these fields so
+older installs keep loading and can be migrated to library.json.
+"""
 
 from __future__ import annotations
 
