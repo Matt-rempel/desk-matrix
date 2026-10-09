@@ -20,6 +20,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from zoneinfo import ZoneInfo
 
 from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings, rgb
 
@@ -78,6 +79,7 @@ FONT = {
     "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
     "8": ("01110", "10001", "10001", "01110", "10001", "10001", "01110"),
     "9": ("01110", "10001", "10001", "01111", "00001", "00001", "01110"),
+    ":": ("00000", "01100", "01100", "00000", "01100", "01100", "00000"),
     ".": ("00000", "00000", "00000", "00000", "00000", "01100", "01100"),
     "-": ("00000", "00000", "00000", "11111", "00000", "00000", "00000"),
     "/": ("00001", "00001", "00010", "00100", "01000", "10000", "10000"),
@@ -302,6 +304,19 @@ def scroll_offset(text: str, elapsed: float, width: int = 32) -> int:
     return -min(overflow, max(0, int((elapsed - 2.0) * 8)))
 
 
+def clock_lines(settings: Settings, now: datetime | None = None) -> tuple[str, str]:
+    """Return 24-hour time and a short date in the selected time zone."""
+    zone = ZoneInfo(settings.timezone)
+    local = (now or datetime.now(zone)).astimezone(zone)
+    return local.strftime("%H:%M"), f"{local:%a %b} {local.day}".upper()
+
+
+def clock_scroll_period(date_text: str) -> float:
+    """Hold both ends of the date before restarting its scroll."""
+    overflow = max(0, text_width(date_text) - 32)
+    return 4.0 + overflow / 8.0
+
+
 def text_pixels(text: str, x: int, y: int, color: tuple[int, int, int], min_x: int = 0):
     for char in text.upper():
         glyph = FONT.get(char, FONT[" "])
@@ -506,7 +521,7 @@ def main() -> int:
     index = 0
     nearby_failed = False
     track_failed = False
-    if settings.display_enabled:
+    if settings.display_enabled and settings.mode != "clock":
         show(screen_top, screen_bottom, 0)
     else:
         matrix.Clear()
@@ -544,6 +559,10 @@ def main() -> int:
                                 resolved_flight = settings.flight
                                 tracked = None
                                 track_failed = False
+                            if settings.mode == "clock":
+                                flights = []
+                                selected_flights = []
+                                nearby_failed = False
                             selected_flights = select_flights(flights, settings.max_planes)
                     except (ValueError, json.JSONDecodeError) as exc:
                         print(f"settings error: {exc}", file=sys.stderr, flush=True)
@@ -551,7 +570,7 @@ def main() -> int:
                 if matrix.brightness != brightness:
                     matrix.brightness = brightness
 
-            if fetch_future is None and now >= next_fetch:
+            if settings.mode != "clock" and fetch_future is None and now >= next_fetch:
                 fetch_future = executor.submit(fetch_aircraft, settings.lat,
                                                settings.lon, settings.radius)
                 fetch_generation = generation
@@ -604,7 +623,7 @@ def main() -> int:
                     metadata_cache[metadata_key] = (now + 120, None)
                 metadata_future = None
                 metadata_key = None
-            if metadata_future is None and now >= next_lookup:
+            if settings.mode != "clock" and metadata_future is None and now >= next_lookup:
                 candidates = ([tracked] if tracked else []) + selected_flights
                 for aircraft in candidates:
                     key = (aircraft.hex_code, aircraft.callsign)
@@ -614,8 +633,20 @@ def main() -> int:
                         next_lookup = now + 5
                         break
 
-            failed = track_failed if settings.mode == "flight" else nearby_failed
-            if now >= screen_end:
+            failed = (track_failed if settings.mode == "flight" else
+                      nearby_failed if settings.mode == "nearby" else False)
+            if settings.mode == "clock":
+                clock_top, clock_bottom = clock_lines(settings)
+                if screen_bottom != clock_bottom or screen_end == 0:
+                    screen_start = now
+                if screen_top != clock_top or screen_bottom != clock_bottom:
+                    next_status = 0
+                screen_top, screen_bottom = clock_top, clock_bottom
+                screen_end = float("inf")
+                screen_dots = screen_active_dot = 0
+                screen_progress = None
+                screen_icon = None
+            elif now >= screen_end:
                 screen_dots = screen_active_dot = 0
                 screen_progress = None
                 screen_icon = None
@@ -664,7 +695,10 @@ def main() -> int:
                 screen_end = now + max(settings.rotate, 4 + max(0, overflow) / 8)
 
             if settings.display_enabled:
-                show(screen_top, screen_bottom, now - screen_start,
+                display_elapsed = now - screen_start
+                if settings.mode == "clock":
+                    display_elapsed %= clock_scroll_period(screen_bottom)
+                show(screen_top, screen_bottom, display_elapsed,
                      error=screen_bottom == "API DELAY", dots=screen_dots,
                      active_dot=screen_active_dot, progress=screen_progress, icon=screen_icon)
             if now >= next_status:

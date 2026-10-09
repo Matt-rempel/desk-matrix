@@ -116,6 +116,7 @@ async function refreshStatus() {
     }
     document.querySelector('#freshness').textContent = data.updated_at
       ? `Updated ${new Date(data.updated_at).toLocaleTimeString()}` : '';
+    document.querySelector('#nearby-card').hidden = data.mode === 'clock';
     const list = document.querySelector('#planes');
     list.replaceChildren();
     if (!data.nearby?.length) {

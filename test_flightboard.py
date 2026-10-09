@@ -1,7 +1,7 @@
 import io
 import json
 import stat
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import tempfile
 import threading
@@ -142,6 +142,18 @@ class FlightboardTests(unittest.TestCase):
             validate_settings({"display_enabled": "off"})
         with self.assertRaisesRegex(ValueError, "Flight must"):
             validate_settings({"mode": "flight", "flight": "../etc"})
+
+    def test_clock_uses_selected_timezone_and_fits_two_rows(self):
+        settings = validate_settings({"mode": "clock", "timezone": "America/Edmonton"})
+        instant = datetime(2026, 10, 9, 5, 7, tzinfo=timezone.utc)
+        top, bottom = app.clock_lines(settings, instant)
+        self.assertEqual((top, bottom), ("23:07", "THU OCT 8"))
+        self.assertLessEqual(app.text_width(top), 32)
+        self.assertGreater(app.text_width(bottom), 32)
+        self.assertEqual(len(app.frame(top, bottom)), 512)
+        self.assertNotEqual(tuple(app.FONT[":"]), tuple(app.FONT[" "]))
+        self.assertLess(app.scroll_offset(bottom, app.clock_scroll_period(bottom) - 2), 0)
+        self.assertEqual(app.scroll_offset(bottom, 0), 0)
 
     def test_progress_icon_and_dots(self):
         plane = app.Aircraft("ACA150", "c00001", 10, 25000, 400,

@@ -108,6 +108,12 @@ class WebServerTests(unittest.TestCase):
                                         "Origin": base, "X-Flightboard-Key": "a" * 64})
                     with urlopen(power_on) as response:
                         self.assertTrue(json.load(response)["display_enabled"])
+                    clock = Request(base + "/api/settings", b'{"mode":"clock"}',
+                                    {"Content-Type": "application/json",
+                                     "Origin": base, "X-Flightboard-Key": "a" * 64})
+                    with urlopen(clock) as response:
+                        self.assertEqual(json.load(response)["mode"], "clock")
+                    self.assertEqual(json.loads(path.read_text())["mode"], "clock")
                 finally:
                     server.shutdown()
                     server.server_close()

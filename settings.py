@@ -62,8 +62,8 @@ def validate_settings(data: dict) -> Settings:
             or not re.fullmatch(r"[A-Za-z0-9 ]{1,8}", label)):
         raise ValueError("Location label must be 1–8 letters or numbers")
     mode = merged["mode"]
-    if mode not in ("nearby", "flight"):
-        raise ValueError("Mode must be nearby or flight")
+    if mode not in ("nearby", "flight", "clock"):
+        raise ValueError("Mode must be nearby, flight, or clock")
     flight = merged["flight"]
     if not isinstance(flight, str) or (flight and not re.fullmatch(r"[A-Za-z0-9]{2,10}", flight)):
         raise ValueError("Flight must be a 2–10 character callsign or flight number")

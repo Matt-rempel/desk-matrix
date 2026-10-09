@@ -31,11 +31,12 @@
     <div class="grid" id="controls" hidden>
       <div class="main-column">
         <section class="card" aria-labelledby="mode-title">
-          <div class="card-heading"><span class="step">01</span><div><h2 id="mode-title">What to show</h2><p>Choose nearby planes or follow one flight.</p></div></div>
+          <div class="card-heading"><span class="step">01</span><div><h2 id="mode-title">What to show</h2><p>Choose nearby planes, one flight, or a clock.</p></div></div>
           <form id="settings-form">
             <div class="mode-grid">
               <label class="mode-option"><input type="radio" name="mode" value="nearby" checked><span><strong>Nearby planes</strong><small>Cycle through aircraft around your location.</small></span></label>
               <label class="mode-option"><input type="radio" name="mode" value="flight"><span><strong>Follow a flight</strong><small>Keep one callsign on screen, with route progress when available.</small></span></label>
+              <label class="mode-option"><input type="radio" name="mode" value="clock"><span><strong>Clock &amp; date</strong><small>Show local time and a scrolling date in your selected time zone.</small></span></label>
             </div>
             <div class="field" id="flight-field"><label for="flight">Flight number or ADS-B callsign</label><input id="flight" name="flight" maxlength="10" placeholder="e.g. ACA150" autocapitalize="characters" spellcheck="false"><p class="hint">Use the callsign shown in Nearby planes for the most reliable match. Flights outside your nearby area can be tracked.</p></div>
             <div class="divider"></div>
@@ -49,7 +50,7 @@
             <div class="field"><label for="brightness">Day brightness <output id="brightness-value">85%</output></label><input id="brightness" name="brightness" type="range" min="1" max="100"></div>
             <label class="toggle"><input id="icons_enabled" name="icons_enabled" type="checkbox"><span><strong>Show tiny aircraft and airline icons</strong><small>Uses a 7×7 pixel mark beside the flight number.</small></span></label>
             <label class="toggle"><input id="night_enabled" name="night_enabled" type="checkbox"><span><strong>Dim at night</strong><small>Uses the time zone below.</small></span></label>
-            <div class="field"><label for="timezone">Time zone</label><input id="timezone" name="timezone" type="text" maxlength="64" placeholder="America/Edmonton" autocomplete="off" spellcheck="false" required><p class="hint">Use an IANA time zone name, such as America/Edmonton or Europe/London.</p></div>
+            <div class="field"><label for="timezone">Time zone</label><input id="timezone" name="timezone" type="text" maxlength="64" placeholder="America/Edmonton" autocomplete="off" spellcheck="false" required><p class="hint">Sets the clock and night dimming. Use an IANA name, such as America/Edmonton or Europe/London.</p></div>
             <div id="night-fields" class="field-row three"><div class="field"><label for="night_start">Start</label><input id="night_start" name="night_start" type="time"></div><div class="field"><label for="night_end">End</label><input id="night_end" name="night_end" type="time"></div><div class="field"><label for="night_brightness">Night %</label><input id="night_brightness" name="night_brightness" type="number" min="1" max="100"></div></div>
             <div class="save-row"><button id="save" type="submit">Save to display <span aria-hidden="true">→</span></button><span id="message" role="status" aria-live="polite"></span></div>
           </form>
@@ -63,7 +64,7 @@
           <div class="save-row"><button id="power-button" type="button" disabled>Turn display off</button><span id="power-message" role="status" aria-live="polite"></span></div>
           <p class="hint">Off blanks the LEDs. The Pi and this settings page stay online.</p>
         </section>
-        <section class="card" aria-labelledby="nearby-title"><p class="eyebrow">AROUND YOUR LOCATION</p><h2 id="nearby-title">Nearby planes</h2><p class="hint">Tap Follow to pin one on the matrix.</p><div id="planes" class="plane-list"><p class="empty">Looking for aircraft…</p></div></section>
+        <section class="card" id="nearby-card" aria-labelledby="nearby-title"><p class="eyebrow">AROUND YOUR LOCATION</p><h2 id="nearby-title">Nearby planes</h2><p class="hint">Tap Follow to pin one on the matrix.</p><div id="planes" class="plane-list"><p class="empty">Looking for aircraft…</p></div></section>
         <p class="source-note">Positions: <a href="https://adsb.fi/" target="_blank" rel="noopener noreferrer">adsb.fi</a> · Route data: <a href="https://www.adsbdb.com/" target="_blank" rel="noopener noreferrer">ADSBdb</a><br>Route progress is an estimate from live position and airport coordinates. Settings are private to your Tailscale network.</p>
       </aside>
     </div>

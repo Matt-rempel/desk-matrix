@@ -126,8 +126,13 @@ flight numbers may need the exact ADS-B callsign, such as `ACA150`. If the
 flight is not broadcasting a recent position or the feed lacks coverage, the
 display shows `WAITING`.
 
-The settings page controls nearby/follow mode, location and radius, number of
-planes, screen time, colors, icons, day brightness, and optional night dimming
+Clock & date mode shows 24-hour local time on the top row and scrolls the
+weekday, month, and day across the bottom row. It uses the configured time
+zone and does not request flight data while selected. The display updates at
+the next minute or date change without a service restart.
+
+The settings page controls nearby/follow/clock mode, location and radius,
+number of planes, screen time, colors, icons, day brightness, and optional night dimming
 in the configured time zone. Its **Turn display off/on** button blanks or
 restores the LEDs immediately while the Pi and web page stay available. The
 choice survives a restart; off does not disconnect electrical power from the
