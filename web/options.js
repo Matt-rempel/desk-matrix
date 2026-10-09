@@ -13,7 +13,8 @@ const LABELS = {
   h24: '24-hour time', colon_blink: 'Blinking colon', work_min: 'Focus minutes', break_min: 'Break minutes',
   callsign: 'Flight or callsign', feed_id: 'Feed', art_id: 'Pixel art', habit_id: 'Habit name', station: 'Airport (ICAO code)',
   which: 'Show', field: 'Show', source: 'Source', event: 'Event', label: 'Label', date: 'Date', text: 'Your text',
-  name: 'Icon', style: 'Style', color: 'Color',
+  name: 'Icon', style: 'Style', color: 'Color', accent: 'Secondary color', icon_color: 'Icon color',
+  face: 'Dial color', city: 'City',
 };
 const CHOICES = {
   now: 'Now', high: 'High', low: 'Low', hilo: 'High · low', next: 'Next', sunrise: 'Sunrise', sunset: 'Sunset',

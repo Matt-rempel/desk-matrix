@@ -4,7 +4,7 @@ import { state, findScreen, isBuiltin, familyOf, describeScreen, clone, screenFo
   defaultOptions, act, saveSettings, subscribe } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
 import { h, header, toggleRow, stepper, messageLine, toast, confirmSheet, paint, busy, eyebrow, splitLayout } from './ui.js';
-import { optionsForm } from './options.js';
+import { optionsForm, colorPicker } from './options.js';
 import { saveScreen, showNow, focusControls, lineupPlaces, removeFromLineup, replaceInLineup } from './controls.js';
 
 const TYPES = [
@@ -136,6 +136,7 @@ export function render(root, { id, go }) {
         for (const name of COLOR_OPTIONS) if (name in slot.options) slot.options[name] = null;
       }
     }
+    renderDetails();
     refresh();
   }
   function syncPalette() {
@@ -405,7 +406,7 @@ export function render(root, { id, go }) {
 
   function detailsSection() {
     detailsBody = h('div', { class: 'details' });
-    const sec = h('section', { class: 'block', 'aria-labelledby': 'det-h' }, eyebrow('Details', 'det-h'), detailsBody);
+    const sec = h('section', { class: 'block', 'aria-labelledby': 'det-h' }, eyebrow('Colors & details', 'det-h'), detailsBody);
     renderDetails();
     sec.hidden = !detailsBody.childElementCount;
     detailsSection.el = sec;
@@ -417,17 +418,29 @@ export function render(root, { id, go }) {
     const layout = layoutOf(work.layout);
     work.slots.forEach((slot, i) => {
       const meta = blockOf(slot.block);
-      if (!meta || !Object.keys(meta.options || {}).length) return;
+      if (!meta || slot.block === 'none') return;
       const skip = family === 'clock' && i === 0 && slot.block === 'time' ? ['h24', 'colon_blink', 'font'] : [];
       if (family === 'clock' && i === 1 && slot.block === 'progress') skip.push('source');
-      const names = Object.keys(meta.options).filter((n) => !skip.includes(n));
-      if (!names.length) return;
+      const names = Object.keys(meta.options || {}).filter((n) => !skip.includes(n));
       const where = layout?.slots[i]?.where || `Slot ${i + 1}`;
       detailsBody.append(h('div', { class: 'detail-group' },
         h('h3', { class: 'detail-title' }, `${meta.name}`, h('span', { class: 'subtle' }, ` · ${where}`)),
-        optionsForm(slot.block, slot.options, () => refresh(), { skip })));
+        slotColorField(slot, i, meta),
+        names.length ? optionsForm(slot.block, slot.options, () => refresh(), { skip }) : null));
     });
     if (detailsSection.el) detailsSection.el.hidden = !detailsBody.childElementCount;
+  }
+
+  // The slot's own color (the clock digits, a message, an icon). "Palette color"
+  // hands it back to the palette chosen above.
+  function slotColorField(slot, index, meta) {
+    const pal = state.catalog.paletteById.get(work.style.palette);
+    const auto = pal ? (index === 0 ? pal.primary : pal.secondary) : '#F4F2EE';
+    const pictorial = ['icon', 'art', 'weather_icon', 'life', 'fire', 'radar', 'analog_clock', 'progress', 'spark', 'hourly_graph', 'habit_week', 'sun_arc'];
+    const label = pictorial.includes(meta.id) ? 'Color' : 'Text color';
+    return h('div', { class: 'field' }, h('div', { class: 'field-label' }, label),
+      colorPicker({ value: slot.color, label: `${meta.name} ${label.toLowerCase()}`, allowAuto: true, autoColor: auto, autoLabel: 'Palette color',
+        onChange: (v) => { slot.color = v; refresh(); syncPalette(); } }));
   }
 
   return () => { unsubscribe(); live.cancel(); stuck.disconnect(); };
