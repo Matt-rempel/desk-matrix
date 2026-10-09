@@ -3,23 +3,132 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import replace
+from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import threading
+import time
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
-from settings import DEFAULT_PATH, STATE_DIR, load_settings, save_settings, validate_settings
-from screens import BUILTIN_SCREENS, MAX_CUSTOM_SCREENS, builtins_with_legacy_colors, resolve_screen
+import blocks
+import catalog
+from library import LIBRARY_PATH, apply_action, load_library, save_library, validate_art, validate_screen
+from settings import (DEFAULT_PATH, LEGACY_FIELDS, STATE_DIR, load_settings, save_settings,
+                      validate_settings)
 
 HERE = Path(__file__).parent
+WEB_DIR = HERE / "web"
 STATUS_PATH = STATE_DIR / "status.json"
+DATA_PATH = STATE_DIR / "data.json"
 TOKEN_PATH = STATE_DIR / "web-token"
 PUBLIC_HOST_PATH = STATE_DIR / "public-host"
 SETTINGS_WRITE_LOCK = threading.Lock()
+MAX_BODY = 64 * 1024
+MAX_PREVIEW_SCREENS = 40
+MAX_PREVIEW_ART = 8
+DATA_MAX_AGE_S = 30 * 60
+STATIC_RE = re.compile(r"/([a-z0-9-]+)\.(js|css|svg)")
+STATIC_TYPES = {"js": "text/javascript; charset=utf-8", "css": "text/css; charset=utf-8",
+                "svg": "image/svg+xml"}
+POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview")
+
+_catalog_body: bytes | None = None
+_data_cache: dict = {"key": None, "data": None}
+_data_lock = threading.Lock()
+
+
+def catalog_body() -> bytes:
+    """GET /api/catalog never changes while the server runs; encode it once."""
+    global _catalog_body
+    if _catalog_body is None:
+        _catalog_body = json.dumps(catalog.catalog_json()).encode()
+    return _catalog_body
+
+
+def _merge_data(base: dict, fresh: dict) -> dict:
+    for key, value in fresh.items():
+        if value is None:
+            continue
+        if key in ("feeds", "metar") and isinstance(value, dict) and isinstance(base.get(key), dict):
+            base[key] = {**base[key], **value}
+        else:
+            base[key] = value
+    return base
+
+
+def preview_data() -> dict:
+    """SAMPLE_DATA overlaid by STATE_DIR/data.json when it is under 30 minutes old.
+
+    Parsed once per data.json version; callers get their own copy.
+    """
+    try:
+        stat = DATA_PATH.stat()
+        fresh = time.time() - stat.st_mtime < DATA_MAX_AGE_S
+        key = (str(DATA_PATH), stat.st_mtime_ns, stat.st_size) if fresh else None
+    except OSError:
+        key = None
+    with _data_lock:
+        if _data_cache["data"] is not None and _data_cache["key"] == key:
+            return copy.deepcopy(_data_cache["data"])
+        data = catalog.sample_data()
+        if key is not None:
+            try:
+                snapshot = json.loads(DATA_PATH.read_text())
+                if isinstance(snapshot, dict):
+                    _merge_data(data, snapshot)
+            except (OSError, ValueError):
+                pass
+        _data_cache.update(key=key, data=data)
+        return copy.deepcopy(data)
+
+
+def frame_hex(pixels) -> str:
+    return bytes(channel for pixel in pixels for channel in pixel).hex()
+
+
+def render_previews(body, settings, lib: dict) -> list[str]:
+    """Validate a /api/preview body and render each screen to a frame string."""
+    if not isinstance(body, dict) or set(body) - {"screens", "elapsed", "art"} or "screens" not in body:
+        raise ValueError("Send {screens: [...], elapsed?, art?}")
+    screens = body["screens"]
+    if not isinstance(screens, list) or len(screens) > MAX_PREVIEW_SCREENS:
+        raise ValueError(f"Preview at most {MAX_PREVIEW_SCREENS} screens at once")
+    elapsed = body.get("elapsed", 0)
+    if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or not 0 <= elapsed <= 86400:
+        raise ValueError("elapsed must be 0–86400 seconds")
+    art = {**catalog.BUILTIN_ART, **{item["id"]: item for item in lib["art"]}}
+    drafts = body.get("art", [])
+    if not isinstance(drafts, list) or len(drafts) > MAX_PREVIEW_ART:
+        raise ValueError(f"Send at most {MAX_PREVIEW_ART} pieces of draft art")
+    for draft in drafts:
+        if not isinstance(draft, dict):
+            raise ValueError("Art must be an object")
+        art_id = draft.get("id")
+        if art_id in (None, "", "draft"):
+            clean = {**validate_art({**draft, "id": "art-" + "0" * 16}), "id": "draft"}
+        else:
+            clean = validate_art(draft)
+        art[clean["id"]] = clean
+    clean_screens = []
+    for screen in screens:
+        clean = validate_screen(screen, preview=True)
+        # An unsaved copy of a built-in shows the original's timer and habit samples.
+        clean["id"] = clean["id"] or clean["based_on"] or ""
+        clean_screens.append(clean)
+    sample = blocks.sample_context()
+    zone = ZoneInfo(settings.timezone)
+    ctx = blocks.RenderContext(
+        now=datetime.now(zone), elapsed=float(elapsed), data=preview_data(),
+        units={"temp": settings.temp_unit, "distance": settings.distance_unit}, art=art,
+        habits={**sample.habits, **lib["habits"]}, timers={**sample.timers, **lib["timers"]})
+    return [frame_hex(blocks.frame(screen, ctx)) for screen in clean_screens]
 
 
 class BoundedHTTPServer(ThreadingHTTPServer):
@@ -80,32 +189,42 @@ class Handler(BaseHTTPRequestHandler):
     def _json(self, status: int, value):
         self._send(status, "application/json; charset=utf-8", json.dumps(value).encode())
 
+    def _static(self, path: str) -> bool:
+        if path == "/":
+            name, content_type = "index.html", "text/html; charset=utf-8"
+        else:
+            match = STATIC_RE.fullmatch(path)
+            if not match:
+                return False
+            name, content_type = f"{match[1]}.{match[2]}", STATIC_TYPES[match[2]]
+        try:
+            body = (WEB_DIR / name).read_bytes()
+        except OSError:
+            return False
+        self._send(200, content_type, body)
+        return True
+
     def do_GET(self):
-        files = {
-            "/": ("index.html", "text/html; charset=utf-8"),
-            "/app.css": ("app.css", "text/css; charset=utf-8"),
-            "/app.js": ("app.js", "text/javascript; charset=utf-8"),
-        }
-        if self.path in files:
-            name, content_type = files[self.path]
-            self._send(200, content_type, (HERE / name).read_bytes())
-        elif self.path.startswith("/api/") and not self._authorized():
+        path = urlsplit(self.path).path
+        if not path.startswith("/api/"):
+            if not self._static(path):
+                self._json(404, {"error": "Not found"})
             return
-        elif self.path == "/api/settings":
+        if not self._authorized():
+            return
+        if path == "/api/settings":
             try:
                 self._json(200, load_settings(DEFAULT_PATH).to_dict())
             except (ValueError, json.JSONDecodeError) as exc:
                 self._json(500, {"error": f"Settings file is invalid: {exc}"})
-        elif self.path == "/api/screens":
+        elif path == "/api/catalog":
+            self._send(200, "application/json; charset=utf-8", catalog_body())
+        elif path == "/api/library":
             try:
-                settings = load_settings(DEFAULT_PATH)
-                self._json(200, {"builtins": builtins_with_legacy_colors(
-                                     settings.top_color, settings.bottom_color),
-                                 "custom": settings.custom_screens,
-                                 "active_id": settings.clock_screen_id})
+                self._json(200, self._library())
             except (ValueError, json.JSONDecodeError) as exc:
-                self._json(500, {"error": f"Settings file is invalid: {exc}"})
-        elif self.path == "/api/status":
+                self._json(500, {"error": str(exc)})
+        elif path == "/api/status":
             try:
                 self._json(200, json.loads(STATUS_PATH.read_text()))
             except (FileNotFoundError, ValueError, json.JSONDecodeError):
@@ -113,25 +232,35 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._json(404, {"error": "Not found"})
 
-    def do_POST(self):
-        if self.path not in ("/api/settings", "/api/display", "/api/screens"):
-            self._json(404, {"error": "Not found"})
-            return
-        if not self._authorized():
-            return
+    def _library(self) -> dict:
+        try:
+            settings = load_settings(DEFAULT_PATH)
+        except (OSError, ValueError):
+            settings = None
+        with SETTINGS_WRITE_LOCK:  # A first load may create library.json.
+            return load_library(LIBRARY_PATH, settings)
+
+    def _origin_allowed(self) -> bool:
         # A browser must send an exact same-origin request. The custom key
         # header also prevents a cross-origin form from submitting settings.
         origin = urlsplit(self.headers.get("Origin", ""))
         if origin.scheme == "https":
             try:
-                allowed_origin = origin.netloc == PUBLIC_HOST_PATH.read_text().strip()
+                return origin.netloc == PUBLIC_HOST_PATH.read_text().strip()
             except OSError:
-                allowed_origin = False
-        else:
-            allowed_origin = (origin.scheme == "http"
-                              and self.client_address[0] in ("127.0.0.1", "::1")
-                              and origin.netloc == self.headers.get("Host"))
-        if not allowed_origin:
+                return False
+        return (origin.scheme == "http"
+                and self.client_address[0] in ("127.0.0.1", "::1")
+                and origin.netloc == self.headers.get("Host"))
+
+    def do_POST(self):
+        path = urlsplit(self.path).path
+        if path not in POST_ROUTES:
+            self._json(404, {"error": "Not found"})
+            return
+        if not self._authorized():
+            return
+        if not self._origin_allowed():
             self._json(403, {"error": "Cross-site request rejected"})
             return
         if self.headers.get("Content-Type", "").split(";", 1)[0] != "application/json":
@@ -139,85 +268,53 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if not 0 < length <= 8192:
-                raise ValueError("Settings request is too large or empty")
+        except ValueError:
+            length = 0
+        if length > MAX_BODY:
+            self._json(413, {"error": "Request is too large"})
+            return
+        try:
+            if length <= 0:
+                raise ValueError("Request is empty")
             data = json.loads(self.rfile.read(length))
+            if path == "/api/preview":
+                settings = load_settings(DEFAULT_PATH)
+                frames = render_previews(data, settings, self._library())
+                self._json(200, {"frames": frames})
+                return
             with SETTINGS_WRITE_LOCK:
                 current = load_settings(DEFAULT_PATH)
-                if self.path == "/api/display":
-                    if (not isinstance(data, dict) or set(data) != {"display_enabled"}
-                            or not isinstance(data["display_enabled"], bool)):
-                        raise ValueError("Send display_enabled as on or off")
-                    settings = replace(current, display_enabled=data["display_enabled"])
-                elif self.path == "/api/screens":
-                    settings = change_screens(current, data)
+                if path == "/api/library":
+                    library = apply_action(load_library(LIBRARY_PATH, current), data)
+                    save_library(library, LIBRARY_PATH)
+                    result = library
                 else:
-                    if not isinstance(data, dict):
-                        raise ValueError("Settings must be an object")
-                    # The separate power button owns this flag. Saving other
-                    # form edits must not turn the panel back on.
-                    settings = validate_settings({**current.to_dict(), **data,
-                                                  "clock_screen_id": current.clock_screen_id,
-                                                  "custom_screens": current.custom_screens,
-                                                  "display_enabled": current.display_enabled})
-                save_settings(settings, DEFAULT_PATH)
+                    if path == "/api/display":
+                        if (not isinstance(data, dict) or set(data) != {"display_enabled"}
+                                or not isinstance(data["display_enabled"], bool)):
+                            raise ValueError("Send display_enabled as on or off")
+                        settings = replace(current, display_enabled=data["display_enabled"])
+                    else:
+                        if not isinstance(data, dict):
+                            raise ValueError("Settings must be an object")
+                        # The separate power button owns display_enabled, and the
+                        # lineup in library.json replaced the legacy screen fields:
+                        # saving form edits must not change either.
+                        form = {key: value for key, value in data.items() if key not in LEGACY_FIELDS}
+                        settings = validate_settings({**current.to_dict(), **form,
+                                                      "display_enabled": current.display_enabled})
+                    save_settings(settings, DEFAULT_PATH)
+                    result = settings.to_dict()
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._json(400, {"error": str(exc)})
             return
         except OSError as exc:
-            self._json(500, {"error": f"Could not save settings: {exc}"})
+            self._json(500, {"error": f"Could not save: {exc}"})
             return
-        self._json(200, settings.to_dict())
+        self._json(200, result)
 
     def log_message(self, format, *args):
         print("flightboard web:", format % args, flush=True)
-
-
-def change_screens(current, data):
-    """Apply one authenticated screen-library edit to the current settings."""
-    if not isinstance(data, dict):
-        raise ValueError("Screen request must be an object")
-    action = data.get("action")
-    library = list(current.custom_screens)
-    selected = current.clock_screen_id
-    mode = current.mode
-    if action == "clone" and set(data) == {"action", "source_id"}:
-        source_id = data["source_id"]
-        if not isinstance(source_id, str) or source_id not in {
-                screen["id"] for screen in (*BUILTIN_SCREENS, *library)}:
-            raise ValueError("Source screen does not exist")
-        if len(library) >= MAX_CUSTOM_SCREENS:
-            raise ValueError("Save at most 20 custom screens")
-        source = resolve_screen(source_id, tuple(library),
-                                current.top_color, current.bottom_color)
-        selected = "custom-" + secrets.token_hex(16)
-        library.append({"id": selected,
-                        "name": (source["name"] + " copy")[:32],
-                        "rows": [dict(row) for row in source["rows"]]})
-        mode = "clock"
-    elif action == "save" and set(data) == {"action", "screen"}:
-        screen = data["screen"]
-        if not isinstance(screen, dict):
-            raise ValueError("Screen must be an object")
-        index = next((i for i, item in enumerate(library)
-                      if item["id"] == screen.get("id")), None)
-        if index is None:
-            raise ValueError("Clone a built-in screen before editing it")
-        library[index] = screen
-    elif action == "select" and set(data) == {"action", "screen_id"}:
-        selected = data["screen_id"]
-        mode = "clock"
-    elif action == "delete" and set(data) == {"action", "screen_id"}:
-        target = data["screen_id"]
-        if target not in {screen["id"] for screen in library}:
-            raise ValueError("Only custom screens can be deleted")
-        library = [screen for screen in library if screen["id"] != target]
-        if selected == target:
-            selected = "clock-classic"
-    else:
-        raise ValueError("Unknown screen action")
-    return validate_settings({**current.to_dict(), "custom_screens": library,
-                              "clock_screen_id": selected, "mode": mode})
 
 
 def main():

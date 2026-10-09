@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Configurable desk display for a 32x16 HUB75 RGB matrix."""
+"""Configurable desk display for a 32x16 HUB75 RGB matrix.
+
+The main loop plays the lineup from library.json through player.py, with data
+from providers.py and the aircraft provider below (adsb.fi + ADSBdb).
+"""
 
 from __future__ import annotations
 
@@ -20,10 +24,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
-from zoneinfo import ZoneInfo
 
-from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings, rgb
-from screens import resolve_screen
+import library
+import render
+from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings
 
 SOURCE = "https://opendata.adsb.fi"
 METADATA_SOURCE = "https://api.adsbdb.com/v0"
@@ -43,57 +47,10 @@ def _adsb_json(request):
             return json.load(response)
 DEFAULT_LAT = 51.08083  # Canada Olympic Park / WinSport, approximate venue center
 DEFAULT_LON = -114.21714
-FONT = {
-    "A": ("01110", "10001", "10001", "11111", "10001", "10001", "10001"),
-    "B": ("11110", "10001", "10001", "11110", "10001", "10001", "11110"),
-    "C": ("01111", "10000", "10000", "10000", "10000", "10000", "01111"),
-    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
-    "E": ("11111", "10000", "10000", "11110", "10000", "10000", "11111"),
-    "F": ("11111", "10000", "10000", "11110", "10000", "10000", "10000"),
-    "G": ("01111", "10000", "10000", "10111", "10001", "10001", "01111"),
-    "H": ("10001", "10001", "10001", "11111", "10001", "10001", "10001"),
-    "I": ("11111", "00100", "00100", "00100", "00100", "00100", "11111"),
-    "J": ("00111", "00010", "00010", "00010", "10010", "10010", "01100"),
-    "K": ("10001", "10010", "10100", "11000", "10100", "10010", "10001"),
-    "L": ("10000", "10000", "10000", "10000", "10000", "10000", "11111"),
-    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
-    "N": ("10001", "11001", "10101", "10011", "10001", "10001", "10001"),
-    "O": ("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
-    "P": ("11110", "10001", "10001", "11110", "10000", "10000", "10000"),
-    "Q": ("01110", "10001", "10001", "10001", "10101", "10010", "01101"),
-    "R": ("11110", "10001", "10001", "11110", "10100", "10010", "10001"),
-    "S": ("01111", "10000", "10000", "01110", "00001", "00001", "11110"),
-    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
-    "U": ("10001", "10001", "10001", "10001", "10001", "10001", "01110"),
-    "V": ("10001", "10001", "10001", "10001", "10001", "01010", "00100"),
-    "W": ("10001", "10001", "10001", "10101", "10101", "10101", "01010"),
-    "X": ("10001", "10001", "01010", "00100", "01010", "10001", "10001"),
-    "Y": ("10001", "10001", "01010", "00100", "00100", "00100", "00100"),
-    "Z": ("11111", "00001", "00010", "00100", "01000", "10000", "11111"),
-    "0": ("01110", "10001", "10011", "10101", "11001", "10001", "01110"),
-    "1": ("00100", "01100", "00100", "00100", "00100", "00100", "01110"),
-    "2": ("01110", "10001", "00001", "00010", "00100", "01000", "11111"),
-    "3": ("11110", "00001", "00001", "01110", "00001", "00001", "11110"),
-    "4": ("00010", "00110", "01010", "10010", "11111", "00010", "00010"),
-    "5": ("11111", "10000", "10000", "11110", "00001", "00001", "11110"),
-    "6": ("01110", "10000", "10000", "11110", "10001", "10001", "01110"),
-    "7": ("11111", "00001", "00010", "00100", "01000", "01000", "01000"),
-    "8": ("01110", "10001", "10001", "01110", "10001", "10001", "01110"),
-    "9": ("01110", "10001", "10001", "01111", "00001", "00001", "01110"),
-    ":": ("00000", "01100", "01100", "00000", "01100", "01100", "00000"),
-    ".": ("00000", "00000", "00000", "00000", "00000", "01100", "01100"),
-    "-": ("00000", "00000", "00000", "11111", "00000", "00000", "00000"),
-    "/": ("00001", "00001", "00010", "00100", "01000", "10000", "10000"),
-    " ": ("00000", "00000", "00000", "00000", "00000", "00000", "00000"),
-}
-
-# Seven-pixel marks are deliberately simple; full logos need a larger matrix.
-ICONS = {
-    "plane": ("0001000", "0001000", "0011100", "1111111", "0011100", "0101010", "1000001"),
-    "maple": ("0010100", "0111110", "1111111", "0111110", "0011100", "0010100", "0001000"),
-    "westjet": ("1000001", "1000001", "1010101", "1010101", "1010101", "1100011", "1000001"),
-    "delta": ("0001000", "0011100", "0011100", "0110110", "0110110", "1111111", "1111111"),
-}
+# The 5x7 font now lives in render.py; these names stay for older callers and tests.
+FONT = render.FONT
+ICONS = {name: tuple(row.replace("#", "1").replace(".", "0") for row in render.ICONS[name])
+         for name in ("plane", "maple", "westjet", "delta")}
 
 
 @dataclass(frozen=True)
@@ -296,95 +253,6 @@ def lookup_metadata(aircraft: Aircraft) -> Metadata | None:
         raise
 
 
-def text_width(text: str) -> int:
-    return max(0, len(text) * 6 - 1)
-
-
-def scroll_offset(text: str, elapsed: float, width: int = 32) -> int:
-    overflow = max(0, text_width(text) - width)
-    return -min(overflow, max(0, int((elapsed - 2.0) * 8)))
-
-
-def clock_rows(settings: Settings, now: datetime | None = None) -> list[tuple[str, str]]:
-    """Resolve the selected clock layout to text and row colors."""
-    zone = ZoneInfo(settings.timezone)
-    local = (now or datetime.now(zone)).astimezone(zone)
-    values = {"time": local.strftime("%H:%M"),
-              "date": f"{local:%a %b} {local.day}".upper(),
-              "weekday": local.strftime("%A").upper()}
-    screen = resolve_screen(settings.clock_screen_id, settings.custom_screens,
-                            settings.top_color, settings.bottom_color)
-    return [(values[row["content"]], row["color"]) for row in screen["rows"]]
-
-
-def clock_lines(settings: Settings, now: datetime | None = None) -> tuple[str, str]:
-    rows = clock_rows(settings, now)
-    return rows[0][0], rows[1][0] if len(rows) > 1 else ""
-
-
-def clock_scroll_period(date_text: str) -> float:
-    """Hold both ends of the date before restarting its scroll."""
-    overflow = max(0, text_width(date_text) - 32)
-    return 4.0 + overflow / 8.0
-
-
-def text_pixels(text: str, x: int, y: int, color: tuple[int, int, int], min_x: int = 0):
-    for char in text.upper():
-        glyph = FONT.get(char, FONT[" "])
-        for dy, row in enumerate(glyph):
-            for dx, bit in enumerate(row):
-                if bit == "1" and min_x <= x + dx < 32 and 0 <= y + dy < 16:
-                    yield (x + dx, y + dy, color)
-        x += 6
-
-
-def clock_frame(rows: list[tuple[str, str]], elapsed: float = 0):
-    """Draw a selected one- or two-row clock layout on the 32x16 panel."""
-    pixels = [(0, 0, 0)] * (32 * 16)
-    for index, (value, color) in enumerate(rows):
-        width = text_width(value)
-        x = (32 - width) // 2 if width <= 32 else scroll_offset(value, elapsed)
-        y = 4 if len(rows) == 1 else index * 8
-        for px, py, pixel_color in text_pixels(value, x, y, rgb(color)):
-            pixels[py * 32 + px] = pixel_color
-    return pixels
-
-
-def frame(top: str, bottom: str, elapsed: float = 0, error: bool = False,
-          settings: Settings | None = None, dots: int = 0, active_dot: int = 0,
-          progress: float | None = None, icon: str | None = None):
-    settings = settings or Settings()
-    pixels = [(0, 0, 0)] * (32 * 16)
-    text_start = 9 if icon and settings.icons_enabled else 0
-    for x, y, color in text_pixels(top, text_start + scroll_offset(top, elapsed, 32 - text_start), 0,
-                                   rgb(settings.accent_color) if error else rgb(settings.top_color),
-                                   min_x=text_start):
-        pixels[y * 32 + x] = color
-    if text_start:
-        symbol = ICONS.get(icon, ICONS["plane"])
-        icon_color = {"maple": (255, 65, 57), "westjet": (58, 208, 219),
-                      "delta": (235, 47, 56)}.get(icon, rgb(settings.accent_color))
-        for y, row in enumerate(symbol):
-            for x, bit in enumerate(row):
-                if bit == "1":
-                    pixels[y * 32 + x] = icon_color
-    for x, y, color in text_pixels(bottom, scroll_offset(bottom, elapsed), 8,
-                                   rgb(settings.bottom_color)):
-        pixels[y * 32 + x] = color
-    if progress is not None:
-        lit = round(max(0, min(1, progress)) * 32)
-        dim = tuple(round(channel * .16) for channel in rgb(settings.accent_color))
-        for x in range(32):
-            pixels[15 * 32 + x] = rgb(settings.accent_color) if x < lit else dim
-    elif dots > 0:
-        start = (32 - (dots * 4 - 2)) // 2
-        dim = tuple(round(channel * .20) for channel in rgb(settings.accent_color))
-        for i in range(dots):
-            for x in (start + i * 4, start + i * 4 + 1):
-                pixels[15 * 32 + x] = rgb(settings.accent_color) if i == active_dot else dim
-    return pixels
-
-
 def icon_for(aircraft: Aircraft, metadata: Metadata) -> str:
     callsign = aircraft.callsign
     iata = metadata.iata_callsign or ""
@@ -432,22 +300,310 @@ def detail(aircraft: Aircraft, metadata: Metadata, page: int) -> tuple[str, str]
     return plane or aircraft.callsign, f"{distance} {altitude} {speed}"
 
 
-def _write_status(value: dict, path: Path) -> None:
-    fd, temporary = tempfile.mkstemp(prefix=".status-", dir=path.parent)
+
+
+def bearing_deg(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Initial great-circle bearing from point 1 to point 2 (0 = north, clockwise)."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dlon = math.radians(lon2 - lon1)
+    y = math.sin(dlon) * math.cos(p2)
+    x = math.cos(p1) * math.sin(p2) - math.sin(p1) * math.cos(p2) * math.cos(dlon)
+    return (math.degrees(math.atan2(y, x)) + 360) % 360
+
+
+def _arrow_route(route: str | None) -> str | None:
+    return route.replace("-", ">") if isinstance(route, str) and route else None
+
+
+def _iso(epoch: float | None) -> str | None:
+    return datetime.fromtimestamp(epoch, timezone.utc).isoformat() if epoch else None
+
+
+def _log(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+
+
+class AircraftProvider:
+    """Fetches nearby and followed aircraft off the render thread for snapshot["aircraft"].
+
+    `update(needs)` is called every frame: it collects finished fetches and
+    starts due ones (`aircraft:nearby` and `aircraft:follow:<CALLSIGN>`), one
+    metadata lookup at a time, on the `refresh` cadence. It never blocks.
+    """
+
+    NEARBY_LIMIT = 20
+    KEEP_AFTER_ERROR_S = 120
+    LOOKUP_SPACING_S = 5
+    CALLSIGN_RE = re.compile(r"[A-Z0-9]{2,10}")
+
+    def __init__(self, settings, refresh: float = 20, *, executor=None,
+                 monotonic_fn=time.monotonic, now_fn=time.time, on_success=None):
+        self.settings = settings
+        self.refresh = refresh
+        self._own_executor = executor is None
+        self._executor = executor or ThreadPoolExecutor(max_workers=2, thread_name_prefix="aircraft")
+        self._mono = monotonic_fn
+        self._now = now_fn
+        self._on_success = on_success
+        self._generation = 0
+        self._nearby: list[Aircraft] | None = None
+        self._nearby_at: float | None = None
+        self._nearby_error: str | None = None
+        self._nearby_future: Future | None = None
+        self._nearby_generation = 0
+        self._next_nearby = 0.0
+        self._follow: dict[str, dict] = {}
+        self._metadata: dict[tuple[str, str], tuple[float, Metadata | None]] = {}
+        self._meta_future: Future | None = None
+        self._meta_key: tuple[str, str] | None = None
+        self._next_lookup = 0.0
+
+    def set_settings(self, settings) -> None:
+        old = self.settings
+        self.settings = settings
+        if (old.lat, old.lon, old.radius) != (settings.lat, settings.lon, settings.radius):
+            self._generation += 1
+            self._nearby, self._nearby_at, self._nearby_error = None, None, None
+            self._next_nearby = 0.0
+
+    @property
+    def nearby(self) -> list[Aircraft]:
+        return list(self._nearby or ())
+
+    def _succeeded(self) -> None:
+        if self._on_success:
+            try:
+                self._on_success()
+            except Exception as exc:  # noqa: BLE001 - health reporting must not stop flights
+                _log(f"health error: {exc}")
+
+    def _poll(self, mono: float) -> None:
+        future = self._nearby_future
+        if future is not None and future.done():
+            self._nearby_future = None
+            try:
+                result = future.result()
+                if self._nearby_generation == self._generation:
+                    self._nearby, self._nearby_at, self._nearby_error = result, self._now(), None
+                    self._succeeded()
+            except Exception as exc:  # noqa: BLE001
+                _log(f"feed error: {exc}")
+                if self._nearby_generation == self._generation:
+                    self._nearby_error = str(exc) or type(exc).__name__
+                    if self._nearby_at is None or self._now() - self._nearby_at > self.KEEP_AFTER_ERROR_S:
+                        self._nearby = None
+        for callsign, entry in self._follow.items():
+            future = entry["future"]
+            if future is None or not future.done():
+                continue
+            entry["future"] = None
+            try:
+                found, alias = future.result()
+                entry.update(found=found, alias=alias, at=self._now(), error=None)
+                self._succeeded()
+            except Exception as exc:  # noqa: BLE001
+                _log(f"flight lookup error ({callsign}): {exc}")
+                entry.update(found=None, error=str(exc) or type(exc).__name__)
+        if self._meta_future is not None and self._meta_future.done():
+            try:
+                found = self._meta_future.result()
+                self._metadata[self._meta_key] = (mono + (21600 if found else 3600), found)
+            except Exception as exc:  # noqa: BLE001
+                _log(f"metadata error: {exc}")
+                self._metadata[self._meta_key] = (mono + 120, None)
+            self._meta_future, self._meta_key = None, None
+            self._metadata = {k: v for k, v in self._metadata.items() if v[0] > mono}
+
+    def update(self, needs) -> None:
+        mono = self._mono()
+        self._poll(mono)
+        settings = self.settings
+        follows = sorted({need[16:] for need in needs if need.startswith("aircraft:follow:")
+                          and self.CALLSIGN_RE.fullmatch(need[16:])})
+        for callsign in [c for c in self._follow if c not in follows]:
+            if self._follow[callsign]["future"] is None:
+                del self._follow[callsign]
+        try:
+            if "aircraft:nearby" in needs and self._nearby_future is None and mono >= self._next_nearby:
+                self._nearby_future = self._executor.submit(fetch_aircraft, settings.lat,
+                                                            settings.lon, settings.radius)
+                self._nearby_generation = self._generation
+                self._next_nearby = mono + self.refresh
+            for callsign in follows:
+                entry = self._follow.setdefault(callsign, {"found": None, "alias": callsign,
+                                                           "future": None, "next": 0.0,
+                                                           "at": None, "error": None})
+                if entry["future"] is None and mono >= entry["next"]:
+                    entry["future"] = self._executor.submit(fetch_tracked_aircraft, entry["alias"],
+                                                            settings.lat, settings.lon)
+                    entry["next"] = mono + self.refresh
+            self._poll(mono)  # an inline executor has already finished
+            if self._meta_future is None and mono >= self._next_lookup:
+                candidates = [e["found"] for c, e in self._follow.items() if c in follows and e["found"]]
+                if "aircraft:nearby" in needs:
+                    candidates += select_flights(self.nearby, settings.max_planes)
+                for aircraft in candidates:
+                    key = (aircraft.hex_code, aircraft.callsign)
+                    if key not in self._metadata:
+                        self._meta_future = self._executor.submit(lookup_metadata, aircraft)
+                        self._meta_key = key
+                        self._next_lookup = mono + self.LOOKUP_SPACING_S
+                        break
+        except RuntimeError:  # executor shut down while stopping
+            return
+        self._poll(mono)
+
+    def _info(self, aircraft: Aircraft) -> Metadata:
+        return self._metadata.get((aircraft.hex_code, aircraft.callsign), (0, None))[1] or Metadata()
+
+    def _nearby_entry(self, aircraft: Aircraft) -> dict:
+        info = self._info(aircraft)
+        bearing = (round(bearing_deg(self.settings.lat, self.settings.lon, aircraft.lat, aircraft.lon), 1)
+                   if aircraft.lat is not None and aircraft.lon is not None else None)
+        return {"callsign": aircraft.callsign, "route": _arrow_route(info.route),
+                "distance_nm": round(aircraft.distance_nm, 1), "altitude_ft": aircraft.altitude_ft,
+                "speed_kt": aircraft.speed_kt, "icon": icon_for(aircraft, info), "bearing_deg": bearing}
+
+    def _tracked_entry(self, callsign: str, aircraft: Aircraft) -> dict:
+        info = self._info(aircraft)
+        route = _arrow_route(info.route)
+        origin, destination = route.split(">", 1) if route else (None, None)
+        progress = route_progress(aircraft, info)
+        remaining = None
+        if (info.destination_position and aircraft.lat is not None and aircraft.lon is not None
+                and aircraft.speed_kt and aircraft.speed_kt >= 30):
+            left = distance_nm(aircraft.lat, aircraft.lon, *info.destination_position)
+            remaining = round(left / aircraft.speed_kt * 60)
+        return {"callsign": callsign, "icao": aircraft.callsign, "route": route,
+                "origin": origin, "destination": destination,
+                "progress": round(progress, 3) if progress is not None else None,
+                "remaining_min": remaining, "altitude_ft": aircraft.altitude_ft,
+                "speed_kt": aircraft.speed_kt, "distance_nm": round(aircraft.distance_nm, 1),
+                "icon": icon_for(aircraft, info)}
+
+    def snapshot(self) -> dict | None:
+        """snapshot["aircraft"], or None before anything was asked for."""
+        if self._nearby is None and not self._follow and self._nearby_error is None:
+            return None
+        nearby = None
+        if self._nearby is not None:
+            selected = select_flights(self._nearby, self.settings.max_planes)
+            ordered = selected + [a for a in self._nearby if a not in selected]
+            nearby = [self._nearby_entry(a) for a in ordered[:self.NEARBY_LIMIT]]
+        follow = {callsign: (self._tracked_entry(callsign, entry["found"]) if entry["found"] else None)
+                  for callsign, entry in self._follow.items()}
+        stamps = [self._nearby_at] + [entry["at"] for entry in self._follow.values()]
+        errors = [self._nearby_error] + [entry["error"] for entry in self._follow.values()]
+        return {"nearby": nearby, "tracked": next(iter(follow.values()), None) if follow else None,
+                "follow": follow, "updated_at": _iso(max((s for s in stamps if s), default=None)),
+                "error": next((e for e in errors if e), None)}
+
+    def close(self) -> None:
+        if self._own_executor:
+            self._executor.shutdown(wait=False, cancel_futures=True)
+
+
+# --- files ------------------------------------------------------------------------------
+
+def _write_json(value, path: Path, mode: int = 0o644) -> None:
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.stem}-", dir=path.parent)
     try:
         with os.fdopen(fd, "w") as handle:
-            json.dump(value, handle)
+            json.dump(value, handle, default=str)
             handle.write("\n")
-        os.chmod(temporary, 0o644)
+        os.chmod(temporary, mode)
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
 
 
-def main() -> int:
+def _write_status(value: dict, path: Path) -> None:
+    _write_json(value, path, 0o644)
+
+
+def _age_s(stamp, now: float) -> int | None:
+    if not isinstance(stamp, str) or not stamp:
+        return None
+    try:
+        parsed = datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return max(0, round(now - parsed.timestamp()))
+
+
+def data_ages(data: dict, now: float | None = None) -> dict:
+    """Seconds since each source last reported: {aircraft, weather, metar, iss, calendar}."""
+    now = time.time() if now is None else now
+    section = lambda key: data.get(key) if isinstance(data.get(key), dict) else {}
+    weather = section("weather")
+    metar = [entry.get("age_s") for entry in section("metar").values()
+             if isinstance(entry, dict) and isinstance(entry.get("age_s"), (int, float))]
+    return {"aircraft": _age_s(section("aircraft").get("updated_at"), now),
+            "weather": (weather.get("age_s") if isinstance(weather.get("age_s"), (int, float))
+                        else _age_s(weather.get("observed_at"), now)),
+            "metar": max(metar) if metar else None,
+            "iss": _age_s(section("iss").get("updated_at"), now),
+            "calendar": _age_s(section("calendar").get("updated_at"), now)}
+
+
+def build_status(settings, info: dict, pixels, data: dict, now: float | None = None) -> dict:
+    """status.json for the web UI: the old keys plus the live frame and lineup state."""
+    now = time.time() if now is None else now
+    on = bool(settings.display_enabled)
+    aircraft = data.get("aircraft") if isinstance(data.get("aircraft"), dict) else {}
+    health = data.get("health") if isinstance(data.get("health"), dict) else {}
+    tracked = aircraft.get("tracked") if isinstance(aircraft.get("tracked"), dict) else None
+    progress = tracked.get("progress") if tracked else None
+    pin = info.get("pin") if info.get("pinned") else None
+    if info.get("interrupt"):
+        detail_text = {"plane_overhead": "Plane overhead", "timer_done": "Timer done",
+                       "rain_soon": "Rain soon", "iss_overhead": "ISS overhead"}.get(
+                           info["interrupt"], info["interrupt"])
+    elif pin:
+        detail_text = "Pinned"
+    else:
+        detail_text = info.get("moment") or "Always on"
+    return {
+        "state": ("off" if not on else
+                  "delayed" if aircraft.get("error") or health.get("net_ok") is False else "live"),
+        "display_enabled": on,
+        "mode": "lineup",
+        "title": info.get("screen_name") if on else "DISPLAY OFF",
+        "detail": detail_text if on else "Turn on in settings",
+        "progress_percent": (round(progress * 100) if on and isinstance(progress, (int, float))
+                             else None),
+        "updated_at": datetime.fromtimestamp(now, timezone.utc).isoformat(),
+        "nearby": [{key: plane.get(key) for key in ("callsign", "distance_nm", "altitude_ft", "route")}
+                   for plane in (aircraft.get("nearby") or [])[:10] if isinstance(plane, dict)],
+        "frame": render.to_hex(pixels if on else [render.BLACK] * 512),
+        "screen_id": info.get("screen_id"),
+        "screen_name": info.get("screen_name"),
+        "moment": None if pin else info.get("moment"),
+        "pinned": pin,
+        "data_age": data_ages(data, now),
+        "feed_age_s": health.get("feed_age_s"),
+        # Device › Custom JSON feeds shows each feed's last error and age.
+        "feeds": {feed_id: {"error": feed.get("error"), "age_s": _age_s(feed.get("updated_at"), now)}
+                  for feed_id, feed in (data.get("feeds") or {}).items() if isinstance(feed, dict)},
+    }
+
+
+# --- main loop ----------------------------------------------------------------------------
+
+FRAME_S = 0.05
+RELOAD_S = 1.0
+SNAPSHOT_S = 1.0
+STATUS_S = 2.0
+DATA_S = 30.0
+
+
+def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--settings", type=Path, default=DEFAULT_PATH)
+    parser.add_argument("--library", type=Path, help="library.json (default: in the state directory)")
     parser.add_argument("--lat", type=float)
     parser.add_argument("--lon", type=float)
     parser.add_argument("--label")
@@ -458,23 +614,159 @@ def main() -> int:
     parser.add_argument("--mapping", default="regular")
     parser.add_argument("--software-pulse", action="store_true")
     parser.add_argument("--once", action="store_true", help="Print nearby flights; do not use GPIO")
-    args = parser.parse_args()
-
-    def configured() -> Settings:
-        from dataclasses import replace
-        from settings import validate_settings
-        current = load_settings(args.settings)
-        overrides = {name: getattr(args, name) for name in
-                     ("lat", "lon", "label", "radius", "rotate", "brightness")
-                     if getattr(args, name) is not None}
-        return validate_settings(replace(current, **overrides).to_dict())
-
+    args = parser.parse_args(argv)
     if args.refresh < 5:
         parser.error("refresh must be at least 5 seconds")
+    args.parser = parser
+    return args
+
+
+def configured(args) -> Settings:
+    """Settings from disk with command-line overrides applied and validated."""
+    from dataclasses import replace
+    from settings import validate_settings
+    current = load_settings(args.settings)
+    overrides = {name: getattr(args, name) for name in
+                 ("lat", "lon", "label", "radius", "rotate", "brightness")
+                 if getattr(args, name, None) is not None}
+    return validate_settings(replace(current, **overrides).to_dict())
+
+
+def library_path(args) -> Path:
+    return getattr(args, "library", None) or library.LIBRARY_PATH
+
+
+def load_library(path: Path, settings) -> dict:
+    """Validated library.json, migrated from settings on first run; ValueError when invalid."""
+    return library.load_library(path, settings)
+
+
+def _mtime(path: Path):
     try:
-        settings = configured()
+        return path.stat().st_mtime_ns
+    except OSError:
+        return None
+
+
+def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Event | None = None,
+        state_dir: Path | None = None, providers=None, aircraft=None,
+        monotonic=time.monotonic, sleep=time.sleep) -> int:
+    """Drive `matrix` (an RGBMatrix or a fake with the same methods) until stopped.
+
+    `stop_after` ends the loop after that many frames (tests).
+    """
+    from player import Player
+    from providers import Providers
+
+    state_dir = Path(state_dir or STATE_DIR)
+    settings = configured(args)
+    lib_path = library_path(args)
+    settings_mtime, lib_mtime = _mtime(args.settings), _mtime(lib_path)
+    try:
+        lib = load_library(lib_path, settings)
+    except (OSError, ValueError) as exc:
+        _log(f"library error: {exc}")
+        lib = {}
+    player = Player(lib, settings)
+    providers = providers or Providers(settings, state_dir)
+    aircraft = aircraft or AircraftProvider(settings, args.refresh,
+                                            on_success=providers.mark_network_ok)
+    canvas = matrix.CreateFrameCanvas()
+    shown = None
+    brightness = None
+    snapshot: dict = {}
+    data: dict = {}
+    pixels, info = [render.BLACK] * 512, {}
+    next_reload = next_snapshot = next_status = 0.0
+    next_data = monotonic() + DATA_S
+    frames = 0
+    matrix.Clear()
+    try:
+        while not (stop_event and stop_event.is_set()):
+            now = monotonic()
+            if now >= next_reload:
+                next_reload = now + RELOAD_S
+                mtime = _mtime(args.settings)
+                if mtime != settings_mtime:
+                    settings_mtime = mtime
+                    try:
+                        updated = configured(args)
+                    except (ValueError, OSError) as exc:
+                        _log(f"settings error: {exc}")
+                    else:
+                        if updated != settings:
+                            settings = updated
+                            player.set_settings(settings)
+                            providers.set_settings(settings)
+                            aircraft.set_settings(settings)
+                            next_snapshot = next_status = now
+                mtime = _mtime(lib_path)
+                if mtime != lib_mtime:
+                    lib_mtime = mtime
+                    try:
+                        lib = load_library(lib_path, settings)
+                        player.set_library(lib)
+                        next_status = now
+                    except (OSError, ValueError) as exc:
+                        _log(f"library error: {exc}")
+            needs = player.needs()
+            providers.update(needs, lib.get("feeds") or [])
+            aircraft.update(needs)
+            if now >= next_snapshot:
+                next_snapshot = now + SNAPSHOT_S
+                snapshot = providers.snapshot()
+            data = dict(snapshot)
+            planes = aircraft.snapshot()
+            if planes is not None:
+                data["aircraft"] = planes
+            try:
+                pixels, info = player.tick(now, data)
+            except Exception as exc:  # noqa: BLE001 - one bad screen must not stop the panel
+                _log(f"render error: {exc}")
+            if settings.display_enabled:
+                wanted = effective_brightness(settings, moment_brightness=info.get("moment_brightness"))
+                if wanted != brightness:
+                    brightness = matrix.brightness = wanted
+                    shown = None  # brightness applies when pixels are set
+                if pixels != shown:
+                    for y in range(16):
+                        row = y * 32
+                        for x in range(32):
+                            canvas.SetPixel(x, y, *pixels[row + x])
+                    canvas = matrix.SwapOnVSync(canvas)
+                    shown = pixels
+            elif shown is not None or brightness is not None:
+                matrix.Clear()
+                shown = brightness = None
+            if now >= next_status:
+                next_status = now + STATUS_S
+                try:
+                    _write_status(build_status(settings, info, pixels, data), state_dir / "status.json")
+                except OSError as exc:
+                    _log(f"status error: {exc}")
+            if now >= next_data:
+                next_data = now + DATA_S
+                try:
+                    _write_json(data, state_dir / "data.json", 0o640)
+                except (OSError, TypeError, ValueError) as exc:
+                    _log(f"data error: {exc}")
+            frames += 1
+            if stop_after is not None and frames >= stop_after:
+                break
+            sleep(max(0.0, now + (FRAME_S if settings.display_enabled else 4 * FRAME_S) - monotonic()))
+    finally:
+        aircraft.close()
+        providers.close()
+        matrix.Clear()
+    return 0
+
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
+    try:
+        settings = configured(args)
     except (ValueError, json.JSONDecodeError) as exc:
-        parser.error(str(exc))
+        args.parser.error(str(exc))
     if args.once:
         for aircraft in fetch_aircraft(settings.lat, settings.lon, settings.radius):
             print(f"{aircraft.callsign:8} {aircraft.distance_nm:5.1f} NM  "
@@ -497,267 +789,16 @@ def main() -> int:
     if sound_module_loaded and not args.software_pulse:
         print("Onboard audio is loaded; using software pulse timing", file=sys.stderr, flush=True)
     matrix = RGBMatrix(options=options)
-    running = True
+    stop_event = threading.Event()
 
     def stop(_signum, _frame):
-        nonlocal running
-        running = False
+        stop_event.set()
 
     signal.signal(signal.SIGINT, stop)
     signal.signal(signal.SIGTERM, stop)
-    canvas = matrix.CreateFrameCanvas()
-
-    def show(top: str, bottom: str, elapsed: float, *, error: bool = False,
-             dots: int = 0, active_dot: int = 0, progress: float | None = None,
-             icon: str | None = None, clock: list[tuple[str, str]] | None = None):
-        nonlocal canvas
-        pixels = (clock_frame(clock, elapsed) if clock is not None else
-                  frame(top, bottom, elapsed, error, settings, dots, active_dot, progress,
-                        icon))
-        for y in range(16):
-            for x in range(32):
-                canvas.SetPixel(x, y, *pixels[y * 32 + x])
-        canvas = matrix.SwapOnVSync(canvas)
-
-    executor = ThreadPoolExecutor(max_workers=3)
-    flights: list[Aircraft] = []
-    selected_flights: list[Aircraft] = []
-    tracked: Aircraft | None = None
-    resolved_flight = settings.flight
-    metadata_cache: dict[tuple[str, str], tuple[float, Metadata | None]] = {}
-    metadata_future: Future[Metadata | None] | None = None
-    metadata_key: tuple[str, str] | None = None
-    fetch_future: Future[list[Aircraft]] | None = None
-    fetch_generation = 0
-    track_future: Future[tuple[Aircraft | None, str]] | None = None
-    track_generation = 0
-    generation = 0
-    next_lookup = next_fetch = next_status = 0.0
-    next_track = time.monotonic() + 1.2
-    next_settings_check = 0.0
-    settings_mtime = args.settings.stat().st_mtime_ns if args.settings.exists() else None
-    screen_end = screen_start = 0.0
-    screen_top, screen_bottom = settings.label, "STARTING"
-    screen_dots = screen_active_dot = 0
-    screen_progress = None
-    screen_icon = None
-    clock_static_signature = None
-    next_credit = time.monotonic() + 60
-    index = 0
-    nearby_failed = False
-    track_failed = False
-    if settings.display_enabled and settings.mode != "clock":
-        show(screen_top, screen_bottom, 0)
-    else:
-        matrix.Clear()
-    try:
-        while running:
-            now = time.monotonic()
-            if now >= next_settings_check:
-                next_settings_check = now + 1
-                mtime = args.settings.stat().st_mtime_ns if args.settings.exists() else None
-                if mtime != settings_mtime:
-                    try:
-                        updated = configured()
-                        settings_mtime = mtime
-                        if updated != settings:
-                            old = settings
-                            settings = updated
-                            if old.display_enabled and not settings.display_enabled:
-                                matrix.Clear()
-                            index = 0
-                            screen_end = 0
-                            next_status = 0
-                            location_changed = ((old.lat, old.lon, old.radius) !=
-                                                (settings.lat, settings.lon, settings.radius))
-                            target_changed = ((old.mode, old.flight) !=
-                                              (settings.mode, settings.flight))
-                            if location_changed or target_changed:
-                                generation += 1
-                                next_fetch = now + 1.2
-                                next_track = now + 1.2
-                            if location_changed:
-                                flights = []
-                                selected_flights = []
-                                nearby_failed = False
-                            if target_changed:
-                                resolved_flight = settings.flight
-                                tracked = None
-                                track_failed = False
-                            if settings.mode == "clock":
-                                flights = []
-                                selected_flights = []
-                                nearby_failed = False
-                            selected_flights = select_flights(flights, settings.max_planes)
-                    except (ValueError, json.JSONDecodeError) as exc:
-                        print(f"settings error: {exc}", file=sys.stderr, flush=True)
-                brightness = effective_brightness(settings)
-                if matrix.brightness != brightness:
-                    matrix.brightness = brightness
-
-            if settings.mode != "clock" and fetch_future is None and now >= next_fetch:
-                fetch_future = executor.submit(fetch_aircraft, settings.lat,
-                                               settings.lon, settings.radius)
-                fetch_generation = generation
-                next_fetch = now + args.refresh
-            if fetch_future is not None and fetch_future.done():
-                try:
-                    result = fetch_future.result()
-                    if fetch_generation == generation:
-                        flights = result
-                        selected_flights = select_flights(flights, settings.max_planes)
-                        nearby_failed = False
-                except (OSError, ValueError, TypeError, urllib.error.URLError) as exc:
-                    print(f"feed error: {exc}", file=sys.stderr, flush=True)
-                    if fetch_generation == generation:
-                        flights = []
-                        selected_flights = []
-                        nearby_failed = True
-                        screen_end = 0
-                fetch_future = None
-                metadata_cache = {key: value for key, value in metadata_cache.items()
-                                  if value[0] > now}
-
-            if settings.mode == "flight" and track_future is None and now >= next_track:
-                track_future = executor.submit(fetch_tracked_aircraft, resolved_flight,
-                                               settings.lat, settings.lon)
-                track_generation = generation
-                next_track = now + args.refresh
-            if track_future is not None and track_future.done():
-                try:
-                    result, alias = track_future.result()
-                    if track_generation == generation:
-                        tracked = result
-                        resolved_flight = alias
-                        track_failed = False
-                        screen_end = 0
-                except (OSError, ValueError, TypeError, urllib.error.URLError) as exc:
-                    print(f"flight lookup error: {exc}", file=sys.stderr, flush=True)
-                    if track_generation == generation:
-                        tracked = None
-                        track_failed = True
-                        screen_end = 0
-                track_future = None
-
-            if metadata_future is not None and metadata_future.done():
-                try:
-                    found = metadata_future.result()
-                    metadata_cache[metadata_key] = (now + (21600 if found else 3600), found)
-                except (OSError, ValueError, TypeError, urllib.error.URLError) as exc:
-                    print(f"metadata error: {exc}", file=sys.stderr, flush=True)
-                    metadata_cache[metadata_key] = (now + 120, None)
-                metadata_future = None
-                metadata_key = None
-            if settings.mode != "clock" and metadata_future is None and now >= next_lookup:
-                candidates = ([tracked] if tracked else []) + selected_flights
-                for aircraft in candidates:
-                    key = (aircraft.hex_code, aircraft.callsign)
-                    if key not in metadata_cache:
-                        metadata_future = executor.submit(lookup_metadata, aircraft)
-                        metadata_key = key
-                        next_lookup = now + 5
-                        break
-
-            failed = (track_failed if settings.mode == "flight" else
-                      nearby_failed if settings.mode == "nearby" else False)
-            if settings.mode == "clock":
-                current_clock_rows = clock_rows(settings)
-                clock_top = current_clock_rows[0][0]
-                clock_bottom = current_clock_rows[1][0] if len(current_clock_rows) > 1 else ""
-                static_signature = tuple(value for value, _ in current_clock_rows
-                                         if ":" not in value)
-                if static_signature != clock_static_signature or screen_end == 0:
-                    screen_start = now
-                clock_static_signature = static_signature
-                if screen_top != clock_top or screen_bottom != clock_bottom:
-                    next_status = 0
-                screen_top, screen_bottom = clock_top, clock_bottom
-                screen_end = float("inf")
-                screen_dots = screen_active_dot = 0
-                screen_progress = None
-                screen_icon = None
-            elif now >= screen_end:
-                screen_dots = screen_active_dot = 0
-                screen_progress = None
-                screen_icon = None
-                if now >= next_credit:
-                    screen_top, screen_bottom = "ADSB.FI", "LIVE DATA"
-                    next_credit = now + 60
-                elif settings.mode == "flight":
-                    if tracked is None:
-                        screen_top = settings.flight
-                        screen_bottom = "WAITING" if not failed else "API DELAY"
-                    else:
-                        key = (tracked.hex_code, tracked.callsign)
-                        info = metadata_cache.get(key, (0, None))[1] or Metadata()
-                        screen_progress = route_progress(tracked, info)
-                        if index % 2 == 0:
-                            screen_top = info.iata_callsign or tracked.callsign
-                            screen_bottom = info.route or "ROUTE UNKNOWN"
-                            screen_icon = icon_for(tracked, info)
-                        else:
-                            screen_top = " ".join(part for part in
-                                                  (info.airline, info.aircraft_type or tracked.aircraft_type)
-                                                  if part) or tracked.callsign
-                            altitude = (f"{round(tracked.altitude_ft / 1000)}KFT"
-                                        if tracked.altitude_ft is not None else "GROUND")
-                            speed = (f"{tracked.speed_kt}KT" if tracked.speed_kt is not None
-                                     else "SPEED ?")
-                            screen_bottom = f"{altitude} {speed}"
-                        index += 1
-                elif selected_flights:
-                    current = (index // 2) % len(selected_flights)
-                    aircraft = selected_flights[current]
-                    key = (aircraft.hex_code, aircraft.callsign)
-                    info = metadata_cache.get(key, (0, None))[1] or Metadata()
-                    screen_top, screen_bottom = detail(aircraft, info, index % 2)
-                    if index % 2 == 0:
-                        screen_icon = icon_for(aircraft, info)
-                    screen_dots, screen_active_dot = len(selected_flights), current
-                    index += 1
-                else:
-                    screen_top = settings.label
-                    screen_bottom = "API DELAY" if failed else "NO FLIGHTS"
-                screen_start = now
-                top_width = 23 if screen_icon and settings.icons_enabled else 32
-                overflow = max(text_width(screen_top) - top_width,
-                               text_width(screen_bottom) - 32)
-                screen_end = now + max(settings.rotate, 4 + max(0, overflow) / 8)
-
-            if settings.display_enabled:
-                display_elapsed = now - screen_start
-                if settings.mode == "clock":
-                    display_elapsed %= max(clock_scroll_period(value)
-                                           for value, _ in current_clock_rows)
-                show(screen_top, screen_bottom, display_elapsed,
-                     error=screen_bottom == "API DELAY", dots=screen_dots,
-                     active_dot=screen_active_dot, progress=screen_progress, icon=screen_icon,
-                     clock=current_clock_rows if settings.mode == "clock" else None)
-            if now >= next_status:
-                next_status = now + 5
-                try:
-                    _write_status({
-                        "state": ("off" if not settings.display_enabled else
-                                  "delayed" if failed else "live"),
-                        "display_enabled": settings.display_enabled,
-                        "mode": settings.mode,
-                        "title": screen_top if settings.display_enabled else "DISPLAY OFF",
-                        "detail": screen_bottom if settings.display_enabled else "Turn on in settings",
-                        "progress_percent": (round(screen_progress * 100)
-                                             if settings.display_enabled and screen_progress is not None
-                                             else None),
-                        "updated_at": datetime.now(timezone.utc).isoformat(),
-                        "nearby": [{"callsign": item.callsign, "distance_nm": item.distance_nm,
-                                    "altitude_ft": item.altitude_ft}
-                                   for item in flights[:10]],
-                    }, STATE_DIR / "status.json")
-                except OSError as exc:
-                    print(f"status error: {exc}", file=sys.stderr, flush=True)
-            time.sleep(0.1)
-    finally:
-        executor.shutdown(wait=False, cancel_futures=True)
-        matrix.Clear()
-    return 0
+    # The library loads after RGBMatrix dropped root, so a migrated library.json
+    # belongs to the flightboard user like the web server's files.
+    return run(matrix, args, stop_event=stop_event)
 
 
 if __name__ == "__main__":

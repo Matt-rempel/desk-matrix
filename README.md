@@ -1,16 +1,15 @@
 # Desk Matrix
 
 Desk Matrix turns a Raspberry Pi and a 32×16 HUB75 RGB matrix into a
-configurable desk display. It currently shows a clock and date, cycles through
-nearby aircraft, or follows one flight. Clock screens can use one centered
-5×7 text row or two rows; long details scroll across the panel. A private
-HTTPS settings page lets you change modes, location, colors, brightness, and
-screen timing from a phone or computer.
+configurable desk display. Everything it shows is a *screen*: clocks, nearby
+and followed flights, weather, METAR, the sun and the ISS, timers, habits,
+messages, pixel art and numbers from your own JSON feeds. A private HTTPS
+settings page on your phone or computer lets you pick screens from a gallery,
+customize them, build your own, draw pixel art, and plan which screens play
+at each time of day.
 
 The application files and Linux services still use the `flightboard` name so
 existing installations can update without moving settings or changing units.
-The control page also shows weather and timer concepts as planned screens;
-they are not active modes yet.
 
 The first installation uses WinSport in Calgary as a sample location. **Change
 the location and time zone in settings for your own desk.**
@@ -67,8 +66,8 @@ the Pi's GPIO header.
    sign in to the **same tailnet**. Open the private HTTPS pairing link printed
    at the end of installation. The settings page also accepts the pairing key
    pasted into its form. Keep the key and link out of screenshots and chat.
-5. Set your **short location label, latitude, longitude, and IANA time zone**
-   on the settings page. For example, Calgary uses `America/Edmonton`.
+5. Under **Device**, set your **short location label, latitude, longitude,
+   and IANA time zone**. For example, Calgary uses `America/Edmonton`.
    Adjust brightness for your panel and power supply.
 
 The web backend listens only on `127.0.0.1:8765` on the Pi. Tailscale Serve
@@ -87,12 +86,21 @@ git pull --ff-only
 sh install.sh
 ```
 
-The installer preserves `/var/lib/flightboard/settings.json` and the pairing
-key. It reuses an existing matrix driver environment and restarts the two
-services after checking imports. If an update fails while switching services,
-it restores the previous application files and units. The full private pairing
+The installer preserves `/var/lib/flightboard` (settings, your screens and
+lineup in `library.json`, and the pairing key). It reuses an existing matrix
+driver environment and restarts the two services after checking imports. If
+an update fails while switching services, it restores the previous
+application files, `web/` directory and units. The full private pairing
 link is shown again after a successful update. To suppress it in a captured
 terminal log, run `sh install.sh --no-pairing-link`.
+
+**Upgrading from the mode-based version:** nothing to do by hand. On first
+start, your settings are migrated into `library.json`: custom clock screens
+become screens in **Your screens**, and the old mode becomes the lineup
+(clock → that clock screen, nearby → *Nearby flight*, follow → a *Follow*
+copy with your flight number). Location, colors, brightness and night hours
+carry over; the old mode fields stay in `settings.json` but are no longer
+used. The previous settings page files in `/opt/flightboard` are removed.
 
 ### Troubleshooting
 
@@ -114,62 +122,97 @@ this is optional. The matrix driver's README describes this hardware limit.
 
 ## What the display shows
 
-Nearby mode shows the nearest aircraft and up to two more with airline-style
-callsigns, filling unused slots with the next closest planes. Each selected
-plane gets a callsign/route view and a detail view with airline, aircraft
-type, distance, approximate altitude, and ground speed. Missing details fall
-back to live callsign and position data. Small dots show which plane is being
-displayed. Tiny 7×7 aircraft or airline-inspired marks can be enabled; they
-are deliberately simple because this panel cannot render full logos clearly.
+The settings page has three tabs.
 
-Follow mode looks for a specific flight and shows route progress when both
-airport coordinates and a recent aircraft position are available. This is an
-approximation along a great-circle route, **not an arrival estimate**. Some
-flight numbers may need the exact ADS-B callsign, such as `ACA150`. If the
-flight is not broadcasting a recent position or the feed lacks coverage, the
-display shows `WAITING`.
+**Screens** opens on a live copy of the panel, then a gallery of built-in
+screens grouped into shelves:
 
-Clock mode starts with three built-in screens: clock and date, time only, and
-time with weekday. Select a preset under **Clock screen library**, or choose
-**Clone & edit** to save a custom screen. Each custom screen has a name, one
-or two rows, and an independent color and content choice (time, date, or
-weekday) for each row. Built-ins stay available as starting points. Time uses
-24-hour format; date includes abbreviated weekday, month, and day. The clock
-uses the configured time zone and does not request flight data while selected.
-Up to 20 custom screens are saved on the Pi with the rest of the settings.
+| Shelf | Screens |
+| --- | --- |
+| Time | Big digits, Classic, Analog, In words, Day progress, Night clock |
+| Sky | Nearby flight, Follow a flight, Radar, ISS, Sun arc |
+| Weather | Right now, Next 12 hours, Rain soon, METAR |
+| Focus | Pomodoro, Countdown, Habit streak, Next up (calendar) |
+| Play | Message, Pixel pet, Life, Ember, Now playing |
+| Data | Market, Score, Transit, Pi health |
 
-The settings page controls nearby/follow/clock mode, location and radius,
-number of planes, screen time, colors, icons, day brightness, and optional night dimming
-in the configured time zone. Its **Turn display off/on** button blanks or
-restores the LEDs immediately while the Pi and web page stay available. The
-choice survives a restart; off does not disconnect electrical power from the
-Pi or panel. Other settings changes are applied without restarting.
+Previews are rendered on the Pi by the same code that drives the panel, so
+what you see is what the LEDs show. **Customize** changes a screen's palette,
+clock style, second line, options and motion, then **Show now** pins it to the
+panel until you return to the lineup, or **Add to lineup** keeps it in
+rotation. Pomodoro timers start, pause and reset from the phone; habit
+screens take a tap for **Done today**. **Build your own** combines one of six
+layouts with blocks (time, date, temperature, flight, countdown, text, feed
+value, sparkline, pixel art and more). The **Pixel studio** draws 7×7 icons,
+16×16 sprites or full-panel art with up to eight animation frames, ready to
+use in a screen. **Planes nearby** lists aircraft in range with a **Follow**
+button whenever a flight screen is playing.
+
+**Lineup** plans the day. Each *time of day* (for example Morning, 07:00–
+09:00 on weekdays) has its own screens, durations and optional brightness;
+**Any other time** plays when none match. Moments may cross midnight; the
+first match in the list wins. Screens change with a cut, slide, dissolve or
+pixel wipe. *Interruptions* break in for a plane overhead (radius, altitude
+and duration are adjustable), a finished timer, rain starting soon, or the
+ISS passing within about 1,500 km.
+
+**Device** holds location and time zone, flight radius and rotation, units
+(°C/°F, nm/km), brightness (follow the lineup, a maximum, night dimming and
+an optional Night red look), the calendar link, custom JSON feeds, and the
+display power switch. Off blanks the LEDs immediately while the Pi and page
+stay available; it survives a restart and does not cut power to the Pi or
+panel. Changes apply without restarting.
+
+Nearby flight shows the closest aircraft and cycles through a few more with
+callsign, route, airline, type, distance, altitude and speed when known.
+Follow a flight shows route progress when both airports and a recent position
+are known: an approximation along a great-circle route, **not an arrival
+estimate**. Some flight numbers need the exact ADS-B callsign, such as
+`ACA150`. Missing data never blanks a screen: it shows a short placeholder
+such as `--` or `NO DATA`.
 
 ## Data and limits
 
-Live aircraft positions come from [adsb.fi](https://adsb.fi/) through its
-[open data API](https://github.com/adsbfi/opendata). Its public API is for
-personal, non-commercial use and allows one request per second. Desk Matrix
-spaces nearby and global callsign requests at least 1.1 seconds apart and
-refreshes positions about every 20 seconds by default. Coverage and
-callsigns depend on available receivers. This is an aircraft position display,
-not an authoritative airport arrival or departure board.
+Sources need no API keys, run off the display thread with timeouts, keep the
+last good value and back off after errors. The page shows each source's age.
 
-Route, airline, and aircraft details come from the
-[ADSBdb public API](https://github.com/mrjackwills/adsbdb). Lookups run one at
-a time and are cached. Routes may be absent or inaccurate. The display uses
-position data when metadata is missing and clears stale aircraft rather than
-showing them indefinitely.
+- **Aircraft:** positions from [adsb.fi](https://adsb.fi/) through its
+  [open data API](https://github.com/adsbfi/opendata) (personal,
+  non-commercial use, one request per second; Desk Matrix spaces requests at
+  least 1.1 s apart and refreshes about every 20 s). Route, airline and type
+  from the [ADSBdb public API](https://github.com/mrjackwills/adsbdb), one
+  lookup at a time and cached. Coverage depends on receivers; routes may be
+  missing or wrong. This is not an authoritative arrivals board.
+- **Weather:** [Open-Meteo](https://open-meteo.com/) forecast for your
+  location every 15 minutes. Weather data by Open-Meteo.com, licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- **METAR:** NOAA [aviationweather.gov](https://aviationweather.gov/) data
+  API every 10 minutes for the airport you enter, with observation age.
+- **ISS:** [wheretheiss.at](https://wheretheiss.at/) every 30 s, only while
+  an ISS screen or interruption needs it.
+- **Sun:** sunrise and sunset are calculated on the Pi; no network.
+- **Calendar (optional):** a private ICS link, fetched every 15 minutes and
+  kept on the Pi. Single events, all-day events and simple daily or weekly
+  repeats are understood; complex recurrence rules are not.
+- **Custom JSON feeds (optional, up to 10):** any http(s) URL, a dotted path
+  to the value (and optionally to a number series), prefix, suffix, and a
+  refresh interval of at least 60 s.
+
+Known limits: the ISS screen shows the station's current distance and
+direction, not predicted passes. Transit arrivals, sports scores, market
+prices and *Now playing* come from your own JSON feeds (for example from a
+home-automation server); there are no built-in services for them. Weather
+alerts are not shown, and the display is not a safety warning channel.
 
 ## Development
 
 Run tests on a computer with Python 3.11+ (the matrix driver is imported only
-when starting the hardware display):
+when starting the hardware display). Everything uses the standard library:
 
 ```sh
 python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
 Run `python3 flightboard.py --once` on the Pi to test the aircraft feed without
-using GPIO. See [IDEAS.md](IDEAS.md) for proposed display modes and
+using GPIO, and `python3 blocks.py time-classic` to print a screen as ASCII. See [IDEAS.md](IDEAS.md) for proposed display modes and
 [CONTRIBUTING.md](CONTRIBUTING.md) for the shared Git workflow.
