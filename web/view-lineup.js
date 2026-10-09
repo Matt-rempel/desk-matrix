@@ -1,6 +1,6 @@
 // Lineup: time-of-day moments, always-on list, interruptions and transitions.
 
-import { state, subscribe, clone, findScreen, builtins, customs, liveMomentId, act } from './store.js';
+import { state, subscribe, clone, findScreen, customs, liveMomentId, act } from './store.js';
 import { screenMatrix } from './matrix.js';
 import { h, toggle, stepper, chips, sheet, toast, messageLine, confirmSheet, busy, nextId } from './ui.js';
 
@@ -40,7 +40,7 @@ function glyphFor(m) {
   return ['☾', 'tint-night'];
 }
 
-export function render(root, { params, go }) {
+export function render(root, { params }) {
   let lu = clone(state.library.lineup);
   let savedJSON = JSON.stringify(lu);
   const open = new Set();
@@ -307,7 +307,6 @@ export function render(root, { params, go }) {
         return h('li', null, btn);
       }))));
     s = sheet({ title: `Add to ${target}`, body });
-    void builtins;
   }
 
   function addToSheet(screenId, seconds) {
@@ -387,7 +386,6 @@ export function render(root, { params, go }) {
     }
   });
 
-  void go;
   return () => { unsubscribe(); document.body.classList.remove('has-savebar'); };
 }
 

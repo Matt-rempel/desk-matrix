@@ -298,7 +298,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .has-savebar .toast { bottom: calc(90px + env(safe-area-inset-bottom)); }
 
 /* ---- Customize ------------------------------------------------------------------------ */
-.palette-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr)); gap: 8px 4px; }
+.palette-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(36px, 1fr)); gap: 8px 4px; }
 .pal { min-width: 0; min-height: 44px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2px 0; background: transparent; border: 0; color: var(--muted); border-radius: 12px; }
 .pal-dot { width: min(44px, 100%); aspect-ratio: 1; border-radius: 50%; box-shadow: 0 0 0 2px var(--bg), 0 0 0 2px transparent; }
 .pal[aria-pressed="true"] .pal-dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }

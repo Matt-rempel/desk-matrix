@@ -1,6 +1,6 @@
 // Build your own: layout, slots, blocks, block options and colors.
 
-import { state, findScreen, isBuiltin, clone, layoutOf, blockOf, defaultOptions, screenForSave, act, customs } from './store.js';
+import { state, findScreen, isBuiltin, clone, layoutOf, blockOf, defaultOptions, act, customs } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
 import { h, header, messageLine, toast, confirmSheet, busy, eyebrow, chips, paint } from './ui.js';
 import { optionsForm, colorPicker } from './options.js';
@@ -31,7 +31,6 @@ export function render(root, { id, go }) {
   work.style = { palette: work.style?.palette ?? null, motion: work.style?.motion || 'still' };
   work.slots = work.slots.map((s) => ({ block: s.block, color: s.color ?? null, options: { ...(s.options || {}) } }));
   let sel = 0;
-  const savedJSON = JSON.stringify(screenForSave(work));
 
   const msg = messageLine();
   const saveLink = h('button', { type: 'button', class: 'subbar-link subbar-strong' }, 'Save');
@@ -237,7 +236,6 @@ export function render(root, { id, go }) {
   renderLook();
   renderAll();
   live.now(work);
-  void savedJSON;
   return () => live.cancel();
 }
 

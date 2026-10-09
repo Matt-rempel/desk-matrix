@@ -94,6 +94,7 @@ export function normalizeCatalog(raw) {
     id, name: v.name || TITLE(id),
     primary: v.primary ?? v.a ?? v.grad ?? '#F4F2EE',
     secondary: v.secondary ?? v.b ?? '#8C8A84',
+    glow: v.glow || null,
   }));
 
   const blocks = asEntries(c.blocks).map(([id, v]) => ({
@@ -102,7 +103,7 @@ export function normalizeCatalog(raw) {
     min_w: Number(v.min_w) || 1, min_h: Number(v.min_h) || 1, needs: v.needs || [],
   }));
 
-  const named = (list, names) => asEntries(list).map(([id, v]) => ({ id, name: v.name || names[id] || TITLE(id) }));
+  const named = (list, names) => asEntries(list).map(([id, v]) => ({ id, name: v.name || names[id] || TITLE(id), glyph: v.glyph || null }));
   const motions = named(c.motions || ['still', 'breathe', 'slide', 'sparkle'],
     { still: 'Still', breathe: 'Breathe', slide: 'Slide in', sparkle: 'Sparkle' });
   const transitions = named(c.transitions || ['cut', 'slide', 'dissolve', 'wipe'],
@@ -116,11 +117,18 @@ export function normalizeCatalog(raw) {
   }));
   // Builtins that no shelf lists still get a home.
   const shelved = new Set(shelves.flatMap((s) => s.screens));
-  const loose = builtins.filter((b) => !shelved.has(b.id)).map((b) => b.id);
+  // Builtins that only back legacy ids (e.g. time-simple) stay out of the gallery.
+  const legacyTargets = new Set(Object.values(c.legacy_ids || {}));
+  const loose = builtins.filter((b) => !shelved.has(b.id) && !legacyTargets.has(b.id) && !b.hidden).map((b) => b.id);
   if (loose.length) shelves.push({ id: 'more', title: 'More', blurb: 'Other built-in screens.', source: '', screens: loose });
 
+  const colors = Array.isArray(c.colors) && c.colors.length
+    ? c.colors.map((x) => (typeof x === 'string' ? { c: x, name: x } : { c: x.c || x.color, name: x.name || x.c || x.color }))
+    : null;
+  const art = Array.isArray(c.art) ? c.art : [];
+
   return {
-    layouts, palettes, blocks, motions, transitions, icons, builtins, shelves,
+    layouts, palettes, blocks, motions, transitions, icons, builtins, shelves, colors, art,
     layoutById: new Map(layouts.map((l) => [l.id, l])),
     paletteById: new Map(palettes.map((p) => [p.id, p])),
     blockById: new Map(blocks.map((b) => [b.id, b])),
@@ -158,6 +166,12 @@ export function findScreen(id) {
 }
 export function layoutOf(id) { return state.catalog?.layoutById.get(id) || null; }
 export function blockOf(id) { return state.catalog?.blockById.get(id) || null; }
+/** Library art plus the catalog's built-in art (builtin-pet, builtin-heart…). */
+export function allArt() {
+  const mine = state.library?.art || [];
+  const ids = new Set(mine.map((a) => a.id));
+  return [...mine, ...(state.catalog?.art || []).filter((a) => !ids.has(a.id))];
+}
 export function paletteOf(id) { return id ? state.catalog?.paletteById.get(id) || null : null; }
 
 /** A screen's family: builtin family, or inherited from the builtin it was based on. */

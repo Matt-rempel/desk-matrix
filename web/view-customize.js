@@ -8,10 +8,11 @@ import { optionsForm } from './options.js';
 import { saveScreen, showNow, focusControls } from './controls.js';
 
 const TYPES = [
-  { id: 'big', layout: 'bigsmall', name: 'Big', note: 'Two-row digits', size: 'lg' },
-  { id: 'classic', layout: 'two', name: 'Classic', note: '5 × 7 pixels', size: 'md' },
-  { id: 'tiny', layout: 'three', name: 'Tiny', note: 'Three lines', size: 'sm' },
+  { id: 'big', layout: 'bigsmall', font: 'big', name: 'Big', note: 'Two-row digits', size: 'lg' },
+  { id: 'classic', layout: 'two', font: '5x7', name: 'Classic', note: '5 × 7 pixels', size: 'md' },
+  { id: 'tiny', layout: 'three', font: '3x5', name: 'Tiny', note: 'Three lines', size: 'sm' },
 ];
+const COLOR_OPTIONS = ['accent', 'icon_color'];
 const SECOND = [
   { id: 'date', block: 'date', name: 'Date' },
   { id: 'weekday', block: 'weekday', name: 'Weekday' },
@@ -38,7 +39,7 @@ export function render(root, { id, go }) {
   let savedJSON = JSON.stringify(screenForSave(work));
   let savedId = builtin ? source.id : source.id;
   const family = familyOf(source);
-  let lastType = typeFromLayout(work.layout) || 'big';
+  let lastType = typeFromFont(work.slots[0]?.options?.font) || typeFromLayout(work.layout) || 'big';
   let thirdSlot = work.layout === 'three' ? clone(work.slots[2]) : null;
 
   let nightToggle = null;
@@ -54,7 +55,7 @@ export function render(root, { id, go }) {
     const pal = state.catalog.paletteById.get(work.style.palette);
     palName.textContent = pal ? pal.name : 'Custom colors';
     const glow = pal ? (Array.isArray(pal.primary) ? pal.primary[1] || pal.primary[0] : pal.primary) : firstColor(work);
-    bezel.style.setProperty('--glow', hexAlpha(glow, 0.28));
+    bezel.style.setProperty('--glow', pal?.glow || hexAlpha(glow, 0.28));
   };
 
   const doneLink = h('a', { class: 'subbar-link subbar-strong', href: '#/' }, 'Done');
@@ -85,7 +86,7 @@ export function render(root, { id, go }) {
   });
   function paintOriginal(dot) {
     const base = original.based_on ? findScreen(original.based_on) : original;
-    const colors = (base?.slots || []).map((s) => s.color).filter(Boolean);
+    const colors = (base?.slots || []).map((s) => s.color).flat().filter(Boolean);
     const pal = state.catalog.paletteById.get(base?.style?.palette);
     paint(dot, pal ? pal.primary : colors.length > 1 ? [colors[0], colors[1]] : colors[0] || '#F4F2EE');
   }
@@ -96,10 +97,17 @@ export function render(root, { id, go }) {
       work.slots.forEach((slot, i) => {
         const match = base.slots?.[i] && base.slots[i].block === slot.block ? base.slots[i] : base.slots?.find((s) => s.block === slot.block);
         slot.color = match ? match.color ?? null : null;
+        for (const name of COLOR_OPTIONS) {
+          if (match && match.options && name in match.options) slot.options[name] = match.options[name];
+          else if (name in slot.options) slot.options[name] = null;
+        }
       });
     } else {
       work.style.palette = pid;
-      for (const slot of work.slots) slot.color = null;
+      for (const slot of work.slots) {
+        slot.color = null;
+        for (const name of COLOR_OPTIONS) if (name in slot.options) slot.options[name] = null;
+      }
     }
     refresh();
   }
@@ -144,7 +152,7 @@ export function render(root, { id, go }) {
   const motionGroup = h('div', { class: 'grid-4', role: 'group', 'aria-label': 'Motion' },
     state.catalog.motions.map((m) => {
       const btn = h('button', { type: 'button', class: 'tile-btn', 'aria-pressed': String(work.style.motion === m.id) },
-        h('span', { class: 'tile-glyph', 'aria-hidden': 'true' }, MOTION_GLYPHS[m.id] || '•'), h('span', null, m.name));
+        h('span', { class: 'tile-glyph', 'aria-hidden': 'true' }, m.glyph || MOTION_GLYPHS[m.id] || '•'), h('span', null, m.name));
       btn.addEventListener('click', () => {
         work.style.motion = m.id;
         for (const b of motionGroup.children) b.setAttribute('aria-pressed', String(b === btn));
@@ -226,7 +234,7 @@ export function render(root, { id, go }) {
     const typeGroup = h('div', { class: 'grid-3', role: 'group', 'aria-label': 'Type' });
     const secondGroup = h('div', { class: 'chips', role: 'group', 'aria-label': 'Second line' });
     const redraw = () => {
-      const type = work.layout === 'full' ? lastType : typeFromLayout(work.layout);
+      const type = typeFromFont(work.slots[0]?.options?.font) || (work.layout === 'full' ? lastType : typeFromLayout(work.layout));
       for (const b of typeGroup.children) b.setAttribute('aria-pressed', String(b.dataset.id === type));
       const sec = secondFromSlots();
       for (const b of secondGroup.children) b.setAttribute('aria-pressed', String(b.dataset.id === sec));
@@ -289,6 +297,9 @@ export function render(root, { id, go }) {
 
   function setType(typeId) {
     lastType = typeId;
+    const t = TYPES.find((x) => x.id === typeId);
+    const timeMeta = blockOf('time');
+    if (!timeMeta || 'font' in (timeMeta.options || {})) work.slots[0].options.font = t.font;
     if (secondFromSlots() === 'none' && work.layout === 'full') return; // stays one big line
     applyLayout(TYPES.find((t) => t.id === typeId).layout);
   }
@@ -336,7 +347,7 @@ export function render(root, { id, go }) {
     work.slots.forEach((slot, i) => {
       const meta = blockOf(slot.block);
       if (!meta || !Object.keys(meta.options || {}).length) return;
-      const skip = family === 'clock' && i === 0 && slot.block === 'time' ? ['h24', 'colon_blink'] : [];
+      const skip = family === 'clock' && i === 0 && slot.block === 'time' ? ['h24', 'colon_blink', 'font'] : [];
       if (family === 'clock' && i === 1 && slot.block === 'progress') skip.push('source');
       const names = Object.keys(meta.options).filter((n) => !skip.includes(n));
       if (!names.length) return;
@@ -349,6 +360,11 @@ export function render(root, { id, go }) {
   }
 
   return () => { unsubscribe(); live.cancel(); };
+}
+
+function typeFromFont(font) {
+  const t = TYPES.find((x) => x.font === font);
+  return t ? t.id : null;
 }
 
 function typeFromLayout(layout) {

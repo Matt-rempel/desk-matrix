@@ -2,7 +2,7 @@
 
 import { state, act, layoutOf, blockOf } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
-import { h, header, messageLine, toast, confirmSheet, busy, stepper, eyebrow, paint, nextId } from './ui.js';
+import { h, header, messageLine, toast, confirmSheet, busy, stepper, paint, nextId } from './ui.js';
 import { saveScreen } from './controls.js';
 
 const SIZES = [
@@ -461,6 +461,5 @@ export function render(root, { id, go }) {
   const onResize = () => layoutGrid();
   window.addEventListener('resize', onResize);
   preview();
-  void eyebrow;
   return () => { clearInterval(animTimer); live.cancel(); window.removeEventListener('resize', onResize); };
 }

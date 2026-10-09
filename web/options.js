@@ -1,9 +1,9 @@
 // Renders inputs for a block's `options` schema from the catalog.
 
-import { state, blockOf } from './store.js';
+import { state, blockOf, allArt } from './store.js';
 import { h, toggleRow, chips, stepper, nextId, paint } from './ui.js';
 
-export const COLORS = [
+const FALLBACK_COLORS = [
   { c: '#F4F2EE', name: 'White' }, { c: '#FFB23F', name: 'Amber' }, { c: '#FF5A36', name: 'Tomato' },
   { c: '#FF7AB6', name: 'Pink' }, { c: '#B98CFF', name: 'Violet' }, { c: '#7CB8FF', name: 'Sky' },
   { c: '#5AD1A0', name: 'Mint' }, { c: '#8C8A84', name: 'Grey' },
@@ -22,6 +22,7 @@ const CHOICES = {
   value: 'Value', time: 'Time', title: 'Title', station: 'Station', category: 'Flight rules', wind: 'Wind',
   distance: 'Distance', direction: 'Direction', cpu: 'CPU temp', net: 'Network', short: 'Short', long: 'Long',
 };
+export const swatchColors = () => state.catalog?.colors || FALLBACK_COLORS;
 const human = (s) => String(s).replace(/[_-]+/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
 export const optionLabel = (name, spec) => spec?.label || LABELS[name] || human(name);
 const choiceLabel = (v) => CHOICES[v] || human(v);
@@ -90,7 +91,9 @@ function optionField(blockId, name, spec, options, set) {
     return h('div', { class: 'field' }, h('label', { class: 'field-label', for: id }, label), input);
   }
   if (type === 'color') {
-    return h('div', { class: 'field' }, h('div', { class: 'field-label' }, label), colorPicker({ value, label, onChange: (v) => set(v) }));
+    // Color options default to null ("use the block's own color").
+    return h('div', { class: 'field' }, h('div', { class: 'field-label' }, label),
+      colorPicker({ value, label, allowAuto: true, autoLabel: 'Default color', onChange: (v) => set(v) }));
   }
   if (type === 'art') return artPicker(label, value, set);
   if (type === 'feed') return feedPicker(label, value, set);
@@ -114,11 +117,11 @@ function optionField(blockId, name, spec, options, set) {
 }
 
 /** Round color swatches; optional "Palette" (null) choice and a custom color input. */
-export function colorPicker({ value, label = 'Color', onChange, allowAuto = false, autoColor = null }) {
+export function colorPicker({ value, label = 'Color', onChange, allowAuto = false, autoColor = null, autoLabel = 'Palette color' }) {
   const group = h('div', { class: 'swatches', role: 'group', 'aria-label': label });
   const items = [];
-  if (allowAuto) items.push({ c: null, name: 'Palette color' });
-  items.push(...COLORS);
+  if (allowAuto) items.push({ c: null, name: autoLabel });
+  items.push(...swatchColors());
   const custom = h('input', { type: 'color', class: 'swatch-input', 'aria-label': 'Custom color', value: /^#[0-9a-fA-F]{6}$/.test(value || '') ? value : '#FFB23F' });
   const buttons = items.map((item) => {
     const btn = h('button', { type: 'button', class: item.c ? 'swatch' : 'swatch swatch-auto', 'aria-label': item.name, 'aria-pressed': String(sameColor(item.c, value)) });
@@ -134,7 +137,7 @@ export function colorPicker({ value, label = 'Color', onChange, allowAuto = fals
     });
     return btn;
   });
-  const isCustom = value && !items.some((i) => sameColor(i.c, value));
+  const isCustom = value && !Array.isArray(value) && !items.some((i) => sameColor(i.c, value));
   custom.classList.toggle('is-on', !!isCustom);
   custom.addEventListener('input', () => {
     for (const b of buttons) b.setAttribute('aria-pressed', 'false');
@@ -147,18 +150,18 @@ export function colorPicker({ value, label = 'Color', onChange, allowAuto = fals
 
 function sameColor(a, b) {
   if (!a || !b) return !a && !b;
-  return String(a).toLowerCase() === String(b).toLowerCase();
+  return JSON.stringify(a).toLowerCase() === JSON.stringify(b).toLowerCase();
 }
 
 function artPicker(label, value, set) {
-  const art = state.library?.art || [];
+  const art = allArt();
   const field = h('div', { class: 'field' }, h('div', { class: 'field-label' }, label));
   if (!art.length) {
     field.append(h('p', { class: 'card-note' }, 'No pixel art yet. ', h('a', { href: '#/draw' }, 'Draw some in the pixel studio'), '.'));
     return field;
   }
   field.append(chips({
-    label, value, choices: art.map((a) => ({ id: a.id, label: `${a.name} · ${a.w}×${a.h}` })), onChange: (v) => set(v),
+    label, value, choices: art.map((a) => ({ id: a.id, label: `${a.name} · ${a.w}×${a.h}${String(a.id).startsWith('builtin-') ? ' · built in' : ''}` })), onChange: (v) => set(v),
   }), h('p', { class: 'card-note' }, h('a', { href: '#/draw' }, 'Draw new art')));
   return field;
 }
