@@ -156,4 +156,5 @@ python3 -m unittest discover -s . -p 'test_*.py'
 ```
 
 Run `python3 flightboard.py --once` on the Pi to test the aircraft feed without
-using GPIO. See [CONTRIBUTING.md](CONTRIBUTING.md) for the shared Git workflow.
+using GPIO. See [IDEAS.md](IDEAS.md) for proposed display modes and
+[CONTRIBUTING.md](CONTRIBUTING.md) for the shared Git workflow.

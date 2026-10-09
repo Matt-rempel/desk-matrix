@@ -50,7 +50,7 @@ if [ ! -x "$CODE_DIR/.venv/bin/python" ]; then
 fi
 if ! "$CODE_DIR/.venv/bin/python" -c 'import rgbmatrix' >/dev/null 2>&1; then
   printf '\nBuilding the matrix driver. This may take several minutes on a Pi 3…\n'
-  sudo "$CODE_DIR/.venv/bin/python" -m pip install --no-input --no-build-isolation \
+  sudo env CMAKE_BUILD_PARALLEL_LEVEL=2 "$CODE_DIR/.venv/bin/python" -m pip install --no-input \
     "git+https://github.com/hzeller/rpi-rgb-led-matrix@$DRIVER_COMMIT"
 fi
 
