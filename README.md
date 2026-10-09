@@ -34,23 +34,20 @@ the Pi's GPIO header.
    name other than `flightboard` so the web service cannot read your GitHub
    credentials or edit your checkout. Boot the Pi and connect the separately
    powered matrix.
-2. Sign in to the Pi over SSH. Once you have access to this private repository,
-   authenticate GitHub on the Pi, get its clone URL from GitHub's **Code**
-   button, and run:
+2. Sign in to the Pi over SSH. Get the public repository's clone URL from
+   GitHub's **Code** button, and run:
 
    ```sh
    sudo apt-get update
-   sudo apt-get install -y git gh
-   gh auth login --git-protocol https
-   gh auth setup-git
+   sudo apt-get install -y git
    git clone 'https://github.com/YOUR_USERNAME/flightboard.git' flightboard
    cd flightboard
    sh install.sh
    ```
 
-   Replace `YOUR_USERNAME` with the eventual repository owner. GitHub CLI's
-   login displays a code to approve in a browser. The Pi user
-   needs `sudo`; the installer asks for that password in the Pi terminal.
+   Replace `YOUR_USERNAME` with the repository owner. Cloning a public repo
+   does not require a GitHub login. The Pi user needs `sudo`; the installer
+   asks for that password in the Pi terminal.
    It installs build packages, compiles a pinned version of
    [rpi-rgb-led-matrix](https://github.com/hzeller/rpi-rgb-led-matrix), creates
    a dedicated `flightboard` service account if needed, and installs the
@@ -73,7 +70,8 @@ The web backend listens only on `127.0.0.1:8765` on the Pi. Tailscale Serve
 provides the HTTPS address to devices allowed by your tailnet. No router port
 forwarding or Tailscale Funnel is needed. Tailscale's HTTPS certificate makes
 the Pi's Tailscale DNS name visible in public certificate records; the page
-itself remains private to the tailnet.
+itself remains private to the tailnet. Publishing the source repository does
+not publish your Pi's saved settings or pairing key.
 
 ### Update
 

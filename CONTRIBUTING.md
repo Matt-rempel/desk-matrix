@@ -1,7 +1,8 @@
 # Contributing
 
-This is a small Raspberry Pi project shared through a private GitHub
-repository. Please keep changes easy to test on the 32×16 panel.
+This is a small Raspberry Pi project shared through a public GitHub
+repository. Please keep changes easy to test on the 32×16 panel. Anyone can
+clone it; pushing a branch requires write access or a fork.
 
 1. Pull the latest `main`, create a descriptive branch, and make your change.
 2. Run `python3 -m unittest discover -s . -p 'test_*.py'` and `sh -n install.sh`.
