@@ -399,7 +399,9 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .options-host:empty { display: none; }
 
 /* Swatches */
-.swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 4px 0; }
+/* The selected swatch's ring reaches 4px outside it; keep the next block clear. */
+.detail-group > .field + .options { margin-top: 12px; }
 .swatch { width: 44px; height: 44px; border-radius: 22px; border: 0; padding: 0; box-shadow: 0 0 0 2px var(--bg), 0 0 0 2px transparent; display: inline-flex; align-items: center; justify-content: center; }
 .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--text); }
 .swatch-auto { background: var(--surface-2); color: var(--accent-ink); font-family: var(--mono); font-weight: 700; font-size: 13px; }
