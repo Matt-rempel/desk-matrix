@@ -194,3 +194,22 @@ export function header({ back, backLabel, title, action }) {
     h('h1', { class: 'subbar-title' }, title),
     action || h('span', { class: 'subbar-spacer', 'aria-hidden': 'true' }));
 }
+
+/**
+ * Two-column layout for wide screens: everything up to and including `last`
+ * (after the sticky sub-bar) goes in the side column, the rest in the main one.
+ * Both wrappers use `display: contents` on phones, so order and sticky
+ * positioning are unchanged there.
+ */
+export function splitLayout(root, last, kind) {
+  root.classList.add('split', `split-${kind}`);
+  const side = h('div', { class: 'split-side' });
+  const main = h('div', { class: 'split-main' });
+  let target = side;
+  for (const child of [...root.children]) {
+    if (child.classList.contains('subbar')) continue;
+    target.append(child);
+    if (child === last) target = main;
+  }
+  root.append(side, main);
+}

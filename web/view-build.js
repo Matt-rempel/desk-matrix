@@ -2,7 +2,7 @@
 
 import { state, findScreen, isBuiltin, clone, layoutOf, blockOf, defaultOptions, act, customs } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
-import { h, header, messageLine, toast, confirmSheet, busy, eyebrow, chips, paint } from './ui.js';
+import { h, header, messageLine, toast, confirmSheet, busy, eyebrow, chips, paint, splitLayout } from './ui.js';
 import { optionsForm, colorPicker } from './options.js';
 import { saveScreen, showNow } from './controls.js';
 
@@ -43,7 +43,12 @@ export function render(root, { id, go }) {
   const host = h('div', { class: 'overlay-host' }, matrix.el, outline);
   const nameInput = h('input', { id: 'sname', class: 'input', value: work.name, maxlength: '32', autocomplete: 'off', required: true });
   nameInput.addEventListener('input', () => { work.name = nameInput.value; });
-  root.append(h('section', { class: 'pad' }, h('div', { class: 'bezel' }, host),
+  const sentinel = h('div', { class: 'sticky-sentinel', 'aria-hidden': 'true' });
+  const pane = h('div', { class: 'preview-pane' }, h('div', { class: 'bezel' }, host));
+  const stuck = new IntersectionObserver(([entry]) => pane.classList.toggle('is-stuck', !entry.isIntersecting),
+    { rootMargin: '-64px 0px 0px 0px' });
+  stuck.observe(sentinel);
+  root.append(sentinel, pane, h('section', { class: 'pad' },
     h('div', { class: 'inline-field' }, h('label', { for: 'sname', class: 'eyebrow' }, 'Name'), nameInput)));
 
   // 1 · Layout
@@ -235,8 +240,9 @@ export function render(root, { id, go }) {
 
   renderLook();
   renderAll();
+  splitLayout(root, pane, 'editor');
   live.now(work);
-  return () => live.cancel();
+  return () => { live.cancel(); stuck.disconnect(); };
 }
 
 function defaultSlots(layoutId) {

@@ -4,7 +4,7 @@ import { state, subscribe, findScreen, builtins, customs, activeItems, pinnedId,
 import { createMatrix, screenMatrix } from './matrix.js';
 import { preview, cachedPreview } from './api.js';
 import { h, toast } from './ui.js';
-import { focusControls, followFlight, unpin, showNow } from './controls.js';
+import { focusControls, followFlight, unpin, showNow, removeFromLineup } from './controls.js';
 
 let filter = 'all';
 
@@ -26,17 +26,18 @@ export function render(root) {
   const bezel = h('div', { class: 'bezel' }, heroMatrix.el);
   const swipeHint = h('p', { class: 'sr-only', 'aria-live': 'polite' });
 
+  root.classList.add('split', 'split-gallery');
   root.append(
-    h('section', { class: 'hero', 'aria-labelledby': 'now-title' },
-      h('div', { class: 'hero-top' }, h('h1', { id: 'now-title', class: 'eyebrow' }, 'On your desk now'), count),
-      bezel,
-      h('div', { class: 'hero-nav' }, prev, h('div', { class: 'hero-caption' }, name, meta, dots), next),
-      extra,
-      h('div', { class: 'btn-row' }, customizeLink, newLink),
-      swipeHint),
-    nearby,
-    chipsEl,
-    shelvesEl);
+    h('div', { class: 'split-side' },
+      h('section', { class: 'hero', 'aria-labelledby': 'now-title' },
+        h('div', { class: 'hero-top' }, h('h1', { id: 'now-title', class: 'eyebrow' }, 'On your desk now'), count),
+        bezel,
+        h('div', { class: 'hero-nav' }, prev, h('div', { class: 'hero-caption' }, name, meta, dots), next),
+        extra,
+        h('div', { class: 'btn-row' }, customizeLink, newLink),
+        swipeHint),
+      nearby),
+    h('div', { class: 'split-main' }, chipsEl, shelvesEl));
 
   const items = () => activeItems();
   const liveId = () => state.status?.screen_id || pinnedId() || null;
@@ -118,7 +119,7 @@ export function render(root) {
 
     // Controls below the hero: unpin, timer, habit, show-this-now.
     const t = screen ? JSON.stringify([state.library?.timers, state.library?.habits]) : '';
-    const key = [s.id, s.live, pinned, t].join('|');
+    const key = [s.id, s.live, pinned, t, JSON.stringify(state.library?.lineup)].join('|');
     if (key !== lastExtraKey) {
       lastExtraKey = key;
       extra.replaceChildren();
@@ -135,6 +136,13 @@ export function render(root) {
           try { await showNow(screen.id); browse = null; toast(`${screen.name} is on the matrix.`); } catch (error) { toast(error.message, 'error'); }
         });
         extra.append(h('div', { class: 'hero-pin' }, h('span', null, 'Up in your lineup.'), btn));
+      }
+      if (screen && s.item) {
+        const btn = h('button', { type: 'button', class: 'link-btn link-danger' }, 'Remove from lineup');
+        btn.addEventListener('click', async () => {
+          try { await removeFromLineup(screen.id); browse = null; toast(`${screen.name} removed from your lineup.`); } catch (error) { toast(error.message, 'error'); }
+        });
+        extra.append(h('div', { class: 'hero-pin' }, h('span', null, 'In your lineup.'), btn));
       }
       const controls = screen ? focusControls(screen, { compact: true }) : null;
       if (controls) extra.append(controls);

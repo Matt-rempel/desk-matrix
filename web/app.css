@@ -43,6 +43,8 @@ h1, h2, h3, p { margin: 0; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Headings get focus after navigation for screen readers; no ring needed. */
+h1[tabindex="-1"]:focus { outline: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .skip-link { position: absolute; left: 8px; top: -60px; z-index: 50; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-decoration: none; }
 .skip-link:focus { top: 8px; }
@@ -490,3 +492,65 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .look-label:first-child { margin-top: 0; }
 .ink-row { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 4px; justify-items: center; }
 .ink-row .swatch-sm, .ink-row .swatch-custom { width: 100%; max-width: 36px; height: auto; aspect-ratio: 1; }
+
+/* ---- Sticky editor preview ------------------------------------------------------------------------- */
+.sticky-sentinel { height: 0; }
+.preview-pane { position: sticky; top: 64px; z-index: 4; padding: 6px var(--gutter) 10px; background: var(--bg); }
+.preview-pane .bezel { transition: padding .2s; }
+.preview-pane.is-stuck { border-bottom: 1px solid var(--line-soft); }
+.preview-pane.is-stuck .bezel { width: fit-content; margin: 0 auto; padding: 8px; box-shadow: none; }
+.preview-pane.is-stuck .matrix, .preview-pane.is-stuck .overlay-host { max-width: 220px; }
+@media (prefers-reduced-motion: reduce) { .preview-pane .bezel { transition: none; } }
+
+/* ---- Lineup thumbnails: remove ----------------------------------------------------------------- */
+.thumb-frame { position: relative; }
+.thumb-remove { position: absolute; top: -10px; right: -10px; width: 28px; height: 28px; padding: 0; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text); font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+/* Keep a 44px hit area around the small visual circle. */
+.thumb-remove::before { content: ""; position: absolute; inset: -8px; }
+.thumb-remove:hover { border-color: var(--danger-line); color: var(--danger); }
+.link-danger { color: var(--danger); }
+
+/* ---- Desktop ------------------------------------------------------------------------------------------ */
+.split-side, .split-main { display: contents; }
+
+@media (min-width: 960px) {
+  body { padding: 0; }
+  .app { max-width: 1240px; border: 0; }
+  .page { position: relative; }
+  .topbar { padding: 20px 32px 12px; }
+  .segnav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 380px; margin: 0; }
+  :root { --gutter: 24px; }
+
+  .split { display: grid; grid-template-columns: minmax(380px, 440px) minmax(0, 1fr); column-gap: 32px; align-items: start; padding: 0 8px; }
+  .split > .subbar { grid-column: 1 / -1; margin: 0 -8px; padding: 12px 24px; }
+  .split-side, .split-main { display: block; min-width: 0; }
+  .split-side { position: sticky; top: 16px; }
+  .split-editor .split-side, .split-draw .split-side { top: 80px; }
+  .split-main { padding-bottom: 24px; }
+
+  /* The side column is always in view on desktop, so the preview stays full size. */
+  .preview-pane { position: static; padding-top: 18px; }
+  .preview-pane.is-stuck { border-bottom: 0; }
+  .preview-pane.is-stuck .matrix, .preview-pane.is-stuck .overlay-host { max-width: 320px; }
+  .preview-pane.is-stuck .bezel { width: auto; padding: 14px; box-shadow: 0 20px 60px -20px var(--glow, rgba(255, 178, 63, .18)); }
+  .split-editor .split-main > .pad:first-child { padding-top: 18px; }
+
+  /* Gallery: hero on the left, shelves wrap into a grid instead of scrolling sideways. */
+  .split-gallery .split-side { top: 16px; padding-bottom: 24px; }
+  .split-gallery .chip-scroll { padding-top: 22px; }
+  .split-gallery .shelf-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 18px 14px; overflow: visible; scroll-snap-type: none; }
+  .split-gallery .shelf-item { min-width: 0; }
+
+  /* Pixel studio: bigger canvas on the left. */
+  .split-draw .draw-canvas { padding-bottom: 24px; }
+
+  /* Lineup: time-of-day cards side by side; the rest in a readable column. */
+  body[data-route="lineup"] .page-body { max-width: 1120px; margin: 0 auto; padding: 0 8px 24px; }
+  body[data-route="lineup"] .moments { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); align-items: start; }
+  body[data-route="lineup"] .page-body > .block { max-width: 760px; }
+
+  /* Device: settings groups in two columns. */
+  body[data-route="device"] .page-body { max-width: 1120px; margin: 0 auto; padding: 0 8px 24px; columns: 2; column-gap: 24px; }
+  body[data-route="device"] .page-body > * { break-inside: avoid; }
+  body[data-route="device"] .device-card { column-span: all; }
+}

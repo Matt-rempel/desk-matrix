@@ -2,7 +2,7 @@
 
 import { state, act, layoutOf, blockOf } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
-import { h, header, messageLine, toast, confirmSheet, busy, stepper, paint, nextId } from './ui.js';
+import { h, header, messageLine, toast, confirmSheet, busy, stepper, paint, nextId, splitLayout } from './ui.js';
 import { saveScreen } from './controls.js';
 
 const SIZES = [
@@ -87,7 +87,8 @@ export function render(root, { id, go }) {
     'aria-label': 'Drawing canvas. Arrow keys move, Space paints.', 'aria-describedby': 'grid-pos' });
   const gridPos = h('p', { id: 'grid-pos', class: 'sr-only', 'aria-live': 'polite' });
   const gridWrap = h('div', { class: 'grid-wrap' }, grid);
-  root.append(h('section', { class: 'pad', 'aria-label': 'Drawing canvas' }, gridWrap, gridPos));
+  const canvasSection = h('section', { class: 'pad draw-canvas', 'aria-label': 'Drawing canvas' }, gridWrap, gridPos);
+  root.append(canvasSection);
 
   // Tools
   const toolRow = h('div', { class: 'tool-row' });
@@ -124,7 +125,7 @@ export function render(root, { id, go }) {
   const gap = () => (art.w <= 7 ? 3 : art.w <= 16 ? 2 : 1);
 
   function layoutGrid() {
-    const avail = Math.min(gridWrap.clientWidth || 350, 420) - 16;
+    const avail = Math.min(gridWrap.clientWidth || 350, 640) - 16;
     const g = gap();
     cell = Math.max(6, Math.floor((avail - g * (art.w - 1)) / art.w));
     if (art.w === 7) cell = Math.min(cell, 38);
@@ -264,7 +265,7 @@ export function render(root, { id, go }) {
       art.frames.length > 1 ? h('button', {
         type: 'button', class: 'frame-btn frame-del', 'aria-label': `Delete frame ${frameIdx + 1}`,
         on: { click: () => { pushUndo(); art.frames.splice(frameIdx, 1); frameIdx = Math.max(0, frameIdx - 1); renderFrames(); drawGrid(); preview(); } },
-      }, '×') : null);
+      }, '×') : '');
   }
 
   function pushUndo() {
@@ -457,6 +458,7 @@ export function render(root, { id, go }) {
   renderSizes();
   renderTools();
   renderFrames();
+  splitLayout(root, canvasSection, 'draw');
   requestAnimationFrame(layoutGrid);
   const onResize = () => layoutGrid();
   window.addEventListener('resize', onResize);

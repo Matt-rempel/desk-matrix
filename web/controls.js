@@ -24,6 +24,34 @@ export async function unpin() {
   await act('unpin', {});
 }
 
+/** Names of the lineup lists ("Morning", "Any other time") that include a screen. */
+export function lineupPlaces(screenId) {
+  const lu = state.library?.lineup;
+  if (!lu) return [];
+  const places = lu.moments.filter((m) => m.screens.some((it) => it.screen_id === screenId)).map((m) => m.name || 'Untitled');
+  if (lu.always.some((it) => it.screen_id === screenId)) places.push('Any other time');
+  return places;
+}
+
+/** Point every lineup entry for one screen at another (a customized copy). */
+export async function replaceInLineup(oldId, newId) {
+  const lu = clone(state.library.lineup);
+  let changed = false;
+  for (const list of [lu.always, ...lu.moments.map((m) => m.screens)]) {
+    for (const it of list) if (it.screen_id === oldId) { it.screen_id = newId; changed = true; }
+  }
+  if (changed) await act('save_lineup', { lineup: lu });
+  return changed;
+}
+
+/** Take a screen out of every lineup list and save the lineup. */
+export async function removeFromLineup(screenId) {
+  const lu = clone(state.library.lineup);
+  lu.always = lu.always.filter((it) => it.screen_id !== screenId);
+  for (const m of lu.moments) m.screens = m.screens.filter((it) => it.screen_id !== screenId);
+  await act('save_lineup', { lineup: lu });
+}
+
 /** Follow a callsign: reuse or create a custom copy of sky-follow, then show it now. */
 export async function followFlight(callsign) {
   const cs = String(callsign || '').trim().toUpperCase();

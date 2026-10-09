@@ -3,9 +3,9 @@
 import { state, findScreen, isBuiltin, familyOf, describeScreen, clone, screenForSave, blockOf, layoutOf,
   defaultOptions, act, saveSettings, subscribe } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
-import { h, header, toggleRow, stepper, messageLine, toast, confirmSheet, paint, busy, eyebrow } from './ui.js';
+import { h, header, toggleRow, stepper, messageLine, toast, confirmSheet, paint, busy, eyebrow, splitLayout } from './ui.js';
 import { optionsForm } from './options.js';
-import { saveScreen, showNow, focusControls } from './controls.js';
+import { saveScreen, showNow, focusControls, lineupPlaces, removeFromLineup, replaceInLineup } from './controls.js';
 
 const TYPES = [
   { id: 'big', layout: 'bigsmall', font: 'big', name: 'Big', note: 'Two-row digits', size: 'lg' },
@@ -58,13 +58,40 @@ export function render(root, { id, go }) {
     bezel.style.setProperty('--glow', pal?.glow || hexAlpha(glow, 0.28));
   };
 
-  const doneLink = h('a', { class: 'subbar-link subbar-strong', href: '#/' }, 'Done');
-  root.append(header({ back: '#/', backLabel: '‹ Gallery', title: 'Customize', action: doneLink }));
+  const doneBtn = h('button', { type: 'button', class: 'subbar-link subbar-strong' }, 'Save');
+  const bar = header({ back: '#/', backLabel: '‹ Gallery', title: 'Customize', action: doneBtn });
+  root.append(bar);
 
-  // Name + preview
+  // Leaving with changes: Save keeps them as one of Your screens; Back asks first.
+  doneBtn.addEventListener('click', async () => {
+    if (!dirty()) { go('#/'); return; }
+    busy(doneBtn, true, 'Saving…');
+    try { await persist(); toast(savedToast()); go('#/'); }
+    catch (error) { msg.error(error); busy(doneBtn, false); }
+  });
+  bar.querySelector('.subbar-link').addEventListener('click', async (event) => {
+    if (!dirty()) return;
+    event.preventDefault();
+    const keep = await confirmSheet({ title: 'Save your changes?', text: `Keep “${work.name}” in Your screens, or discard the changes.`,
+      confirmLabel: 'Save', danger: false });
+    if (keep) {
+      try { await persist(); toast(savedToast()); } catch (error) { msg.error(error); return; }
+    }
+    go('#/');
+  });
+
+  // Preview: stays in view while the controls below scroll.
+  const sentinel = h('div', { class: 'sticky-sentinel', 'aria-hidden': 'true' });
+  const pane = h('div', { class: 'preview-pane' }, bezel);
+  root.append(sentinel, pane);
+  const stuck = new IntersectionObserver(([entry]) => pane.classList.toggle('is-stuck', !entry.isIntersecting),
+    { rootMargin: '-64px 0px 0px 0px' });
+  stuck.observe(sentinel);
+
+  // Name
   const nameInput = h('input', { class: 'title-input', 'aria-label': 'Screen name', value: work.name || '', maxlength: '32', autocomplete: 'off' });
   nameInput.addEventListener('input', () => { work.name = nameInput.value; refresh(); });
-  root.append(h('section', { class: 'pad' }, bezel,
+  root.append(h('section', { class: 'pad' },
     h('div', { class: 'title-row' },
       h('div', { class: 'title-col' }, nameInput, h('div', { class: 'subtle' }, `${describeScreen(source)}${source.source ? ' · ' + source.source : ''}`)),
       palName)));
@@ -169,12 +196,45 @@ export function render(root, { id, go }) {
     h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, 'Shows for'), h('div', { class: 'row-detail' }, 'Each time it comes up in the lineup')),
     stepper({ label: 'seconds', value: seconds, min: 5, max: 300, step: 5, format: (v) => `${v} s`, onChange: (v) => { seconds = v; } })));
 
+  // In the lineup?
+  const lineupWrap = h('div');
+  const renderLineup = () => {
+    const places = lineupPlaces(savedId);
+    lineupWrap.replaceChildren();
+    if (!places.length) return;
+    const btn = h('button', { type: 'button', class: 'btn btn-small btn-danger-quiet' }, 'Remove');
+    btn.addEventListener('click', async () => {
+      busy(btn, true, 'Removing…');
+      try { await removeFromLineup(savedId); toast(`${work.name} removed from your lineup.`); }
+      catch (error) { msg.error(error); busy(btn, false); }
+    });
+    lineupWrap.append(h('section', { class: 'block card row' },
+      h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, 'In your lineup'), h('div', { class: 'row-detail' }, places.join(' · '))),
+      btn));
+  };
+  renderLineup();
+  root.append(lineupWrap);
+
   // Actions
   const showBtn = h('button', { type: 'button', class: 'btn btn-primary' }, 'Show now');
   const addBtn = h('button', { type: 'button', class: 'btn btn-secondary' }, 'Add to lineup');
+  const saveBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-wide' }, builtin ? 'Save to Your screens' : 'Save changes');
   root.append(h('div', { class: 'btn-row pad-x' }, showBtn, addBtn),
-    h('p', { class: 'foot-note' }, 'Changes preview here first. Nothing reaches the matrix until you tap Show now.'),
+    h('div', { class: 'btn-row pad-x' }, saveBtn),
+    h('p', { class: 'foot-note' }, 'Changes preview here first. Saving keeps them in Your screens; nothing reaches the matrix until you tap Show now.'),
     h('div', { class: 'pad-x' }, msg));
+  saveBtn.addEventListener('click', async () => {
+    if (!dirty() && !builtin) { msg.show('No changes to save.'); return; }
+    busy(saveBtn, true, 'Saving…');
+    try {
+      // An unchanged built-in still becomes a copy, so it can be found in Your screens.
+      if (!dirty() && builtin && !work.id) savedJSON = '';
+      await persist();
+      toast(savedToast());
+      msg.show(`${work.name} is in Your screens.`);
+    } catch (error) { msg.error(error); }
+    finally { busy(saveBtn, false); if (work.id) saveBtn.textContent = 'Save changes'; }
+  });
 
   if (!builtin) {
     const del = h('button', { type: 'button', class: 'btn btn-danger-quiet' }, 'Delete screen');
@@ -189,8 +249,11 @@ export function render(root, { id, go }) {
   async function persist() {
     if (!String(work.name || '').trim()) throw new Error('Give the screen a name.');
     if (dirty()) {
+      const firstCopy = builtin && !work.id;
       const newId = await saveScreen({ ...work, id: work.id || '' });
       if (!newId) throw new Error('The screen was saved but could not be found.');
+      // The customized copy takes the built-in's place wherever it was in the lineup.
+      if (firstCopy) await replaceInLineup(source.id, newId);
       work.id = newId;
       savedId = newId;
       savedJSON = JSON.stringify(screenForSave(work));
@@ -198,6 +261,10 @@ export function render(root, { id, go }) {
     }
     if (seconds !== initialSeconds) await updateLineupSeconds(savedId, seconds);
     return savedId;
+  }
+
+  function savedToast() {
+    return builtin ? `${work.name} saved to Your screens.` : `${work.name} saved.`;
   }
 
   showBtn.addEventListener('click', async () => {
@@ -219,11 +286,12 @@ export function render(root, { id, go }) {
     } catch (error) { msg.error(error); busy(addBtn, false); }
   });
 
+  splitLayout(root, pane, 'editor');
   refresh();
   live.now(work);
 
   const unsubscribe = subscribe((what) => {
-    if (what === 'library') renderFocus();
+    if (what === 'library') { renderFocus(); renderLineup(); }
     if (what === 'settings' && nightToggle) nightToggle.setAttribute('aria-pressed', String(!!state.settings?.night_palette));
   });
 
@@ -362,7 +430,7 @@ export function render(root, { id, go }) {
     if (detailsSection.el) detailsSection.el.hidden = !detailsBody.childElementCount;
   }
 
-  return () => { unsubscribe(); live.cancel(); };
+  return () => { unsubscribe(); live.cancel(); stuck.disconnect(); };
 }
 
 function typeFromFont(font) {

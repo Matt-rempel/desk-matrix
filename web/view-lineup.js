@@ -129,11 +129,19 @@ export function render(root, { params }) {
   function screensStrip(items, listName, editing) {
     const strip = h('ul', { class: 'thumb-strip', role: 'list' });
     if (!editing) {
-      for (const it of items) {
+      items.forEach((it, i) => {
         const scr = findScreen(it.screen_id);
-        strip.append(h('li', { class: 'thumb' }, scr ? screenMatrix(scr, { pitch: 2.5, glow: false, label: `${scr.name} preview` }).el : h('span', { class: 'thumb-missing' }, '?'),
-          h('span', { class: 'thumb-name' }, scr ? scr.name : 'Missing screen')));
-      }
+        const name = scr ? scr.name : 'Missing screen';
+        const remove = h('button', { type: 'button', class: 'thumb-remove', 'aria-label': `Remove ${name} from ${listName}` }, '×');
+        remove.addEventListener('click', () => {
+          items.splice(i, 1);
+          changed();
+          toast(`${name} removed. Save the lineup to apply.`);
+        });
+        strip.append(h('li', { class: 'thumb' },
+          h('div', { class: 'thumb-frame' }, scr ? screenMatrix(scr, { pitch: 2.5, glow: false, label: `${name} preview` }).el : h('span', { class: 'thumb-missing' }, '?'), remove),
+          h('span', { class: 'thumb-name' }, name)));
+      });
     }
     const add = h('button', { type: 'button', class: 'thumb-add', 'aria-label': `Add a screen to ${listName}` }, '+');
     add.addEventListener('click', () => pickScreen(listName, (sid) => {
