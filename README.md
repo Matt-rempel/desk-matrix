@@ -77,6 +77,18 @@ the Pi's Tailscale DNS name visible in public certificate records; the page
 itself remains private to the tailnet. Publishing the source repository does
 not publish your Pi's saved settings or pairing key.
 
+### Add the settings page to your Home Screen
+
+On iPhone, connect to Tailscale, open the Pi's HTTPS settings address in
+**Safari**, then use **Share → Add to Home Screen**. Name it **Desk Matrix**
+and add it. On Android, open the same address in Chrome and choose
+**Install app** (or **Add to Home screen**) from the browser menu.
+
+The installed app has its own pairing session, so enter the key in it if
+prompted. Keep Tailscale connected to change settings; when the Pi cannot
+be reached, the app shows a retry page. The offline page caches no settings,
+flight data, or pairing key.
+
 ### Update
 
 On the Pi, from the repository checkout:

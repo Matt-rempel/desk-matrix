@@ -9,7 +9,7 @@ DRIVER_COMMIT=51d3231e370593b60952b2c3b18d2e3802329f18
 SHOW_PAIRING=1
 # Python modules installed into $CODE_DIR; the web UI is copied to $CODE_DIR/web.
 APP_FILES="flightboard.py settings.py screens.py render.py catalog.py blocks.py providers.py library.py player.py web_server.py"
-WEB_REQUIRED="index.html app.css app.js"
+WEB_REQUIRED="index.html app.css app.js sw.js manifest.webmanifest offline.html icon-192.png icon-512.png apple-touch-icon.png"
 # The settings page before the screen gallery redesign kept these in $CODE_DIR.
 OBSOLETE_FILES="index.html app.css app.js"
 

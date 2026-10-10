@@ -259,7 +259,7 @@ function showPairing(message = pairingMessage) {
     h('div', { class: 'brand brand-lg' }, logo(), h('span', { class: 'brand-name' }, 'desk matrix')),
     h('h1', { id: 'pair-title', class: 'pair-title' }, 'Connect this browser'),
     h('p', { id: 'pairing-help', class: 'pair-text' },
-      'Enter the pairing key shown in the Pi installation terminal, or open the pairing link from it. The key stays in this browser tab only.'),
+      'Enter the pairing key shown in the Pi installation terminal, or open the pairing link from it. The key stays in this session only.'),
     form));
   if (!message) input.focus();
 }
@@ -297,3 +297,11 @@ window.addEventListener('hashchange', () => {
 takeKeyFromHash();
 if (hasKey()) start();
 else showPairing();
+
+// A small offline page makes a Home Screen launch understandable when Tailscale
+// or the Pi is unavailable. The worker never caches settings or pairing keys.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  }, { once: true });
+}

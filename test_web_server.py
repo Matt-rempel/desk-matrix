@@ -83,13 +83,36 @@ class StaticFileTests(ServerTestCase):
         self.assertEqual(body, (web_server.WEB_DIR / "index.html").read_bytes())
         self.assertIn("script-src 'self'", headers["Content-Security-Policy"])
         self.assertEqual(headers["X-Content-Type-Options"], "nosniff")
+        self.assertIn(b'rel="manifest" href="/manifest.webmanifest"', body)
+        self.assertIn(b'rel="apple-touch-icon" href="/apple-touch-icon.png"', body)
         for name, content_type in (("app.js", "text/javascript; charset=utf-8"),
                                    ("app.css", "text/css; charset=utf-8"),
                                    ("icon.svg", "image/svg+xml"),
+                                   ("sw.js", "text/javascript; charset=utf-8"),
                                    ("view-lineup.js", "text/javascript; charset=utf-8")):
             status, headers, body = self.get("/" + name + "?v=2", key=None)
             self.assertEqual(headers["Content-Type"], content_type)
             self.assertEqual(body, (web_server.WEB_DIR / name).read_bytes())
+
+    def test_pwa_assets_are_public_but_no_settings_are_cached(self):
+        status, headers, body = self.get("/manifest.webmanifest", key=None)
+        self.assertEqual(status, 200)
+        self.assertEqual(headers["Content-Type"], "application/manifest+json")
+        manifest = json.loads(body)
+        self.assertEqual(manifest["start_url"], "/")
+        self.assertEqual(manifest["display"], "standalone")
+        self.assertEqual({icon["sizes"] for icon in manifest["icons"]}, {"192x192", "512x512"})
+        for name, size in (("icon-192.png", 192), ("icon-512.png", 512),
+                           ("apple-touch-icon.png", 180)):
+            status, headers, body = self.get("/" + name, key=None)
+            self.assertEqual(headers["Content-Type"], "image/png")
+            self.assertTrue(body.startswith(b"\x89PNG\r\n\x1a\n"))
+            self.assertEqual(int.from_bytes(body[16:20], "big"), size)
+            self.assertEqual(int.from_bytes(body[20:24], "big"), size)
+        self.assertIn(b"Tailscale", self.get("/offline.html", key=None)[2])
+        worker = self.get("/sw.js", key=None)[2]
+        self.assertIn(b"event.request.mode !== 'navigate'", worker)
+        self.assertNotIn(b"/api/", worker)
 
     def test_rejects_unknown_and_traversal_paths(self):
         for path in ("/nope.js", "/index.html", "/web_server.py", "/settings.json", "/web-token",

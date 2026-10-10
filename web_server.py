@@ -37,6 +37,13 @@ DATA_MAX_AGE_S = 30 * 60
 STATIC_RE = re.compile(r"/([a-z0-9-]+)\.(js|css|svg)")
 STATIC_TYPES = {"js": "text/javascript; charset=utf-8", "css": "text/css; charset=utf-8",
                 "svg": "image/svg+xml"}
+PWA_FILES = {
+    "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
+    "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
+    "/icon-192.png": ("icon-192.png", "image/png"),
+    "/icon-512.png": ("icon-512.png", "image/png"),
+    "/offline.html": ("offline.html", "text/html; charset=utf-8"),
+}
 POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview")
 
 _catalog_body: bytes | None = None
@@ -192,6 +199,8 @@ class Handler(BaseHTTPRequestHandler):
     def _static(self, path: str) -> bool:
         if path == "/":
             name, content_type = "index.html", "text/html; charset=utf-8"
+        elif path in PWA_FILES:
+            name, content_type = PWA_FILES[path]
         else:
             match = STATIC_RE.fullmatch(path)
             if not match:
