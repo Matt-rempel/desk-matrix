@@ -11,6 +11,11 @@ const INTERRUPTS = [
   { id: 'timer_done', name: 'Timer finished', defaults: { enabled: true } },
   { id: 'rain_soon', name: 'Rain starting', defaults: { enabled: false, minutes: 15 } },
   { id: 'iss_overhead', name: 'ISS passing over', defaults: { enabled: false } },
+  // Pi alerts
+  { id: 'pi_hot', name: 'Pi running hot', group: 'pi', defaults: { enabled: true, threshold_c: 75 } },
+  { id: 'pi_power', name: 'Low power', group: 'pi', defaults: { enabled: true } },
+  { id: 'offline', name: 'Offline', group: 'pi', defaults: { enabled: false, minutes: 5 } },
+  { id: 'disk_low', name: 'Storage low', group: 'pi', defaults: { enabled: true, percent: 10 } },
 ];
 
 function randomHex(n) {
@@ -49,6 +54,7 @@ export function render(root, { params }) {
   const list = h('div', { class: 'moments' });
   const alwaysHost = h('div');
   const intHost = h('div', { class: 'card card-rows' });
+  const piHost = h('div', { class: 'card card-rows' });
   const trHost = h('div');
   const msg = messageLine();
   const saveBar = h('div', { class: 'savebar', role: 'region', 'aria-label': 'Unsaved lineup changes', hidden: true });
@@ -76,6 +82,9 @@ export function render(root, { params }) {
     h('section', { class: 'block', 'aria-labelledby': 'int-h' },
       h('h2', { id: 'int-h', class: 'section-title' }, 'Interruptions'),
       h('p', { class: 'lead' }, 'Moments worth breaking into the lineup for.'), intHost),
+    h('section', { class: 'block', 'aria-labelledby': 'pi-h' },
+      h('h2', { id: 'pi-h', class: 'section-title' }, 'Pi alerts'),
+      h('p', { class: 'lead' }, 'Speak up when the Pi itself needs attention. Each one repeats while the problem lasts.'), piHost),
     h('section', { class: 'block', 'aria-labelledby': 'tr-h' }, h('h2', { id: 'tr-h', class: 'eyebrow' }, 'Between screens'), trHost),
     h('div', { class: 'pad-x' }, msg),
     saveBar);
@@ -241,7 +250,9 @@ export function render(root, { params }) {
 
   function renderInterrupts() {
     intHost.replaceChildren();
+    piHost.replaceChildren();
     for (const def of INTERRUPTS) {
+      const host = def.group === 'pi' ? piHost : intHost;
       const cfg = { ...def.defaults, ...(lu.interrupts[def.id] || {}) };
       lu.interrupts[def.id] = cfg;
       const detail = interruptDetail(def.id, cfg);
@@ -249,10 +260,10 @@ export function render(root, { params }) {
       const row = h('div', { class: 'row' },
         h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, def.name), h('div', { class: 'row-detail', id: detailId }, detail)),
         toggle({ label: def.name, pressed: !!cfg.enabled, describedBy: detailId, onChange: (v) => { cfg.enabled = v; renderInterrupts(); syncBar(); } }));
-      intHost.append(row);
+      host.append(row);
       if (cfg.enabled) {
         const extra = interruptParams(def.id, cfg);
-        if (extra) intHost.append(extra);
+        if (extra) host.append(extra);
       }
     }
   }
@@ -265,6 +276,10 @@ export function render(root, { params }) {
       case 'timer_done': return 'Flash the panel three times';
       case 'rain_soon': return `${cfg.minutes} minutes ahead · once per hour`;
       case 'iss_overhead': return 'When the ISS is within about 1,500 km · once per pass';
+      case 'pi_hot': return `CPU at ${cfg.threshold_c}°C or more · every 10 min while hot`;
+      case 'pi_power': return 'Under-voltage or throttling · every 30 min while it lasts';
+      case 'offline': return `No internet for ${cfg.minutes} min · then hourly`;
+      case 'disk_low': return `Less than ${cfg.percent}% of the SD card free · every 6 hours`;
       default: return '';
     }
   }
@@ -276,6 +291,18 @@ export function render(root, { params }) {
         paramRow('Radius', stepper({ label: 'radius in nautical miles', value: cfg.radius_nm, min: 1, max: 25, format: (v) => `${v} nm`, onChange: (v) => { cfg.radius_nm = v; refresh(); } })),
         paramRow('Below', stepper({ label: 'maximum altitude', value: cfg.max_alt_ft, min: 1000, max: 40000, step: 1000, format: (v) => `${v / 1000}k ft`, onChange: (v) => { cfg.max_alt_ft = v; refresh(); } })),
         paramRow('Show for', stepper({ label: 'seconds', value: cfg.seconds, min: 5, max: 120, step: 5, format: (v) => `${v} s`, onChange: (v) => { cfg.seconds = v; refresh(); } })));
+    }
+    if (id === 'pi_hot') {
+      return h('div', { class: 'sub-rows' },
+        paramRow('At', stepper({ label: 'temperature in degrees Celsius', value: cfg.threshold_c, min: 55, max: 85, format: (v) => `${v}°C`, onChange: (v) => { cfg.threshold_c = v; refresh(); } })));
+    }
+    if (id === 'offline') {
+      return h('div', { class: 'sub-rows' },
+        paramRow('After', stepper({ label: 'minutes offline', value: cfg.minutes, min: 5, max: 60, step: 5, format: (v) => `${v} min`, onChange: (v) => { cfg.minutes = v; refresh(); } })));
+    }
+    if (id === 'disk_low') {
+      return h('div', { class: 'sub-rows' },
+        paramRow('Below', stepper({ label: 'percent free', value: cfg.percent, min: 5, max: 50, step: 5, format: (v) => `${v}%`, onChange: (v) => { cfg.percent = v; refresh(); } })));
     }
     if (id === 'rain_soon') {
       return h('div', { class: 'sub-rows' },

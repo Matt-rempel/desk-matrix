@@ -64,9 +64,15 @@ INTERRUPT_DEFAULTS = {
     "timer_done": {"enabled": True},
     "rain_soon": {"enabled": False, "minutes": 15},
     "iss_overhead": {"enabled": False},
+    # Pi alerts
+    "pi_hot": {"enabled": True, "threshold_c": 75},
+    "pi_power": {"enabled": True},
+    "offline": {"enabled": False, "minutes": 5},
+    "disk_low": {"enabled": True, "percent": 10},
 }
 INTERRUPT_BOUNDS = {
     "radius_nm": (1, 50), "max_alt_ft": (500, 50000), "seconds": (5, 300), "minutes": (5, 120),
+    "threshold_c": (55, 85), "percent": (5, 50),
 }
 WORK_MIN, BREAK_MIN = (1, 120), (1, 60)
 DEFAULT_ITEM_SECONDS = 15

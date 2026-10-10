@@ -15,6 +15,8 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
+import socket
 import threading
 import time
 import urllib.error
@@ -30,10 +32,14 @@ WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 METAR_URL = "https://aviationweather.gov/api/data/metar"
 ISS_URL = "https://api.wheretheiss.at/v1/satellites/25544"
 CPU_TEMP_PATH = Path("/sys/class/thermal/thermal_zone0/temp")
+# Raspberry Pi firmware flags: bit 0 under-voltage now; bits 1-3 frequency capped,
+# throttled or at the soft temperature limit now.
+THROTTLED_PATH = Path("/sys/devices/platform/soc/soc:firmware/get_throttled")
+NET_PROBE = ("1.1.1.1", 443)  # a TCP connect only, made while the offline alert is on
 
 # Refresh intervals in seconds (plan: weather 15 min, METAR 10 min, ISS 30 s,
 # calendar 15 min, feeds per feed with a 60 s floor).
-INTERVALS = {"weather": 900, "metar": 600, "iss": 30, "calendar": 900}
+INTERVALS = {"weather": 900, "metar": 600, "iss": 30, "calendar": 900, "net": 60}
 FEED_MIN_INTERVAL = 60
 FEED_DEFAULT_INTERVAL = 300
 BACKOFF_BASE = 60
@@ -636,6 +642,29 @@ def cpu_temp_c(path: Path = CPU_TEMP_PATH) -> float | None:
     return round(value / 1000 if abs(value) > 200 else value, 1)
 
 
+def throttle_flags(path: Path = THROTTLED_PATH) -> dict | None:
+    """Under-voltage and throttling right now, from the Pi firmware; None elsewhere."""
+    try:
+        value = int(path.read_text().strip(), 16)
+    except (OSError, ValueError):
+        return None
+    return {"under_voltage": bool(value & 0x1), "throttled": bool(value & 0xE)}
+
+
+def disk_free_pct(path) -> float | None:
+    try:
+        usage = shutil.disk_usage(path)
+    except OSError:
+        return None
+    return round(usage.free * 100 / usage.total, 1) if usage.total else None
+
+
+def probe_network(address=NET_PROBE, timeout: float = 4.0) -> dict:
+    """Raise OSError when the internet cannot be reached."""
+    with socket.create_connection(address, timeout=timeout):
+        return {}
+
+
 # --------------------------------------------------------------------- providers
 
 class _Source:
@@ -658,7 +687,8 @@ class Providers:
     """Schedules background fetches for the data needs of the active screens."""
 
     def __init__(self, settings, state_dir=None, *, executor: Executor | None = None,
-                 now_fn=time.time, monotonic_fn=time.monotonic, cpu_path: Path = CPU_TEMP_PATH):
+                 now_fn=time.time, monotonic_fn=time.monotonic, cpu_path: Path = CPU_TEMP_PATH,
+                 throttled_path: Path = THROTTLED_PATH):
         self._lock = threading.Lock()
         self._own_executor = executor is None
         self._executor = executor or ThreadPoolExecutor(max_workers=3, thread_name_prefix="providers")
@@ -669,6 +699,8 @@ class Providers:
         self._needs: set[str] = set()
         self._generation = 0
         self._net_ok_at: float | None = None
+        self._offline_since: float | None = None  # wall clock of the first failed probe
+        self._throttled_path = throttled_path
         self._net_attempted = False
         self._calendar_cache: tuple[float, dict | None] | None = None
         self._calendar_lock = threading.Lock()
@@ -795,6 +827,8 @@ class Providers:
             config = tuple(str(feed.get(k) or "") for k in ("url", "path", "series_path", "prefix", "suffix"))
             feed = dict(feed)
             return need, interval, lambda: parse_feed(_get_json(feed["url"]), feed), config
+        if need == "net":
+            return "net", INTERVALS["net"], probe_network, None
         return None  # sun and health are computed in snapshot(); aircraft/timers live elsewhere
 
     def _fetch_weather(self, url: str) -> dict:
@@ -818,17 +852,24 @@ class Providers:
                 source.data, source.fetched_at, source.error, source.failures = data, self._now(), None, 0
                 source.next_due = mono + interval
                 self._net_ok_at = mono
+                self._offline_since = None
                 if source.key == "calendar":
                     self._calendar_cache = None
             else:
                 source.failures += 1
                 source.error = error
                 source.next_due = mono + min(BACKOFF_CAP, BACKOFF_BASE * 2 ** (source.failures - 1))
+                if source.key == "net":
+                    # Keep probing every minute: the alert needs to know when it is back.
+                    source.next_due = mono + INTERVALS["net"]
+                    if self._offline_since is None:
+                        self._offline_since = self._now()
 
     def mark_network_ok(self) -> None:
         """Let other providers (e.g. aircraft) report a successful fetch for health.net_ok."""
         with self._lock:
             self._net_attempted, self._net_ok_at = True, self._mono()
+            self._offline_since = None
 
     # -- snapshot ----------------------------------------------------------------
     def snapshot(self) -> dict:
@@ -844,6 +885,7 @@ class Providers:
             net_ok = (self._net_ok_at is not None and mono - self._net_ok_at <= NET_OK_WINDOW)
             if not net_ok and not self._net_attempted:
                 net_ok = None
+            offline_since = self._offline_since
         snap: dict = {}
         weather = sources.get("weather", (None,))[0]
         if weather:
@@ -879,8 +921,12 @@ class Providers:
             entry = sources.get(_source_key(need))
             if entry and entry[1] is not None:
                 ages.append(now - entry[1])
+        power = throttle_flags(self._throttled_path) or {}
         snap["health"] = {"cpu_temp_c": cpu_temp_c(self._cpu_path), "net_ok": net_ok,
-                          "feed_age_s": round(max(ages)) if ages else None}
+                          "feed_age_s": round(max(ages)) if ages else None,
+                          "under_voltage": power.get("under_voltage"), "throttled": power.get("throttled"),
+                          "disk_free_pct": disk_free_pct(self._state_dir or "/"),
+                          "offline_s": round(now - offline_since) if offline_since is not None else 0}
         return snap
 
     def _calendar_next(self, events: list[dict], now: float, now_dt: datetime) -> dict | None:

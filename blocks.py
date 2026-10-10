@@ -807,6 +807,41 @@ def b_calendar(s: Slot) -> list[dict]:
 
 # --- data -----------------------------------------------------------------
 
+ALERTS = {"hot": ("thermo", "PI HOT"), "power": ("bolt", "POWER"),
+          "offline": ("nowifi", "NO NET"), "disk": ("sdcard", "DISK")}
+
+
+def alert_value(kind: str, health: dict, units: dict) -> str:
+    if kind == "hot":
+        temp = temp_value(health.get("cpu_temp_c"), units)
+        return f"{temp}°" if temp is not None else "--"
+    if kind == "power":
+        if health.get("under_voltage"):
+            return "LOW"
+        if health.get("throttled"):
+            return "SLOW"
+        return "OK" if health.get("under_voltage") is not None else "--"
+    if kind == "offline":
+        seconds = health.get("offline_s")
+        if not isinstance(seconds, (int, float)):
+            return "--"
+        return minutes_text(seconds / 60) if seconds >= 60 else "OK"
+    pct = health.get("disk_free_pct")
+    return f"{jround(pct)}%" if isinstance(pct, (int, float)) else "--"
+
+
+def b_alert(s: Slot) -> list[dict]:
+    r, kind = s.rect, s.opt("kind")
+    icon_name, label = ALERTS.get(kind, ALERTS["hot"])
+    value = alert_value(kind, s.source("health") or {}, s.ctx.units)
+    color = s.color if value != "--" else dim(s.color)
+    if r.full:
+        return [icon(icon_name, r.x, r.y, s.icon_color(solid(s.color))),
+                T(r.sub(9, 1, r.w - 9, 5), [label, label[:4]], s.accent(MUTED), a="l"),
+                T(r.sub(0, 9, r.w, 7), [value], color)]
+    return [T(r, [f"{label} {value}", value], color)]
+
+
 def b_feed(s: Slot) -> list[dict]:
     r = s.rect
     feed_id = str(s.opt("feed_id") or "")
@@ -1006,7 +1041,7 @@ RENDERERS: dict[str, Callable[[Slot], list[dict]]] = {
     "weather_icon": b_weather_icon, "rain": b_rain, "sun_time": b_sun_time, "flight": b_flight,
     "plane_count": b_plane_count, "countdown": b_countdown, "timer": b_timer, "text": b_text,
     "progress": b_progress, "spark": b_spark, "icon": b_icon, "art": b_art, "feed": b_feed,
-    "calendar_next": b_calendar, "metar": b_metar, "iss": b_iss, "health": b_health,
+    "calendar_next": b_calendar, "metar": b_metar, "alert": b_alert, "iss": b_iss, "health": b_health,
     "world_clock": b_world, "analog_clock": b_analog, "fuzzy_time": b_fuzzy, "radar": b_radar, "sun_arc": b_sun_arc,
     "hourly_graph": b_hourly, "habit_week": b_habit, "life": b_life, "fire": b_fire, "none": b_none,
 }

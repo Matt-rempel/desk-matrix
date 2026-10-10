@@ -560,7 +560,9 @@ def build_status(settings, info: dict, pixels, data: dict, now: float | None = N
     pin = info.get("pin") if info.get("pinned") else None
     if info.get("interrupt"):
         detail_text = {"plane_overhead": "Plane overhead", "timer_done": "Timer done",
-                       "rain_soon": "Rain soon", "iss_overhead": "ISS overhead"}.get(
+                       "rain_soon": "Rain soon", "iss_overhead": "ISS overhead",
+                       "pi_hot": "Pi running hot", "pi_power": "Low power",
+                       "offline": "Offline", "disk_low": "Storage low"}.get(
                            info["interrupt"], info["interrupt"])
     elif pin:
         detail_text = "Pinned"

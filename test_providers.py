@@ -471,16 +471,44 @@ class SchedulingTests(ProviderTestCase):
 class HealthTests(ProviderTestCase):
     def test_health_values(self):
         p = self.make()
-        self.assertEqual(p.snapshot()["health"], {"cpu_temp_c": 48.3, "net_ok": None, "feed_age_s": None})
+        pick = lambda h: {k: h[k] for k in ("cpu_temp_c", "net_ok", "feed_age_s")}
+        self.assertEqual(pick(p.snapshot()["health"]), {"cpu_temp_c": 48.3, "net_ok": None, "feed_age_s": None})
         with patch_fetch({"open-meteo": weather_payload()}):
             p.update({"weather", "health"}, [])
         self.clock.advance(120)
-        self.assertEqual(p.snapshot()["health"], {"cpu_temp_c": 48.3, "net_ok": True, "feed_age_s": 120})
+        self.assertEqual(pick(p.snapshot()["health"]), {"cpu_temp_c": 48.3, "net_ok": True, "feed_age_s": 120})
         self.clock.advance(600)
         self.assertFalse(p.snapshot()["health"]["net_ok"])
         p.mark_network_ok()
         self.assertTrue(p.snapshot()["health"]["net_ok"])
         self.assertIsNone(providers.cpu_temp_c(Path("/nonexistent/thermal")))
+
+    def test_throttling_and_disk(self):
+        flags = Path(self.enterContext(tempfile.TemporaryDirectory())) / "get_throttled"
+        flags.write_text("0x50005\n")  # under-voltage and throttled now, plus history bits
+        self.assertEqual(providers.throttle_flags(flags), {"under_voltage": True, "throttled": True})
+        flags.write_text("50000")  # only "has happened since boot" bits
+        self.assertEqual(providers.throttle_flags(flags), {"under_voltage": False, "throttled": False})
+        self.assertIsNone(providers.throttle_flags(Path("/nonexistent/get_throttled")))
+        self.assertIsNone(providers.disk_free_pct("/nonexistent/path"))
+        free = providers.disk_free_pct("/")
+        self.assertTrue(0 <= free <= 100)
+
+    def test_offline_probe(self):
+        p = self.make()
+        self.assertEqual(p.snapshot()["health"]["offline_s"], 0)
+        with mock.patch.object(providers, "probe_network", side_effect=OSError("unreachable")):
+            p.update({"net"}, [])
+            self.clock.advance(300)
+            self.assertEqual(p.snapshot()["health"]["offline_s"], 300)
+            p.update({"net"}, [])  # retried every minute, not backed off
+            self.clock.advance(60)
+            p.update({"net"}, [])
+        self.assertEqual(p.snapshot()["health"]["offline_s"], 360)
+        with mock.patch.object(providers, "probe_network", return_value={}):
+            self.clock.advance(60)
+            p.update({"net"}, [])
+        self.assertEqual(p.snapshot()["health"]["offline_s"], 0)
 
     def test_seed_from_state_dir(self):
         with tempfile.TemporaryDirectory() as tmp:

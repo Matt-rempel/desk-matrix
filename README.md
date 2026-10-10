@@ -154,7 +154,12 @@ button whenever a flight screen is playing.
 first match in the list wins. Screens change with a cut, slide, dissolve or
 pixel wipe. *Interruptions* break in for a plane overhead (radius, altitude
 and duration are adjustable), a finished timer, rain starting soon, or the
-ISS passing within about 1,500 km.
+ISS passing within about 1,500 km. *Pi alerts* break in when the Pi itself
+needs attention: CPU at or above a chosen temperature (75 °C by default),
+under-voltage or throttling reported by the Pi firmware, no internet for a
+chosen number of minutes (checked with a TCP connection to 1.1.1.1 every
+minute, only while that alert is on), or the SD card nearly full. Each
+repeats while the problem lasts and re-arms once it clears.
 
 **Device** holds location and time zone, flight radius and rotation, units
 (°C/°F, nm/km), brightness (follow the lineup, a maximum, night dimming and

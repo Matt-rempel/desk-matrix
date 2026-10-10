@@ -65,7 +65,7 @@ class CatalogTests(unittest.TestCase):
 
     def test_shelves_and_legacy_ids(self):
         shelved = [sid for shelf in catalog.SHELVES for sid in shelf["items"]]
-        self.assertEqual([s["id"] for s in catalog.SHELVES], ["time", "sky", "weather", "focus", "play", "data"])
+        self.assertEqual([s["id"] for s in catalog.SHELVES], ["time", "sky", "weather", "focus", "play", "data", "system"])
         self.assertTrue(set(shelved) <= set(catalog.BUILTINS))
         self.assertTrue(PLAN_IDS <= set(shelved))
         self.assertEqual(catalog.LEGACY_IDS["clock-classic"], "time-classic")
@@ -163,6 +163,22 @@ class BlockBehaviourTests(unittest.TestCase):
                                  ("none", None, {}), ("none", None, {})), now=morning)
         self.assertEqual(texts(row), [["NYC 10:24", "10:24"]])
         self.assertIsNone(blocks.city_time("XXX", morning))
+
+    def test_pi_alerts(self):
+        health = {"cpu_temp_c": 78.4, "under_voltage": True, "throttled": True,
+                  "disk_free_pct": 6.2, "offline_s": 720}
+        data = {**self.ctx.data, "health": health}
+        values = {kind: texts(self.render(one("alert", kind=kind), data=data))
+                  for kind in ("hot", "power", "offline", "disk")}
+        self.assertEqual(values["hot"], [["PI HOT", "PI H"], ["78°"]])
+        self.assertEqual(values["power"][1], ["LOW"])
+        self.assertEqual(values["offline"][1], ["12M"])
+        self.assertEqual(values["disk"][1], ["6%"])
+        fahrenheit = self.render(one("alert", kind="hot"), data=data, units={"temp": "F", "distance": "nm"})
+        self.assertEqual(texts(fahrenheit)[1], ["173°"])
+        throttled_only = {**data, "health": {**health, "under_voltage": False}}
+        self.assertEqual(texts(self.render(one("alert", kind="power"), data=throttled_only))[1], ["SLOW"])
+        self.assertEqual(texts(self.render(one("alert", kind="hot"), data={}))[1], ["--"])
 
     def test_time_options(self):
         afternoon = datetime(2026, 10, 9, 16, 24, 1, tzinfo=MDT)

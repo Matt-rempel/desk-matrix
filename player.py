@@ -39,7 +39,15 @@ FLASH_COUNT = 3
 TIMER_SHOW_S = 5
 TIMER_LATE_S = 120  # a phase that ended longer ago (e.g. while powered off) does not flash
 INTERRUPT_NEEDS = {"plane_overhead": {"aircraft:nearby"}, "rain_soon": {"weather"},
-                   "iss_overhead": {"iss"}, "timer_done": set()}
+                   "iss_overhead": {"iss"}, "timer_done": set(), "pi_hot": {"health"},
+                   "pi_power": {"health"}, "disk_low": {"health"}, "offline": {"net"}}
+# Pi alerts: (screen, repeat while the problem lasts, seconds on the panel)
+ALERT_SHOW_S = 10
+ALERT_REPEAT_S = {"pi_hot": 600, "pi_power": 1800, "offline": 3600, "disk_low": 6 * 3600}
+ALERT_SCREENS = {"pi_hot": "sys-hot", "pi_power": "sys-power", "offline": "sys-offline",
+                 "disk_low": "sys-disk"}
+HOT_CLEAR_C = 5  # a hot alert re-arms once the Pi is this far below the threshold
+DISK_CLEAR_PCT = 2
 INTERRUPT_DEFAULTS = library.INTERRUPT_DEFAULTS
 WIPE_ORDER = tuple(random.Random(0x5EED).sample(range(PIXELS), PIXELS))
 WHITE = (255, 255, 255)
@@ -214,6 +222,7 @@ class Player:
         self._rain_fired: float | None = None
         self._iss_overhead = False
         self._timer_seen: set[tuple[str, float]] = set()
+        self._alert_fired: dict[str, float] = {}
         self.set_library(library)
 
     # -- inputs ----------------------------------------------------------------
@@ -334,6 +343,8 @@ class Player:
             return
         if self._interrupt:
             return
+        if self._check_alerts(mono, data):
+            return
         config = self._interrupt_config("plane_overhead")
         aircraft = data.get("aircraft") if isinstance(data.get("aircraft"), dict) else {}
         if config:
@@ -362,6 +373,41 @@ class Player:
             return
         if iss_new_pass and self._interrupt_config("iss_overhead"):
             self._start_interrupt(mono, "iss_overhead", "sky-iss", ISS_SHOW_S)
+
+    def _alert_states(self, data: dict) -> dict[str, bool | None]:
+        """Each Pi alert: True (problem), False (clear, re-arm) or None (keep waiting)."""
+        health = data.get("health") if isinstance(data.get("health"), dict) else {}
+        states: dict[str, bool | None] = {}
+        config = self._interrupt_config("pi_hot")
+        temp = health.get("cpu_temp_c")
+        if config and isinstance(temp, (int, float)):
+            states["pi_hot"] = (True if temp >= config["threshold_c"]
+                                else False if temp <= config["threshold_c"] - HOT_CLEAR_C else None)
+        if self._interrupt_config("pi_power") and health.get("under_voltage") is not None:
+            states["pi_power"] = bool(health.get("under_voltage") or health.get("throttled"))
+        config = self._interrupt_config("offline")
+        offline = health.get("offline_s")
+        if config and isinstance(offline, (int, float)):
+            states["offline"] = (True if offline >= config["minutes"] * 60
+                                 else False if offline == 0 else None)
+        config = self._interrupt_config("disk_low")
+        free = health.get("disk_free_pct")
+        if config and isinstance(free, (int, float)):
+            states["disk_low"] = (True if free < config["percent"]
+                                  else False if free >= config["percent"] + DISK_CLEAR_PCT else None)
+        return states
+
+    def _check_alerts(self, mono: float, data: dict) -> bool:
+        for name, problem in self._alert_states(data).items():
+            if problem is False:
+                self._alert_fired.pop(name, None)
+            elif problem:
+                fired = self._alert_fired.get(name)
+                if fired is None or mono - fired >= ALERT_REPEAT_S[name]:
+                    self._alert_fired[name] = mono
+                    self._start_interrupt(mono, name, ALERT_SCREENS[name], ALERT_SHOW_S)
+                    return True
+        return False
 
     # -- rendering inputs ------------------------------------------------------------
     def _timers_raw(self) -> dict:

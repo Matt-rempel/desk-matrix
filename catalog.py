@@ -166,6 +166,11 @@ BLOCKS = {
     "iss": _block("ISS", "ISS", "sky", {
         "field": _enum("distance", "distance", "direction", "label"),
         "accent": _color(), "icon_color": _color()}, 11, 5, ["iss"]),
+    "alert": _block("Pi alert", "HOT", "data", {
+        "kind": {"type": "enum", "default": "hot", "choices": ["hot", "power", "offline", "disk"],
+                 "labels": {"hot": "Running hot", "power": "Low power", "offline": "Offline",
+                            "disk": "Storage low"}},
+        "accent": _color(), "icon_color": _color()}, 11, 5, ["health"]),
     "health": _block("Pi health", "48°", "data", {
         "field": _enum("cpu", "cpu", "net", "feed"), "accent": _color()}, 11, 5, ["health"]),
     "world_clock": _block("World clock", "LDN", "time", {
@@ -282,6 +287,14 @@ BUILTIN_SCREENS = [
     _screen("data-transit", "Transit", "full", [
         _slot("feed", "#5AD1A0", feed_id=SAMPLE_FEEDS["transit"], label="201", icon="bus",
               accent=INK, icon_color="#5AD1A0")], "data", "Next departure", "JSON feed"),
+    _screen("sys-hot", "Pi running hot", "full", [_slot("alert", "#FF5A36", kind="hot", accent=MUTED)],
+            "system", "CPU temperature", "On the Pi"),
+    _screen("sys-power", "Low power", "full", [_slot("alert", "#FFC83D", kind="power", accent=MUTED)],
+            "system", "Under-voltage · throttling", "On the Pi"),
+    _screen("sys-offline", "Offline", "full", [_slot("alert", "#7CB8FF", kind="offline", accent=MUTED)],
+            "system", "No internet", "On the Pi"),
+    _screen("sys-disk", "Storage low", "full", [_slot("alert", "#B98CFF", kind="disk", accent=MUTED)],
+            "system", "SD card space", "On the Pi"),
     _screen("data-health", "Pi health", "full", [_slot("health", "#5AE08A", accent=AMBER)],
             "data", "Temp · network · feed", "This Pi"),
     _screen("night-clock", "Night clock", "full", [_slot("time", "#B3261E", font="5x7")],
@@ -313,6 +326,9 @@ SHELVES = [
     {"id": "data", "title": "Data", "source": "Needs a feed",
      "blurb": "Numbers that change during the day.",
      "items": ["data-market", "data-score", "data-transit", "data-health"]},
+    {"id": "system", "title": "Pi alerts", "source": "On the Pi",
+     "blurb": "Shown by Lineup › Pi alerts when the Pi needs attention.",
+     "items": ["sys-hot", "sys-power", "sys-offline", "sys-disk"]},
 ]
 
 LEGACY_IDS = {"clock-classic": "time-classic", "clock-simple": "time-simple",
@@ -375,7 +391,8 @@ SAMPLE_DATA = {
         SAMPLE_FEEDS["music"]: {"value": "SIDE A", "series": [],
                                 "updated_at": "2026-10-09T16:23:00Z", "error": None},
     },
-    "health": {"cpu_temp_c": 48.0, "net_ok": True, "feed_age_s": 6},
+    "health": {"cpu_temp_c": 48.0, "net_ok": True, "feed_age_s": 6, "under_voltage": False,
+               "throttled": False, "disk_free_pct": 62.0, "offline_s": 0},
     "aircraft": {
         "nearby": [
             {"callsign": "WJA123", "route": "YYC>YVR", "distance_nm": 3.2, "altitude_ft": 12000,

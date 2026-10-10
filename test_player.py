@@ -281,6 +281,35 @@ class InterruptTests(unittest.TestCase):
                                                "max_alt_ft": 10000, "seconds": 15}})
         self.assertIsNone(off.tick(0, data)[1]["interrupt"])
 
+    def test_pi_hot_repeats_while_hot_and_rearms_when_cool(self):
+        p, _ = self.make({"pi_hot": {"enabled": True, "threshold_c": 75}})
+        hot = {"health": {"cpu_temp_c": 77.0}}
+        _, info = p.tick(0, hot)
+        self.assertEqual((info["screen_id"], info["interrupt"]), ("sys-hot", "pi_hot"))
+        self.assertEqual(p.tick(player.ALERT_SHOW_S, hot)[1]["screen_id"], "time-big")
+        self.assertIsNone(p.tick(300, hot)[1]["interrupt"])  # repeats every 10 minutes
+        self.assertEqual(p.tick(600, hot)[1]["interrupt"], "pi_hot")
+        warm = {"health": {"cpu_temp_c": 72.0}}  # below the threshold but not 5° below
+        self.assertIsNone(p.tick(700, warm)[1]["interrupt"])
+        self.assertIsNone(p.tick(710, hot)[1]["interrupt"])  # still waiting out the repeat
+        cool = {"health": {"cpu_temp_c": 65.0}}
+        self.assertIsNone(p.tick(720, cool)[1]["interrupt"])
+        self.assertEqual(p.tick(730, hot)[1]["interrupt"], "pi_hot")  # re-armed
+        off, _ = self.make({"pi_hot": {"enabled": False, "threshold_c": 75}})
+        self.assertIsNone(off.tick(0, hot)[1]["interrupt"])
+
+    def test_power_offline_and_disk_alerts(self):
+        p, _ = self.make({"pi_power": {"enabled": True}, "offline": {"enabled": True, "minutes": 5},
+                          "disk_low": {"enabled": True, "percent": 10}})
+        self.assertEqual(p.tick(0, {"health": {"under_voltage": True, "throttled": False}})[1]["screen_id"],
+                         "sys-power")
+        self.assertIsNone(p.tick(20, {"health": {"offline_s": 120}})[1]["interrupt"])
+        self.assertEqual(p.tick(40, {"health": {"offline_s": 300}})[1]["screen_id"], "sys-offline")
+        self.assertEqual(p.tick(60, {"health": {"disk_free_pct": 4.0}})[1]["screen_id"], "sys-disk")
+        self.assertIsNone(p.tick(80, {"health": {"disk_free_pct": 4.0, "offline_s": 400,
+                                                  "under_voltage": True}})[1]["interrupt"])
+        self.assertTrue({"health", "net"} <= p.needs())
+
     def test_rain_soon_once_per_hour(self):
         p, _ = self.make({"rain_soon": {"enabled": True, "minutes": 30}})
         dry = {"weather": {"rain_in_min": None}}
