@@ -61,7 +61,7 @@ export function render(root, { id, go }) {
 
   const msg = messageLine();
   const saveLink = h('button', { type: 'button', class: 'subbar-link subbar-strong' }, 'Save');
-  root.append(header({ back: '#/', backLabel: '‹ Back', title: 'Pixel studio', action: saveLink }));
+  root.append(header({ back: '#/', backLabel: 'Back to screens', title: 'Pixel studio', action: saveLink }));
 
   // Preview
   const matrix = createMatrix({ pitch: 4, glow: true, label: 'How the art looks on the matrix' });

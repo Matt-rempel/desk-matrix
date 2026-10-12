@@ -189,8 +189,18 @@ export function busy(button, on, text) {
 }
 
 export function header({ back, backLabel, title, action }) {
+  const ns = 'http://www.w3.org/2000/svg';
+  const chevron = document.createElementNS(ns, 'svg');
+  for (const [name, value] of Object.entries({
+    viewBox: '0 0 24 24', width: '20', height: '20', fill: 'none',
+    stroke: 'currentColor', 'stroke-width': '2', 'stroke-linecap': 'round',
+    'stroke-linejoin': 'round', 'aria-hidden': 'true',
+  })) chevron.setAttribute(name, value);
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'm15 18-6-6 6-6');
+  chevron.append(path);
   return h('header', { class: 'subbar' },
-    h('a', { class: 'subbar-link', href: back }, backLabel),
+    h('a', { class: 'subbar-back', href: back, 'aria-label': backLabel, title: backLabel }, chevron),
     h('h1', { class: 'subbar-title' }, title),
     action || h('span', { class: 'subbar-spacer', 'aria-hidden': 'true' }));
 }

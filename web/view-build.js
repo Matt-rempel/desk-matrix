@@ -34,7 +34,7 @@ export function render(root, { id, go }) {
 
   const msg = messageLine();
   const saveLink = h('button', { type: 'button', class: 'subbar-link subbar-strong' }, 'Save');
-  root.append(header({ back: editing ? `#/customize/${encodeURIComponent(work.id)}` : '#/', backLabel: 'Cancel', title: editing ? 'Edit screen' : 'New screen', action: saveLink }));
+  root.append(header({ back: editing ? `#/customize/${encodeURIComponent(work.id)}` : '#/', backLabel: editing ? 'Back to customize' : 'Back to screens', title: editing ? 'Edit screen' : 'New screen', action: saveLink }));
 
   // Preview with slot outline
   const matrix = createMatrix({ pitch: 10, glow: true, label: 'Screen preview' });

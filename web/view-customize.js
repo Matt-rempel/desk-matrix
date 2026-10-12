@@ -25,7 +25,7 @@ const MOTION_GLYPHS = { still: '■', breathe: '◐', slide: '→', sparkle: '�
 export function render(root, { id, go }) {
   const source = findScreen(id);
   if (!source) {
-    root.append(header({ back: '#/', backLabel: '‹ Gallery', title: 'Customize' }),
+    root.append(header({ back: '#/', backLabel: 'Back to screens', title: 'Customize' }),
       h('div', { class: 'empty-state' }, h('p', null, 'That screen no longer exists.'), h('a', { class: 'btn btn-primary', href: '#/' }, 'Back to the gallery')));
     return null;
   }
@@ -59,7 +59,7 @@ export function render(root, { id, go }) {
   };
 
   const doneBtn = h('button', { type: 'button', class: 'subbar-link subbar-strong' }, 'Save');
-  const bar = header({ back: '#/', backLabel: '‹ Gallery', title: 'Customize', action: doneBtn });
+  const bar = header({ back: '#/', backLabel: 'Back to screens', title: 'Customize', action: doneBtn });
   root.append(bar);
 
   // Leaving with changes: Save keeps them as one of Your screens; Back asks first.
@@ -69,7 +69,7 @@ export function render(root, { id, go }) {
     try { await persist(); toast(savedToast()); go('#/'); }
     catch (error) { msg.error(error); busy(doneBtn, false); }
   });
-  bar.querySelector('.subbar-link').addEventListener('click', async (event) => {
+  bar.querySelector('.subbar-back').addEventListener('click', async (event) => {
     if (!dirty()) return;
     event.preventDefault();
     const keep = await confirmSheet({ title: 'Save your changes?', text: `Keep “${work.name}” in Your screens, or discard the changes.`,
