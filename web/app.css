@@ -1,4 +1,4 @@
-/* Desk Matrix settings — phone-first, one centered column on desktop. */
+/* Desk Matrix settings — phone-first, with wider layouts for larger screens. */
 
 :root {
   color-scheme: dark;
@@ -582,7 +582,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 /* ---- Desktop ------------------------------------------------------------------------------------------ */
 .split-side, .split-main { display: contents; }
 
-@media (min-width: 960px) {
+@media (min-width: 800px) {
   body { padding: 0; }
   .app { max-width: 1240px; border: 0; }
   .page { position: relative; }
@@ -590,7 +590,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
   .segnav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 380px; margin: 0; }
   :root { --gutter: 24px; }
 
-  .split { display: grid; grid-template-columns: minmax(380px, 440px) minmax(0, 1fr); column-gap: 32px; align-items: start; padding: 0 8px; }
+  .split { display: grid; grid-template-columns: minmax(300px, min(42%, 440px)) minmax(0, 1fr); column-gap: clamp(16px, 3vw, 32px); align-items: start; padding: 0 8px; }
   .split > .subbar { grid-column: 1 / -1; margin: 0 -8px; padding: 12px 24px; }
   .split-side, .split-main { display: block; min-width: 0; }
   .split-side { position: sticky; top: 16px; }
