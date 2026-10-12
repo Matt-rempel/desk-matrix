@@ -5,7 +5,14 @@ const KEY_RE = /^[0-9a-fA-F]{64}$/;
 let key = '';
 let onUnauthorized = () => {};
 
-try { key = sessionStorage.getItem(KEY_NAME) || ''; } catch { key = ''; }
+// Keep a paired browser connected across tab closes and browser restarts.
+// Older versions used sessionStorage, so migrate an existing pairing on load.
+let remembered = '';
+try { remembered = localStorage.getItem(KEY_NAME) || ''; } catch { /* private or blocked storage */ }
+if (!KEY_RE.test(remembered)) {
+  try { remembered = sessionStorage.getItem(KEY_NAME) || ''; } catch { /* blocked storage */ }
+}
+if (KEY_RE.test(remembered)) setKey(remembered);
 
 /** Accept a pairing link: `#key=<64 hex>` or the older `#<64 hex>`. */
 export function takeKeyFromHash() {
@@ -21,13 +28,28 @@ export function getKey() { return key; }
 export function hasKey() { return KEY_RE.test(key); }
 export function setKey(value) {
   key = String(value || '').trim();
+  if (!KEY_RE.test(key)) key = '';
+  if (!key) {
+    try { localStorage.removeItem(KEY_NAME); } catch { /* blocked storage */ }
+    try { sessionStorage.removeItem(KEY_NAME); } catch { /* blocked storage */ }
+    return;
+  }
+  let persistent = false;
+  try { localStorage.setItem(KEY_NAME, key); persistent = true; } catch { /* blocked storage */ }
   try {
-    if (key) sessionStorage.setItem(KEY_NAME, key);
-    else sessionStorage.removeItem(KEY_NAME);
+    if (persistent) sessionStorage.removeItem(KEY_NAME);
+    else sessionStorage.setItem(KEY_NAME, key);
   } catch { /* storage blocked: key lives for this page only */ }
 }
 export function forgetKey() { setKey(''); }
 export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
+
+// A "Forget this browser" action also disconnects other open tabs on this site.
+if (typeof window !== 'undefined') window.addEventListener('storage', (event) => {
+  if ((event.key !== KEY_NAME && event.key !== null) || event.newValue === key) return;
+  try { sessionStorage.removeItem(KEY_NAME); } catch { /* blocked storage */ }
+  location.reload();
+});
 
 export class ApiError extends Error {
   constructor(message, status) { super(message); this.status = status; }

@@ -271,7 +271,7 @@ export function render(root) {
   });
   root.append(group('This browser', 'br-h', h('div', { class: 'card card-pad' },
     h('div', { class: 'row-title' }, 'Paired with a key'),
-    h('div', { class: 'row-detail' }, 'The pairing key stays in this browser tab only. The settings page is private to your network.'),
+    h('div', { class: 'row-detail' }, 'This browser remembers the pairing key until you forget it or clear its site data. The settings page is private to your network.'),
     forget)));
 
   updateDevice();

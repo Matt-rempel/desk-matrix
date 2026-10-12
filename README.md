@@ -84,9 +84,11 @@ On iPhone, connect to Tailscale, open the Pi's HTTPS settings address in
 and add it. On Android, open the same address in Chrome and choose
 **Install app** (or **Add to Home screen**) from the browser menu.
 
-The installed app has its own pairing session, so enter the key in it if
-prompted. Keep Tailscale connected to change settings; when the Pi cannot
-be reached, the app shows a retry page. The offline page caches no settings,
+The installed app may have separate browser storage, so enter the key in it
+once if prompted. Each browser or installed app remembers its pairing until
+you choose **Forget this browser** or clear its site data. Private browsing
+may discard it sooner. Keep Tailscale connected to change settings; when the
+Pi cannot be reached, the app shows a retry page. The offline page caches no settings,
 flight data, or pairing key.
 
 ### Update
@@ -124,8 +126,8 @@ tailscale serve status
 
 To retrieve a lost pairing key **on the Pi**, use
 `sudo cat /var/lib/flightboard/web-token`. The key is stored in a file
-readable only by the service account and root. The webpage keeps it only in
-the current browser tab's session storage.
+readable only by the service account and root. A paired browser stores it in
+its local site data until you choose **Forget this browser** or clear that data.
 
 For smoother matrix timing, disable onboard audio with
 `dtparam=audio=off` in `/boot/firmware/config.txt`, then reboot. The display

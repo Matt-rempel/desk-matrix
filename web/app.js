@@ -259,7 +259,7 @@ function showPairing(message = pairingMessage) {
     h('div', { class: 'brand brand-lg' }, logo(), h('span', { class: 'brand-name' }, 'desk matrix')),
     h('h1', { id: 'pair-title', class: 'pair-title' }, 'Connect this browser'),
     h('p', { id: 'pairing-help', class: 'pair-text' },
-      'Enter the pairing key shown in the Pi installation terminal, or open the pairing link from it. The key stays in this session only.'),
+      'Enter the pairing key shown in the Pi installation terminal, or open the pairing link from it. This browser remembers the key until you forget it or clear its site data.'),
     form));
   if (!message) input.focus();
 }
