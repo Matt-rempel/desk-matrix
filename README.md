@@ -162,6 +162,9 @@ value, sparkline, pixel art and more). The **Pixel studio** draws 7×7 icons,
 use in a screen. **Planes nearby** lists aircraft in range with a **Follow**
 button whenever a flight screen is playing.
 
+The **Sports** shelf starts with **NHL game**. Clone that screen, pick a team
+from all 32 clubs, and save it. You can show it now or add it to the lineup.
+
 **Lineup** plans the day. Each *time of day* (for example Morning, 07:00–
 09:00 on weekdays) has its own screens, durations and optional brightness;
 **Any other time** plays when none match. Moments may cross midnight; the
@@ -174,6 +177,11 @@ under-voltage or throttling reported by the Pi firmware, no internet for a
 chosen number of minutes (checked with a TCP connection to 1.1.1.1 every
 minute, only while that alert is on), or the SD card nearly full. Each
 repeats while the problem lasts and re-arms once it clears.
+An optional **NHL game live** interruption follows the NHL screen you select,
+even when it is not in the lineup. Choose brief alerts at puck drop and score
+changes (with an adjustable duration), or keep that screen up for the entire
+live game. A pinned screen stays in front; timer and Pi alerts take priority.
+The lineup resumes when the game ends or live data becomes stale.
 
 **Device** holds location and time zone, flight radius and rotation, units
 (°C/°F, nm/km), brightness (follow the lineup, a maximum, night dimming and

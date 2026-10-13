@@ -134,6 +134,11 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(clean["interrupts"]["rain_soon"], {"enabled": True, "minutes": 30})
         self.assertEqual(clean["interrupts"]["plane_overhead"]["radius_nm"], 3)
         self.assertTrue(clean["interrupts"]["timer_done"]["enabled"])
+        self.assertEqual(clean["interrupts"]["nhl_live"],
+                         {"enabled": False, "screen_id": "data-score", "mode": "brief", "seconds": 20})
+        hockey = {**lineup, "interrupts": {"nhl_live": {"enabled": True, "screen_id": CUSTOM,
+                                                        "mode": "game", "seconds": 30}}}
+        self.assertEqual(validate_lineup(hockey, known)["interrupts"]["nhl_live"]["mode"], "game")
 
         def with_moment(**changes):
             return {**lineup, "moments": [{**moment, **changes}]}
@@ -150,6 +155,9 @@ class ValidationTests(unittest.TestCase):
             {**lineup, "interrupts": {"plane_overhead": {"enabled": True, "radius_nm": 0}}},
             {**lineup, "interrupts": {"plane_overhead": {"enabled": "yes"}}},
             {**lineup, "interrupts": {"timer_done": {"enabled": True, "minutes": 3}}},
+            {**lineup, "interrupts": {"nhl_live": {"screen_id": "missing"}}},
+            {**lineup, "interrupts": {"nhl_live": {"mode": "forever"}}},
+            {**lineup, "interrupts": {"nhl_live": {"seconds": 301}}},
             {**lineup, "extra": 1},
             with_moment(start="24:00"), with_moment(end="6:30"), with_moment(start="06:30"),
             with_moment(days=[1, 1]), with_moment(days=[7]), with_moment(days=[]),
@@ -191,6 +199,13 @@ class ValidationTests(unittest.TestCase):
         for value in bad:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 validate_library(value)
+
+    def test_nhl_interruption_requires_nhl_screen(self):
+        base = default_library()
+        base["lineup"]["interrupts"]["nhl_live"] = {"enabled": True, "screen_id": "time-big",
+                                                       "mode": "brief", "seconds": 20}
+        with self.assertRaisesRegex(ValueError, "needs an NHL screen"):
+            validate_library(base)
 
     def test_resolve_screen(self):
         lib = validate_library({"version": 1, "screens": [screen()]})
@@ -244,6 +259,17 @@ class ActionTests(unittest.TestCase):
         self.assertNotIn(sid, lib["timers"])
         with self.assertRaisesRegex(ValueError, "own screens"):
             act(lib, "delete_screen", screen_id="time-big")
+
+    def test_deleting_followed_nhl_screen_resets_alert(self):
+        custom = screen(id="", layout="full", based_on="data-score",
+                        slots=[{"block": "nhl", "color": "#FFFFFF", "options": {"team": "EDM"}}])
+        lib = act(self.lib, "save_screen", screen=custom)
+        sid = lib["screens"][0]["id"]
+        lib = act(lib, "save_lineup", lineup={**lib["lineup"], "interrupts": {
+            **lib["lineup"]["interrupts"], "nhl_live": {"enabled": True, "screen_id": sid,
+                                                           "mode": "game", "seconds": 20}}})
+        lib = act(lib, "delete_screen", screen_id=sid)
+        self.assertEqual(lib["lineup"]["interrupts"]["nhl_live"], lib_mod.INTERRUPT_DEFAULTS["nhl_live"])
 
     def test_screen_limit(self):
         lib = self.lib

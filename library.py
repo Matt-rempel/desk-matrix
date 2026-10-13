@@ -64,6 +64,7 @@ INTERRUPT_DEFAULTS = {
     "timer_done": {"enabled": True},
     "rain_soon": {"enabled": False, "minutes": 15},
     "iss_overhead": {"enabled": False},
+    "nhl_live": {"enabled": False, "screen_id": "data-score", "mode": "brief", "seconds": 20},
     # Pi alerts
     "pi_hot": {"enabled": True, "threshold_c": 75},
     "pi_power": {"enabled": True},
@@ -394,6 +395,16 @@ def validate_lineup(lineup, known: set) -> dict:
     for kind, defaults in INTERRUPT_DEFAULTS.items():
         value = {**defaults, **_object(interrupts.get(kind, {}), f"Interruption {kind}", (), defaults)}
         clean = {"enabled": _bool(value["enabled"], f"Interruption {kind} enabled")}
+        if kind == "nhl_live":
+            screen_id = value["screen_id"]
+            _check(isinstance(screen_id, str) and screen_id in known,
+                   "NHL live interruption needs an existing screen")
+            _check(value["mode"] in ("brief", "game"),
+                   "NHL live interruption mode must be brief or game")
+            clean.update(screen_id=screen_id, mode=value["mode"],
+                         seconds=_int(value["seconds"], *INTERRUPT_BOUNDS["seconds"], "NHL alert seconds"))
+            clean_interrupts[kind] = clean
+            continue
         for key in defaults:
             if key != "enabled":
                 clean[key] = _int(value[key], *INTERRUPT_BOUNDS[key], f"Interruption {key.replace('_', ' ')}")
@@ -438,6 +449,12 @@ def validate_library(data) -> dict:
     _unique([feed["id"] for feed in feeds], "Feed")
     known = _known_ids(screen["id"] for screen in screens)
     lineup = validate_lineup(data.get("lineup", base["lineup"]), known)
+    nhl_screen_id = lineup["interrupts"]["nhl_live"]["screen_id"]
+    nhl_screen = next((screen for screen in screens if screen["id"] == nhl_screen_id), None)
+    if nhl_screen is None:
+        nhl_screen = catalog.BUILTINS.get(nhl_screen_id)
+    _check(nhl_screen is not None and any(slot["block"] == "nhl" for slot in nhl_screen["slots"]),
+           "NHL live interruption needs an NHL screen")
     pinned = data.get("pinned")
     if pinned is not None:
         _object(pinned, "Pinned screen", ("screen_id",), ("screen_id", "until"))
@@ -721,6 +738,8 @@ def apply_action(lib: dict, action: dict, now=time.time) -> dict:
         lineup["always"] = [item for item in lineup["always"] if item["screen_id"] != screen_id]
         for moment in lineup["moments"]:
             moment["screens"] = [item for item in moment["screens"] if item["screen_id"] != screen_id]
+        if lineup["interrupts"].get("nhl_live", {}).get("screen_id") == screen_id:
+            lineup["interrupts"]["nhl_live"] = copy.deepcopy(INTERRUPT_DEFAULTS["nhl_live"])
         if lib["pinned"] and lib["pinned"]["screen_id"] == screen_id:
             lib["pinned"] = None
         lib["timers"].pop(screen_id, None)

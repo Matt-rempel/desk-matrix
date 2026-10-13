@@ -11,6 +11,7 @@ const INTERRUPTS = [
   { id: 'timer_done', name: 'Timer finished', defaults: { enabled: true } },
   { id: 'rain_soon', name: 'Rain starting', defaults: { enabled: false, minutes: 15 } },
   { id: 'iss_overhead', name: 'ISS passing over', defaults: { enabled: false } },
+  { id: 'nhl_live', name: 'NHL game live', defaults: { enabled: false, screen_id: 'data-score', mode: 'brief', seconds: 20 } },
   // Pi alerts
   { id: 'pi_hot', name: 'Pi running hot', group: 'pi', defaults: { enabled: true, threshold_c: 75 } },
   { id: 'pi_power', name: 'Low power', group: 'pi', defaults: { enabled: true } },
@@ -276,6 +277,9 @@ export function render(root, { params }) {
       case 'timer_done': return 'Flash the panel three times';
       case 'rain_soon': return `${cfg.minutes} minutes ahead · once per hour`;
       case 'iss_overhead': return 'When the ISS is within about 1,500 km · once per pass';
+      case 'nhl_live': return cfg.mode === 'game'
+        ? 'Show the selected NHL screen throughout the game'
+        : `At puck drop and score changes · show for ${cfg.seconds} s`;
       case 'pi_hot': return `CPU at ${cfg.threshold_c}°C or more · every 10 min while hot`;
       case 'pi_power': return 'Under-voltage or throttling · every 30 min while it lasts';
       case 'offline': return `No internet for ${cfg.minutes} min · then hourly`;
@@ -286,6 +290,25 @@ export function render(root, { params }) {
 
   function interruptParams(id, cfg) {
     const refresh = () => { renderInterrupts(); syncBar(); };
+    if (id === 'nhl_live') {
+      const screens = [...(state.catalog?.builtins || []), ...(state.library?.screens || [])]
+        .filter((screen) => (screen.slots || []).some((slot) => slot.block === 'nhl'));
+      const inputId = nextId('nhl-screen');
+      const select = h('select', { id: inputId, class: 'input' }, screens.map((screen) => {
+        const team = screen.slots.find((slot) => slot.block === 'nhl')?.options?.team || 'CGY';
+        return h('option', { value: screen.id, selected: screen.id === cfg.screen_id }, `${screen.name} · ${team}`);
+      }));
+      select.addEventListener('change', () => { cfg.screen_id = select.value; refresh(); });
+      const mode = chips({ label: 'NHL alert behavior', value: cfg.mode,
+        choices: [{ id: 'brief', label: 'Brief alerts' }, { id: 'game', label: 'Entire game' }],
+        onChange: (value) => { cfg.mode = value; refresh(); } });
+      return h('div', { class: 'sub-rows' },
+        h('div', { class: 'field pad-row' }, h('label', { class: 'field-label', for: inputId }, 'Screen to follow'), select,
+          h('p', { class: 'card-note' }, 'Clone NHL game in Sports to choose another team or look.')),
+        h('div', { class: 'field pad-row' }, h('div', { class: 'field-label' }, 'When it appears'), mode),
+        cfg.mode === 'brief' ? paramRow('Show for', stepper({ label: 'seconds', value: cfg.seconds,
+          min: 5, max: 120, step: 5, format: (v) => `${v} s`, onChange: (v) => { cfg.seconds = v; refresh(); } })) : null);
+    }
     if (id === 'plane_overhead') {
       return h('div', { class: 'sub-rows' },
         paramRow('Radius', stepper({ label: 'radius in nautical miles', value: cfg.radius_nm, min: 1, max: 25, format: (v) => `${v} nm`, onChange: (v) => { cfg.radius_nm = v; refresh(); } })),

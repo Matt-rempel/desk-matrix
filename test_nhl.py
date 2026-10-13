@@ -15,7 +15,8 @@ NOW = datetime(2026, 10, 12, 19, 0, tzinfo=timezone.utc)
 
 def game(state, start, *, home="CGY", away="EDM", home_score=None, away_score=None,
          period=2, clock="10:20"):
-    return {"gameState": state, "startTimeUTC": start, "homeTeam": {"abbrev": home, "score": home_score},
+    return {"id": 2026020001, "gameState": state, "startTimeUTC": start,
+            "homeTeam": {"abbrev": home, "score": home_score},
             "awayTeam": {"abbrev": away, "score": away_score},
             "periodDescriptor": {"number": period, "periodType": "REG"},
             "clock": {"timeRemaining": clock}}
@@ -31,6 +32,7 @@ class NHLTests(unittest.TestCase):
         ]}
         result = nhl.parse_schedule(payload, "CGY", NOW)
         self.assertEqual((result["state"], result["away"], result["away_score"]), ("live", "CGY", 4))
+        self.assertEqual(result["game_id"], 2026020001)
         payload["games"].pop()
         self.assertEqual(nhl.parse_schedule(payload, "CGY", NOW)["state"], "final")
         self.assertEqual(nhl.parse_schedule(payload, "CGY", NOW.replace(day=13))["state"], "upcoming")

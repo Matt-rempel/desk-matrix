@@ -59,7 +59,7 @@ def parse_schedule(payload: dict, team: str, now: datetime | None = None) -> dic
     period = game.get("periodDescriptor") or {}
     clock = game.get("clock") or {}
     result = {
-        "team": team, "state": state, "home": home.get("abbrev", "---"),
+        "team": team, "game_id": game.get("id"), "state": state, "home": home.get("abbrev", "---"),
         "away": away.get("abbrev", "---"), "start": _start(game).isoformat(),
         "home_score": home.get("score"), "away_score": away.get("score"),
         "period": period.get("number") or game.get("period"),

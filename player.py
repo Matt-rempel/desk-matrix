@@ -223,6 +223,7 @@ class Player:
         self._iss_overhead = False
         self._timer_seen: set[tuple[str, float]] = set()
         self._alert_fired: dict[str, float] = {}
+        self._nhl_seen: tuple | None = None
         self.set_library(library)
 
     # -- inputs ----------------------------------------------------------------
@@ -307,9 +308,64 @@ class Player:
         for name, needs in INTERRUPT_NEEDS.items():
             if self._interrupt_config(name):
                 result |= needs
+        target = self._nhl_target()
+        if target:
+            result.add(f"nhl:{target[1]}")
         return result
 
     # -- interruptions ---------------------------------------------------------------
+    def _nhl_target(self) -> tuple[dict, str, dict] | None:
+        config = self._interrupt_config("nhl_live")
+        if not config:
+            return None
+        screen = resolve_screen(self.library, config.get("screen_id"))
+        if not screen:
+            return None
+        for slot in screen.get("slots") or ():
+            if isinstance(slot, dict) and slot.get("block") == "nhl":
+                options = slot.get("options")
+                team = options.get("team", "CGY") if isinstance(options, dict) else "CGY"
+                if f"nhl:{team}" in blocks.data_needs(screen):
+                    return config, team, screen
+        return None
+
+    def _nhl_game(self, data: dict) -> tuple[dict, str, dict] | None:
+        target = self._nhl_target()
+        if not target:
+            return None
+        config, team, screen = target
+        hockey = data.get("nhl") if isinstance(data.get("nhl"), dict) else {}
+        game = hockey.get(team) if isinstance(hockey.get(team), dict) else {}
+        age = game.get("age_s")
+        if (game.get("state") != "live" or
+                (isinstance(age, (int, float)) and age > 180)):
+            return None
+        return config, screen["id"], game
+
+    def _check_nhl(self, mono: float, data: dict) -> bool:
+        live = self._nhl_game(data)
+        if not live:
+            hockey = data.get("nhl") if isinstance(data.get("nhl"), dict) else {}
+            target = self._nhl_target()
+            game = hockey.get(target[1]) if target else None
+            if isinstance(game, dict) and game.get("state") in ("final", "upcoming", "none"):
+                self._nhl_seen = None
+            return False
+        config, screen_id, game = live
+        if config["mode"] == "game":
+            self._start_interrupt(mono, "nhl_live", screen_id, 2)
+            self._interrupt["mode"] = "game"
+            self._interrupt["until"] = float("inf")
+            return True
+        token = (screen_id, game.get("game_id") or game.get("start"),
+                 game.get("home_score"), game.get("away_score"))
+        if token == self._nhl_seen:
+            return False
+        self._nhl_seen = token
+        self._start_interrupt(mono, "nhl_live", screen_id, config["seconds"])
+        self._interrupt["mode"] = "brief"
+        return True
+
     def _start_interrupt(self, mono: float, name: str, screen_id: str, seconds: float,
                          flash: float = 0.0, focus: dict | None = None) -> None:
         screen = resolve_screen(self.library, screen_id) or catalog.BUILTINS[FALLBACK_SCREEN]
@@ -320,6 +376,10 @@ class Player:
     def _check_interrupts(self, mono: float, now: float, data: dict, pinned: bool) -> None:
         if self._interrupt and mono >= self._interrupt["until"]:
             self._interrupt = None
+        if self._interrupt and self._interrupt["name"] == "nhl_live" and self._interrupt.get("mode") == "game":
+            live = self._nhl_game(data)
+            if not live or live[0]["mode"] != "game" or live[1] != self._interrupt["screen_id"]:
+                self._interrupt = None
         # timer_done preempts any other interruption; its bookkeeping runs even when off
         done = None
         for timer_id, timer in self._timers_raw().items():
@@ -341,9 +401,13 @@ class Player:
             self._start_interrupt(mono, "timer_done", done, TIMER_SHOW_S,
                                   flash=FLASH_COUNT * 2 * FLASH_HALF_S)
             return
-        if self._interrupt:
+        if self._interrupt and self._interrupt["name"] != "nhl_live":
             return
         if self._check_alerts(mono, data):
+            return
+        if self._interrupt:
+            return
+        if self._check_nhl(mono, data):
             return
         config = self._interrupt_config("plane_overhead")
         aircraft = data.get("aircraft") if isinstance(data.get("aircraft"), dict) else {}

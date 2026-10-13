@@ -263,6 +263,55 @@ class InterruptTests(unittest.TestCase):
         lib = library(always=[("time-big", 10)], interrupts=interrupts, **kw)
         return Player(lib, settings(), now_fn=clock or Clock()), lib
 
+    @staticmethod
+    def nhl_data(state="live", home_score=2, away_score=1, age_s=10, team="CGY"):
+        return {"nhl": {team: {"state": state, "game_id": 2026020001,
+                                "home": team, "away": "EDM", "home_score": home_score,
+                                "away_score": away_score, "age_s": age_s}}}
+
+    def test_nhl_brief_alerts_at_puck_drop_and_score_changes(self):
+        cfg = {"nhl_live": {"enabled": True, "screen_id": "data-score", "mode": "brief", "seconds": 20}}
+        p, _ = self.make(cfg)
+        live = self.nhl_data()
+        self.assertEqual((p.tick(0, live)[1]["screen_id"], p._interrupt["name"]),
+                         ("data-score", "nhl_live"))
+        live["nhl"]["CGY"]["clock"] = "09:01"
+        self.assertEqual(p.tick(20, live)[1]["screen_id"], "time-big")
+        self.assertIsNone(p.tick(30, live)[1]["interrupt"])
+        live["nhl"]["CGY"]["home_score"] = 3
+        self.assertEqual(p.tick(31, live)[1]["interrupt"], "nhl_live")
+        self.assertEqual(p.tick(51, live)[1]["screen_id"], "time-big")
+        self.assertIsNone(p.tick(52, live)[1]["interrupt"])
+        self.assertIsNone(p.tick(53, self.nhl_data(age_s=190))[1]["interrupt"])
+        self.assertIsNone(p.tick(54, self.nhl_data(state="final"))[1]["interrupt"])
+
+    def test_nhl_entire_game_resumes_after_pi_alert_and_ends_with_game(self):
+        cfg = {"nhl_live": {"enabled": True, "screen_id": "data-score", "mode": "game", "seconds": 20},
+               "pi_power": {"enabled": True}}
+        p, _ = self.make(cfg)
+        live = self.nhl_data()
+        self.assertEqual(p.tick(0, live)[1]["interrupt"], "nhl_live")
+        self.assertEqual(p.tick(1000, live)[1]["interrupt"], "nhl_live")
+        power = {**live, "health": {"under_voltage": True}}
+        self.assertEqual(p.tick(1001, power)[1]["interrupt"], "pi_power")
+        self.assertEqual(p.tick(1011, live)[1]["interrupt"], "nhl_live")
+        self.assertEqual(p.tick(1012, self.nhl_data(state="final"))[1]["screen_id"], "time-big")
+        self.assertIsNone(p.tick(1013, self.nhl_data(age_s=190))[1]["interrupt"])
+
+    def test_nhl_alert_uses_selected_custom_screen_and_pin_wins(self):
+        sid = "custom-" + "b" * 32
+        own = {**catalog.BUILTINS["data-score"], "id": sid, "name": "My Oilers",
+               "slots": [{**catalog.BUILTINS["data-score"]["slots"][0],
+                          "options": {"team": "EDM", "accent": "#FF9A3D"}}]}
+        cfg = {"nhl_live": {"enabled": True, "screen_id": sid, "mode": "brief", "seconds": 10}}
+        p, lib = self.make(cfg, screens=[own], pinned={"screen_id": "time-classic", "until": None})
+        self.assertIn("nhl:EDM", p.needs())
+        self.assertNotIn("nhl:CGY", p.needs())
+        live = self.nhl_data(team="EDM")
+        self.assertEqual(p.tick(0, live)[1]["screen_id"], "time-classic")
+        lib["pinned"] = None
+        self.assertEqual((p.tick(1, live)[1]["screen_id"], p._interrupt["name"]), (sid, "nhl_live"))
+
     def test_plane_overhead_once_per_callsign_per_hour(self):
         p, _ = self.make({"plane_overhead": {"enabled": True, "radius_nm": 3,
                                              "max_alt_ft": 10000, "seconds": 15}})

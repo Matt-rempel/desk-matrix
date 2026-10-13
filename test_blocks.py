@@ -65,9 +65,11 @@ class CatalogTests(unittest.TestCase):
 
     def test_shelves_and_legacy_ids(self):
         shelved = [sid for shelf in catalog.SHELVES for sid in shelf["items"]]
-        self.assertEqual([s["id"] for s in catalog.SHELVES], ["time", "sky", "weather", "focus", "play", "data", "system"])
+        self.assertEqual([s["id"] for s in catalog.SHELVES],
+                         ["time", "sky", "weather", "sports", "focus", "play", "data", "system"])
         self.assertTrue(set(shelved) <= set(catalog.BUILTINS))
         self.assertTrue(PLAN_IDS <= set(shelved))
+        self.assertEqual(next(s["items"] for s in catalog.SHELVES if s["id"] == "sports"), ["data-score"])
         self.assertEqual(catalog.LEGACY_IDS["clock-classic"], "time-classic")
         for target in catalog.LEGACY_IDS.values():
             self.assertIn(target, catalog.BUILTINS)

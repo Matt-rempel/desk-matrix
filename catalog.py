@@ -158,10 +158,10 @@ BLOCKS = {
         "field": _enum("value", "value", "label"), "label": _str("", 16),
         "icon": {"type": "enum", "default": "", "choices": [""] + ICON_NAMES},
         "accent": _color(), "icon_color": _color()}, 8, 5, ["feed"]),
-    "nhl": _block("NHL game", "CGY 2", "data", {
+    "nhl": _block("NHL game", "CGY 2", "sports", {
         "team": {"type": "enum", "default": "CGY", "choices": list(TEAMS),
                  "labels": {code: f"{name} ({code})" for code, name in TEAM_NAMES.items()},
-                 "label": "Follow team"},
+                 "label": "Team shown"},
         "h24": _bool(False),
         "accent": _color()}, 32, 16, ["nhl"]),
     "calendar_next": _block("Next event", "9:30", "focus", {
@@ -290,7 +290,7 @@ BUILTIN_SCREENS = [
         "data", "Index · sparkline", "JSON feed"),
     _screen("data-score", "NHL game", "full", [
         _slot("nhl", INK, team="CGY", accent="#FF9A3D")],
-        "data", "Live score · next game", "NHL"),
+        "sports", "Live score · next game", "NHL"),
     _screen("data-transit", "Transit", "full", [
         _slot("feed", "#5AD1A0", feed_id=SAMPLE_FEEDS["transit"], label="201", icon="bus",
               accent=INK, icon_color="#5AD1A0")], "data", "Next departure", "JSON feed"),
@@ -324,6 +324,9 @@ SHELVES = [
     {"id": "weather", "title": "Weather", "source": "Uses location",
      "blurb": "Glanceable conditions, with the reading time kept visible.",
      "items": ["weather-now", "weather-hourly", "weather-rain", "weather-metar"]},
+    {"id": "sports", "title": "Sports", "source": "NHL",
+     "blurb": "Follow a team and catch the next game, live score, or final.",
+     "items": ["data-score"]},
     {"id": "focus", "title": "Focus", "source": "Offline",
      "blurb": "Timers and countdowns you start from your phone.",
      "items": ["focus-pomodoro", "focus-countdown", "focus-streak", "focus-nextup"]},
@@ -332,7 +335,7 @@ SHELVES = [
      "items": ["play-message", "play-pet", "play-life", "play-fire", "play-music"]},
     {"id": "data", "title": "Data", "source": "Needs a feed",
      "blurb": "Numbers that change during the day.",
-     "items": ["data-market", "data-score", "data-transit", "data-health"]},
+     "items": ["data-market", "data-transit", "data-health"]},
     {"id": "system", "title": "Pi alerts", "source": "On the Pi",
      "blurb": "Shown by Lineup › Pi alerts when the Pi needs attention.",
      "items": ["sys-hot", "sys-power", "sys-offline", "sys-disk"]},
