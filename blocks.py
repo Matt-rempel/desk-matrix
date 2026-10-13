@@ -871,6 +871,46 @@ def b_feed(s: Slot) -> list[dict]:
     return [T(r.sub(0, 1, r.w, 5), [label], accent), long_text(r.sub(0, 8, r.w, 7), text, value_color)]
 
 
+def b_nhl(s: Slot) -> list[dict]:
+    """Two large lines on the original panel; game status replaces row two briefly."""
+    r, team = s.rect, s.opt("team")
+    game = (s.source("nhl") or {}).get(team) or {}
+    if not r.full:
+        return s.placeholder([team])
+    top, bottom = r.sub(0, 0, 32, 7), r.sub(0, 9, 32, 7)
+    accent = s.accent("#FF9A3D")
+    state = game.get("state")
+    if state == "upcoming":
+        opponent = game.get("away") if game.get("home") == team else game.get("home")
+        start = s.local(game.get("start"))
+        if not start:
+            return [T(top, [f"{team} NHL"], s.color), T(bottom, ["SCHEDULE"], accent)]
+        hour = f"{start.hour:02d}" if s.opt("h24") else str(start.hour % 12 or 12)
+        suffix = "" if s.opt("h24") else ("P" if start.hour >= 12 else "A")
+        when = f"{start:%a} {hour}:{start.minute:02d}{suffix}".upper()
+        return [T(top, [f"{team} {opponent or '---'}"], s.color),
+                T(bottom, [when], accent)]
+    if state in ("live", "final"):
+        home, away = game.get("home"), game.get("away")
+        own, other = ((game.get("home_score"), game.get("away_score")) if home == team
+                      else (game.get("away_score"), game.get("home_score")))
+        opponent = away if home == team else home
+        score = lambda n: str(n) if isinstance(n, int) and not isinstance(n, bool) else "-"
+        status = "FINAL"
+        if state == "live":
+            kind, number = game.get("period_type"), game.get("period")
+            period = kind if kind in ("OT", "SO") else f"P{number}" if isinstance(number, int) else "LIVE"
+            status = f"{period} {game.get('clock') or ''}".strip()
+            if game.get("age_s") is not None and game["age_s"] > 180:
+                status = "STALE"
+        detail = int(s.ctx.elapsed) % 14 >= 9
+        return [T(top, [f"{team} {score(own)}"], s.color),
+                T(bottom, [status] if detail else [f"{opponent or '---'} {score(other)}"],
+                  accent)]
+    label = "OFFLINE" if game.get("error") else "NO GAME" if state == "none" else "LOADING"
+    return [T(top, [f"{team} NHL"], s.color), T(bottom, [label], accent)]
+
+
 def b_spark(s: Slot) -> list[dict]:
     if s.opt("source") == "feed":
         feed = (s.source("feeds") or {}).get(str(s.opt("feed_id") or "")) or {}
@@ -1041,6 +1081,7 @@ RENDERERS: dict[str, Callable[[Slot], list[dict]]] = {
     "weather_icon": b_weather_icon, "rain": b_rain, "sun_time": b_sun_time, "flight": b_flight,
     "plane_count": b_plane_count, "countdown": b_countdown, "timer": b_timer, "text": b_text,
     "progress": b_progress, "spark": b_spark, "icon": b_icon, "art": b_art, "feed": b_feed,
+    "nhl": b_nhl,
     "calendar_next": b_calendar, "metar": b_metar, "alert": b_alert, "iss": b_iss, "health": b_health,
     "world_clock": b_world, "analog_clock": b_analog, "fuzzy_time": b_fuzzy, "radar": b_radar, "sun_arc": b_sun_arc,
     "hourly_graph": b_hourly, "habit_week": b_habit, "life": b_life, "fire": b_fire, "none": b_none,
@@ -1119,6 +1160,10 @@ def data_needs(screen: dict) -> set[str]:
             station = str(options.get("station") or "").strip().upper()
             if station:
                 needs.add(f"metar:{station}")
+        elif block == "nhl":
+            team = options.get("team", "CGY")
+            if team in catalog.BLOCKS["nhl"]["options"]["team"]["choices"]:
+                needs.add(f"nhl:{team}")
         elif block in ("feed", "spark"):
             if block == "spark" and options.get("source", "temp_hourly") != "feed":
                 needs.add("weather")

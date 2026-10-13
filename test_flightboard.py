@@ -443,7 +443,7 @@ class RunLoopTests(unittest.TestCase):
         self.assertEqual(status["nearby"], [{"callsign": "WJA1", "distance_nm": 3.0,
                                              "altitude_ft": 9000, "route": "YYC>YVR"}])
         self.assertEqual(status["data_age"], {"aircraft": 30, "weather": None, "metar": None,
-                                              "iss": None, "calendar": None})
+                                              "nhl": None, "iss": None, "calendar": None})
         self.assertEqual(status["frame"][:6], "ff0000")
         # web/view-device.js reads status.feeds[<id>].error for each custom feed row.
         self.assertEqual(status["feeds"], {"feed-0a1b2c3d": {"error": "HTTP 404", "age_s": 30}})

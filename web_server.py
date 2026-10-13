@@ -63,7 +63,7 @@ def _merge_data(base: dict, fresh: dict) -> dict:
     for key, value in fresh.items():
         if value is None:
             continue
-        if key in ("feeds", "metar") and isinstance(value, dict) and isinstance(base.get(key), dict):
+        if key in ("feeds", "metar", "nhl") and isinstance(value, dict) and isinstance(base.get(key), dict):
             base[key] = {**base[key], **value}
         else:
             base[key] = value

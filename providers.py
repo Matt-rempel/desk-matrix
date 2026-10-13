@@ -24,6 +24,8 @@ import urllib.parse
 import urllib.request
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+import nhl
+
 USER_AGENT = "Flightboard/0.4 personal (desk matrix)"
 MAX_BYTES = 1024 * 1024
 FETCH_TIMEOUT = 10
@@ -81,6 +83,14 @@ def _get_json(url: str, timeout: float = FETCH_TIMEOUT):
     with urllib.request.urlopen(request, timeout=timeout) as response:
         body = _read_limited(response).decode("utf-8")
     return json.loads(body) if body.strip() else None  # e.g. HTTP 204 for an unknown station
+
+
+def _nhl_json(url: str):
+    # The NHL edge rejects the generic Python and project user agents.
+    request = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0", "Accept": "application/json"})
+    with urllib.request.urlopen(request, timeout=FETCH_TIMEOUT) as response:
+        return json.loads(_read_limited(response))
 
 
 def _error_text(exc: BaseException) -> str:
@@ -754,6 +764,10 @@ class Providers:
             if isinstance(entry, dict):
                 source = self._source(f"feed:{feed_id}")
                 source.data = {"value": entry.get("value"), "series": list(entry.get("series") or [])}
+        for team, entry in (saved.get("nhl") or {}).items() if isinstance(saved.get("nhl"), dict) else ():
+            if team in nhl.TEAMS and isinstance(entry, dict):
+                source = self._source(f"nhl:{team}")
+                source.data = {k: v for k, v in entry.items() if k not in ("error", "updated_at", "age_s")}
 
     def _source(self, key: str) -> _Source:
         source = self._sources.get(key)
@@ -802,6 +816,21 @@ class Providers:
 
     def _job_for(self, need: str, feeds_by_id: dict):
         lat, lon, tz = self._location()
+        if need.startswith("nhl:"):
+            team = need[4:]
+            if team not in nhl.TEAMS:
+                return None
+            previous = self._sources.get(need)
+            game = previous.data if previous and isinstance(previous.data, dict) else {}
+            interval = 30 if game.get("state") == "live" else 300
+            if game.get("state") == "upcoming":
+                try:
+                    start = datetime.fromisoformat(game["start"]).timestamp()
+                    if 0 <= start - self._now() < 7200:
+                        interval = 60
+                except (KeyError, ValueError, TypeError):
+                    pass
+            return need, interval, lambda: self._fetch_nhl(team), team
         if need == "weather":
             url = weather_url(lat, lon, tz)
             return "weather", INTERVALS["weather"], lambda: self._fetch_weather(url), (lat, lon, tz)
@@ -833,6 +862,13 @@ class Providers:
 
     def _fetch_weather(self, url: str) -> dict:
         return parse_weather(_get_json(url), self._now())
+
+    def _fetch_nhl(self, team: str) -> dict:
+        now = datetime.fromtimestamp(self._now(), timezone.utc)
+        week = nhl.parse_schedule(_nhl_json(f"{nhl.API}/club-schedule/{team}/week/now"), team, now)
+        if week["state"] != "none":
+            return week
+        return nhl.parse_schedule(_nhl_json(f"{nhl.API}/club-schedule-season/{team}/now"), team, now)
 
     def _fetch_calendar(self, url: str, tz_name: str) -> dict:
         return {"events": parse_ics(_get_text(url), _zone(tz_name))}
@@ -912,6 +948,14 @@ class Providers:
                                   "updated_at": iso_utc(fetched), "error": error}
         if feeds:
             snap["feeds"] = feeds
+        hockey = {}
+        for key, (data, fetched, error) in sources.items():
+            if key.startswith("nhl:"):
+                hockey[key[4:]] = {**(data or {"team": key[4:], "state": "none"}),
+                                   "updated_at": iso_utc(fetched), "error": error,
+                                   "age_s": max(0, round(now - fetched)) if fetched else None}
+        if hockey:
+            snap["nhl"] = hockey
         try:
             snap["sun"] = sun_info(lat, lon, tz, now_dt)
         except (ValueError, OverflowError):

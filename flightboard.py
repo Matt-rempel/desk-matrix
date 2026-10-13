@@ -535,16 +535,19 @@ def _age_s(stamp, now: float) -> int | None:
 
 
 def data_ages(data: dict, now: float | None = None) -> dict:
-    """Seconds since each source last reported: {aircraft, weather, metar, iss, calendar}."""
+    """Seconds since each source last reported, keyed by source type."""
     now = time.time() if now is None else now
     section = lambda key: data.get(key) if isinstance(data.get(key), dict) else {}
     weather = section("weather")
     metar = [entry.get("age_s") for entry in section("metar").values()
              if isinstance(entry, dict) and isinstance(entry.get("age_s"), (int, float))]
+    nhl = [entry.get("age_s") for entry in section("nhl").values()
+           if isinstance(entry, dict) and isinstance(entry.get("age_s"), (int, float))]
     return {"aircraft": _age_s(section("aircraft").get("updated_at"), now),
             "weather": (weather.get("age_s") if isinstance(weather.get("age_s"), (int, float))
                         else _age_s(weather.get("observed_at"), now)),
             "metar": max(metar) if metar else None,
+            "nhl": min(nhl) if nhl else None,
             "iss": _age_s(section("iss").get("updated_at"), now),
             "calendar": _age_s(section("calendar").get("updated_at"), now)}
 

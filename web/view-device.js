@@ -189,6 +189,7 @@ export function render(root) {
       row('Aircraft', [link('https://adsb.fi/', 'adsb.fi'), ' positions · ', link('https://www.adsbdb.com/', 'ADSBdb'), ' routes'], 'aircraft', 'When needed'),
       row('Weather', [link('https://open-meteo.com/', 'Open-Meteo'), ' · uses your location'], 'weather', 'When needed'),
       row('Airport METAR', [link('https://aviationweather.gov/', 'aviationweather.gov')], 'metar', 'When needed'),
+      row('NHL games', [link('https://www.nhl.com/', 'NHL'), ' schedules and scores'], 'nhl', 'When needed'),
       row('Sun & ISS', ['Sun calculated on the Pi · ISS from ', link('https://wheretheiss.at/', 'wheretheiss.at')], 'iss', 'Offline'),
       row('Calendar', 'Optional · stays on the Pi', 'calendar', s().calendar_ics_url ? 'Set up' : 'Off'),
       calForm,

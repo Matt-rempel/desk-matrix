@@ -21,7 +21,7 @@ rows. Longer details can scroll, but a glance should still make sense.
 | Pi health and data age | Excellent | Local temperature, network, and feed age | Done: Pi health screen; source ages in Device |
 | Next calendar event | Fair | Calendar account, private tokens, title truncation | Done: Next up, from an optional private ICS link |
 | Transit arrival | Fair | Local transit feed and stop choice | Done via a custom JSON feed (no GTFS-realtime) |
-| Sports score | Fair | Team choice and licensed/live feed | Done via a custom JSON feed |
+| Sports score | Fair | Team choice and live feed | Done for NHL: team picker, next game, live/final score; other leagues open |
 | ISS overhead pass | Good | Location and orbital data, refreshed periodically | Partly: current distance and direction; pass prediction needs SGP4 |
 | Market price | Fair | Ticker and market feed; numbers can change quickly | Done via a custom JSON feed with sparkline |
 | World clocks | Excellent | Offline; 33 built-in cities and the Pi's time zone database | Done: World clocks (three cities), World clock (one city), world clock block |

@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 
 from render import ICONS
+from nhl import TEAMS, TEAM_NAMES
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
 
@@ -157,6 +158,12 @@ BLOCKS = {
         "field": _enum("value", "value", "label"), "label": _str("", 16),
         "icon": {"type": "enum", "default": "", "choices": [""] + ICON_NAMES},
         "accent": _color(), "icon_color": _color()}, 8, 5, ["feed"]),
+    "nhl": _block("NHL game", "CGY 2", "data", {
+        "team": {"type": "enum", "default": "CGY", "choices": list(TEAMS),
+                 "labels": {code: f"{name} ({code})" for code, name in TEAM_NAMES.items()},
+                 "label": "Follow team"},
+        "h24": _bool(False),
+        "accent": _color()}, 32, 16, ["nhl"]),
     "calendar_next": _block("Next event", "9:30", "focus", {
         "field": _enum("title", "time", "title"), "h24": _bool(False),
         "accent": _color()}, 11, 5, ["calendar"]),
@@ -281,9 +288,9 @@ BUILTIN_SCREENS = [
     _screen("data-market", "Market", "full", [
         _slot("feed", "#5AE08A", feed_id=SAMPLE_FEEDS["market"], label="TSX", accent=INK)],
         "data", "Index · sparkline", "JSON feed"),
-    _screen("data-score", "Score", "full", [
-        _slot("feed", INK, feed_id=SAMPLE_FEEDS["score"], label="CGY EDM", accent="#FF9A3D")],
-        "data", "Your team, live", "JSON feed"),
+    _screen("data-score", "NHL game", "full", [
+        _slot("nhl", INK, team="CGY", accent="#FF9A3D")],
+        "data", "Live score · next game", "NHL"),
     _screen("data-transit", "Transit", "full", [
         _slot("feed", "#5AD1A0", feed_id=SAMPLE_FEEDS["transit"], label="201", icon="bus",
               accent=INK, icon_color="#5AD1A0")], "data", "Next departure", "JSON feed"),
@@ -391,6 +398,10 @@ SAMPLE_DATA = {
         SAMPLE_FEEDS["music"]: {"value": "SIDE A", "series": [],
                                 "updated_at": "2026-10-09T16:23:00Z", "error": None},
     },
+    "nhl": {"CGY": {"team": "CGY", "state": "live", "home": "CGY", "away": "EDM",
+                    "home_score": 2, "away_score": 1, "period": 3, "period_type": "REG",
+                    "clock": "12:34", "start": "2026-10-09T15:00:00Z",
+                    "updated_at": "2026-10-09T16:24:00Z", "error": None}},
     "health": {"cpu_temp_c": 48.0, "net_ok": True, "feed_age_s": 6, "under_voltage": False,
                "throttled": False, "disk_free_pct": 62.0, "offline_s": 0},
     "aircraft": {
@@ -436,4 +447,3 @@ def catalog_json() -> dict:
         "builtins": BUILTIN_SCREENS, "shelves": SHELVES, "legacy_ids": LEGACY_IDS,
         "art": list(BUILTIN_ART.values()),
     })
-

@@ -3,7 +3,7 @@
 Desk Matrix turns a Raspberry Pi and a 32×16 HUB75 RGB matrix into a
 configurable desk display. Everything it shows is a *screen*: clocks, nearby
 and followed flights, weather, METAR, the sun and the ISS, timers, habits,
-messages, pixel art and numbers from your own JSON feeds. A private HTTPS
+messages, pixel art, NHL scores and numbers from your own JSON feeds. A private HTTPS
 settings page on your phone or computer lets you pick screens from a gallery,
 customize them, build your own, draw pixel art, and plan which screens play
 at each time of day.
@@ -209,6 +209,13 @@ last good value and back off after errors. The page shows each source's age.
   API every 10 minutes for the airport you enter, with observation age.
 - **ISS:** [wheretheiss.at](https://wheretheiss.at/) every 30 s, only while
   an ISS screen or interruption needs it.
+- **NHL:** the NHL's public club schedule feed for the selected team. The
+  built-in **NHL game** screen replaces the old sample Score feed. Clone it to
+  choose any NHL team and a 12 or 24 hour puck-drop time. It shows the next
+  game, live scores and period/clock, or the recent final score. It refreshes
+  every 30 s during a game, every minute close to puck drop, and otherwise
+  every five minutes. The NHL feed may change without notice; cached values
+  are marked stale if live updates stop.
 - **Sun:** sunrise and sunset are calculated on the Pi; no network.
 - **Calendar (optional):** a private ICS link, fetched every 15 minutes and
   kept on the Pi. Single events, all-day events and simple daily or weekly
@@ -218,9 +225,9 @@ last good value and back off after errors. The page shows each source's age.
   refresh interval of at least 60 s.
 
 Known limits: the ISS screen shows the station's current distance and
-direction, not predicted passes. Transit arrivals, sports scores, market
-prices and *Now playing* come from your own JSON feeds (for example from a
-home-automation server); there are no built-in services for them. Weather
+direction, not predicted passes. Sports leagues other than NHL, transit
+arrivals, market prices and *Now playing* come from your own JSON feeds (for
+example from a home-automation server). Weather
 alerts are not shown, and the display is not a safety warning channel.
 
 ## Development
