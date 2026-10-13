@@ -48,7 +48,7 @@ export function render(root) {
     from.addEventListener('change', () => from.value && quick({ night_start: from.value }, bMsg, 'Night hours saved.'));
     until.addEventListener('change', () => until.value && quick({ night_end: until.value }, bMsg, 'Night hours saved.'));
     nightFields.append(
-      h('div', { class: 'field-pair pad-row' },
+      h('div', { class: 'field-pair night-time-pair pad-row' },
         h('div', { class: 'field' }, h('label', { class: 'field-label', for: 'night-start' }, 'From'), from),
         h('div', { class: 'field' }, h('label', { class: 'field-label', for: 'night-end' }, 'Until'), until)),
       h('div', { class: 'row row-sub' }, h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, 'Night brightness')),
