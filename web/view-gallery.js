@@ -8,6 +8,17 @@ import { focusControls, followFlight, unpin, showNow, removeFromLineup } from '.
 
 let filter = 'all';
 
+function navChevron(direction) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', direction === 'left' ? 'M18 3 L6 12 L18 21' : 'M6 3 L18 12 L6 21');
+  svg.append(path);
+  return svg;
+}
+
 export function render(root) {
   let browse = null; // index into the lineup while browsing, null = follow live
   const heroMatrix = createMatrix({ pitch: 10, glow: true, label: 'What the matrix shows now' });
@@ -15,8 +26,8 @@ export function render(root) {
   const name = h('div', { class: 'hero-name' });
   const meta = h('div', { class: 'hero-meta' });
   const dots = h('div', { class: 'dots', 'aria-hidden': 'true' });
-  const prev = h('button', { type: 'button', class: 'round-btn', 'aria-label': 'Previous screen in lineup' }, '‹');
-  const next = h('button', { type: 'button', class: 'round-btn', 'aria-label': 'Next screen in lineup' }, '›');
+  const prev = h('button', { type: 'button', class: 'round-btn', 'aria-label': 'Previous screen in lineup' }, navChevron('left'));
+  const next = h('button', { type: 'button', class: 'round-btn', 'aria-label': 'Next screen in lineup' }, navChevron('right'));
   const extra = h('div', { class: 'hero-extra' });
   const customizeLink = h('a', { class: 'btn btn-primary', href: '#/' }, 'Customize');
   const newLink = h('a', { class: 'btn btn-secondary', href: '#/build' }, '+ New screen');

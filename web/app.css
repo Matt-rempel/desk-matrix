@@ -220,8 +220,9 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .pad-x.btn-row + .pad-x.btn-row { margin-top: 12px; }
 .link-btn { min-height: 44px; padding: 0 8px; border: 0; background: none; color: var(--accent-fg); font-size: 14px; font-weight: 600; }
 .link-btn:hover { color: var(--accent-text); }
-.round-btn { flex: 0 0 auto; width: 44px; height: 44px; border-radius: 22px; border: 1px solid var(--line); background: transparent; color: var(--text); font-size: 20px; line-height: 1; }
-.round-btn:disabled { opacity: .35; }
+.round-btn { display: grid; place-items: center; flex: 0 0 auto; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: transparent; color: var(--text); }
+.round-btn svg { display: block; width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.7; stroke-linecap: round; stroke-linejoin: round; }
+.round-btn:disabled { opacity: .55; }
 .mini-btn { width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); font-size: 16px; padding: 0; flex: 0 0 auto; }
 .mini-btn:disabled { opacity: .35; }
 .mini-danger { color: var(--danger); }
