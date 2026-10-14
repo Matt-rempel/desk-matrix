@@ -1,10 +1,11 @@
 # Desk Matrix
 
-Desk Matrix turns a Raspberry Pi and a 32×16 HUB75 RGB matrix into a
-configurable desk display. Everything it shows is a *screen*: clocks, nearby
-and followed flights, weather, METAR, the sun and the ISS, timers, habits,
-messages, pixel art, NHL scores and numbers from your own JSON feeds. A private HTTPS
-settings page on your phone or computer lets you pick screens from a gallery,
+Desk Matrix turns a Raspberry Pi and a HUB75 RGB matrix into a configurable
+desk display. **The current release is built for one 32×16 panel.** Everything
+it shows is a *screen*: clocks, nearby and followed flights, weather, METAR,
+the sun and the ISS, timers, habits, messages, pixel art, NHL scores and
+numbers from your own JSON feeds. A private HTTPS settings page on your phone
+or computer lets you pick screens from a gallery,
 customize them, build your own, draw pixel art, and plan which screens play
 at each time of day.
 
@@ -15,6 +16,8 @@ The first installation uses WinSport in Calgary as a sample location. **Change
 the location and time zone in settings for your own desk.**
 
 ## Hardware
+
+### Tested build
 
 - Raspberry Pi 3 Model B, tested with Raspberry Pi OS Lite 64-bit
 - One 32×16 HUB75 RGB matrix, wired with the driver's
@@ -31,7 +34,42 @@ board if you want a simpler and sturdier connection than individual jumpers.
 The Pi and panel must each have adequate power; do not power the matrix from
 the Pi's GPIO header.
 
-## Install on a new Pi
+### Planned 64×32 build and gift kit
+
+We plan to test a denser, **64×32 P3 HUB75 panel** with a Raspberry Pi Zero 2 W
+and an [Adafruit RGB Matrix Bonnet](https://www.adafruit.com/product/3211).
+For a second build, the parts list is:
+
+| Part | What to check |
+| --- | --- |
+| 64×32 P3 HUB75 panel | Confirm 5 V power, a 16-pin HUB75 input, dimensions and mounting holes. The [panel we are evaluating](https://www.alibaba.com/product-introduction/LED-Matrix-Panel-P3-Indoor-HD_1600188215401.html) advertises a data ribbon and panel power harness. |
+| Raspberry Pi Zero 2 W | Choose the **with-header** model, or solder a 40-pin header onto a bare Zero 2 W so the Bonnet can fit. Its Wi-Fi is 2.4 GHz. A used Pi 3 Model B is a larger fallback; that model is already tested with our 32×16 build. |
+| RGB Matrix Bonnet | Provides the 16-pin panel connection, level shifting and panel power terminals. Its GPIO mapping differs from the currently configured `regular` mapping. |
+| Pi power | Separate, reliable 5.1 V / 2.5 A micro-USB supply for a Zero 2 W or Pi 3. |
+| Panel power | Separate, correctly polarized 5 V supply sized for the panel. A 5 V / 4 A, center-positive 5.5×2.1 mm barrel supply fits the Bonnet's DC input; verify the panel's current requirement. |
+| Storage and enclosure | 16 GB or larger microSD card (a spare is fine), plus a printed stand or case and mounting hardware measured after the panel arrives. |
+
+The pictured panel listing includes the ribbon and power harness, so check the
+delivered package before buying extra cables. [Adafruit's Bonnet wiring
+guide](https://learn.adafruit.com/adafruit-rgb-matrix-bonnet-for-raspberry-pi?view=all)
+shows how the harness connects to the Bonnet terminals and recommends powering
+the Pi separately. Connect or change wiring only while both supplies are
+unplugged.
+
+**This is a planned build, not a supported configuration yet.** The panel
+dimensions are currently fixed at 32×16 in the renderer and matrix driver
+setup; the installer does not switch sizes. The Bonnet also needs its own GPIO
+mapping. We need to adapt the renderer, layouts, previews, driver settings and
+tests, then verify the 64×32 panel and Zero 2 W on real hardware before using
+the install steps below for that kit.
+
+A **Raspberry Pi Pico 2 W with headers is not a drop-in alternative** to a
+Zero 2 W. Pico boards are microcontrollers that do not run Raspberry Pi OS or
+use a microSD card, while this application requires Linux, Python packages,
+systemd and the Pi matrix driver. A Pico-based display would be a different
+hardware and software project. See [Raspberry Pi's Pico documentation](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html).
+
+## Install on a new Pi (tested 32×16 build)
 
 1. Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to flash
    Raspberry Pi OS Lite 64-bit. In Imager's customization screen, set a unique
