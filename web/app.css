@@ -173,6 +173,12 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .icon-btn:hover { border-color: var(--line-strong); }
 .power-btn.is-off { color: var(--muted); }
 .power-btn:not(.is-off) { color: var(--ok); }
+.update-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 8px var(--gutter) 0; padding: 12px 14px; border: 1px solid var(--accent); border-radius: 14px; background: var(--accent-soft); }
+.update-banner[hidden] { display: none; }
+.update-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; color: var(--muted); }
+.update-copy strong { color: var(--accent-text); font-size: 14px; }
+.update-button { flex: 0 0 auto; min-height: 44px; }
+@media (max-width: 390px) { .update-banner { flex-wrap: wrap; } .update-button { width: 100%; } }
 
 .segnav { display: flex; gap: 4px; margin: 8px var(--gutter) 0; padding: 4px; background: var(--surface); border-radius: 14px; }
 .segnav-item { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 10px; color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; }

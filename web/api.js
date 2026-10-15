@@ -85,6 +85,8 @@ export const api = {
   library: () => request('/api/library'),
   settings: () => request('/api/settings'),
   status: () => request('/api/status'),
+  updateStatus: (fresh = false) => request(fresh ? '/api/update?fresh=1' : '/api/update'),
+  installUpdate: (version) => request('/api/update', { method: 'POST', body: { version } }),
   saveSettings: (partial) => request('/api/settings', { method: 'POST', body: partial }),
   display: (enabled) => request('/api/display', { method: 'POST', body: { display_enabled: enabled } }),
   action: (action, fields = {}) => request('/api/library', { method: 'POST', body: { action, ...fields } }),

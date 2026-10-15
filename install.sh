@@ -8,7 +8,21 @@ STATE_DIR=/var/lib/flightboard
 DRIVER_COMMIT=51d3231e370593b60952b2c3b18d2e3802329f18
 SHOW_PAIRING=1
 # Python modules installed into $CODE_DIR; the web UI is copied to $CODE_DIR/web.
-APP_FILES="flightboard.py settings.py screens.py render.py catalog.py blocks.py nhl.py providers.py library.py player.py web_server.py"
+APP_FILES=$(python3 - "$SOURCE_DIR/deploy-manifest.json" <<'PY'
+import json, re, sys
+try:
+    names = json.load(open(sys.argv[1], encoding="utf-8"))["app_files"]
+    if not isinstance(names, list) or not names or len(names) != len(set(names)):
+        raise ValueError("Invalid application file list")
+    if any(not isinstance(name, str) or not re.fullmatch(r"[a-z][a-z0-9_]*\.py", name)
+           or name.startswith("test_") for name in names):
+        raise ValueError("Invalid application file name")
+    print(" ".join(names))
+except (OSError, KeyError, ValueError, TypeError) as exc:
+    raise SystemExit(f"Invalid deploy-manifest.json: {exc}")
+PY
+)
+APP_FILES="$APP_FILES deploy-manifest.json"
 WEB_REQUIRED="index.html app.css app.js sw.js manifest.webmanifest offline.html icon-192.png icon-512.png apple-touch-icon.png"
 # The settings page before the screen gallery redesign kept these in $CODE_DIR.
 OBSOLETE_FILES="index.html app.css app.js"
@@ -32,6 +46,12 @@ if ! command -v apt-get >/dev/null 2>&1 || ! command -v systemctl >/dev/null 2>&
   exit 1
 fi
 for file in $APP_FILES flightboard.service flightboard-web.service; do
+  if [ ! -f "$SOURCE_DIR/$file" ]; then
+    printf 'Missing %s; run the installer from a complete checkout.\n' "$file" >&2
+    exit 1
+  fi
+done
+for file in updater.py desk-matrix-update-apply.service desk-matrix-update-apply.path; do
   if [ ! -f "$SOURCE_DIR/$file" ]; then
     printf 'Missing %s; run the installer from a complete checkout.\n' "$file" >&2
     exit 1
@@ -187,6 +207,22 @@ systemctl is-active --quiet flightboard-web.service
 systemctl is-active --quiet flightboard.service
 curl --connect-timeout 3 --max-time 5 -fsS http://127.0.0.1:8765/ -o /dev/null
 rollback=0
+
+# The updater runs from a root-owned path. The web service can only place a
+# fixed update request in its existing writable state directory.
+source_commit=$(git -C "$SOURCE_DIR" rev-parse --verify HEAD 2>/dev/null || true)
+if [ -z "$source_commit" ]; then
+  printf 'Phone updates require installing from a Git checkout.\n' >&2
+  exit 1
+fi
+sudo install -d -o root -g root -m 0755 /opt/flightboard-updater
+sudo install -o root -g root -m 0644 "$SOURCE_DIR/updater.py" /opt/flightboard-updater/updater.py
+for unit in desk-matrix-update-apply.service desk-matrix-update-apply.path; do
+  sudo install -o root -g root -m 0644 "$SOURCE_DIR/$unit" "/etc/systemd/system/$unit"
+done
+sudo /usr/bin/python3 /opt/flightboard-updater/updater.py bootstrap "$source_commit"
+sudo systemctl daemon-reload
+sudo systemctl enable --now desk-matrix-update-apply.path
 
 printf '\nDesk Matrix is running. Settings: https://%s/\n' "$dns_name"
 if [ "$SHOW_PAIRING" -eq 1 ]; then

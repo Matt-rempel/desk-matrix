@@ -1,0 +1,15 @@
+{
+  "app_files": [
+    "flightboard.py",
+    "settings.py",
+    "screens.py",
+    "render.py",
+    "catalog.py",
+    "blocks.py",
+    "nhl.py",
+    "providers.py",
+    "library.py",
+    "player.py",
+    "web_server.py"
+  ]
+}

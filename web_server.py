@@ -12,9 +12,11 @@ import os
 from pathlib import Path
 import re
 import secrets
+import subprocess
+import tempfile
 import threading
 import time
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
 import blocks
@@ -30,7 +32,16 @@ STATUS_PATH = STATE_DIR / "status.json"
 DATA_PATH = STATE_DIR / "data.json"
 TOKEN_PATH = STATE_DIR / "web-token"
 PUBLIC_HOST_PATH = STATE_DIR / "public-host"
+UPDATE_REQUEST_PATH = STATE_DIR / "update-request.json"
+UPDATE_ROOT = Path("/var/lib/desk-matrix-updater")
+UPDATE_STATUS_PATH = UPDATE_ROOT / "status.json"
+UPDATE_INSTALLED_PATH = UPDATE_ROOT / "installed.sha"
+UPDATE_REPO_URL = "https://github.com/Matt-rempel/desk-matrix.git"
+UPDATE_BRANCH = "main"
 SETTINGS_WRITE_LOCK = threading.Lock()
+UPDATE_CHECK_LOCK = threading.Lock()
+UPDATE_SHA_RE = re.compile(r"[0-9a-f]{40}\Z")
+_update_cache: dict = {"at": 0.0, "current": "", "data": None}
 MAX_BODY = 64 * 1024
 MAX_PREVIEW_SCREENS = 40
 MAX_PREVIEW_ART = 8
@@ -45,11 +56,80 @@ PWA_FILES = {
     "/icon-512.png": ("icon-512.png", "image/png"),
     "/offline.html": ("offline.html", "text/html; charset=utf-8"),
 }
-POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview")
+POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update")
 
 _catalog_body: bytes | None = None
 _data_cache: dict = {"key": None, "data": None}
 _data_lock = threading.Lock()
+
+
+def update_status(*, fresh: bool = False) -> dict:
+    """Read updater progress or check the fixed public branch without privilege."""
+    try:
+        current = UPDATE_INSTALLED_PATH.read_text().strip()
+    except OSError:
+        return {"state": "not_configured", "message": "Phone updates need one-time setup on the Pi"}
+    if not UPDATE_SHA_RE.fullmatch(current):
+        return {"state": "not_configured", "message": "The installed version is unknown"}
+    if UPDATE_REQUEST_PATH.exists():
+        try:
+            if time.time() - UPDATE_REQUEST_PATH.stat().st_mtime > 120:
+                return {"state": "error", "current": current,
+                        "message": "The updater did not start. Run the installer once on the Pi."}
+        except OSError:
+            pass
+        return {"state": "queued", "current": current, "message": "Waiting for the updater"}
+    try:
+        progress = json.loads(UPDATE_STATUS_PATH.read_text()[:4096])
+        age = time.time() - datetime.fromisoformat(progress["updated_at"]).timestamp()
+        if isinstance(progress, dict) and 0 <= age < 20 * 60 and (progress.get("state") == "installing"
+                or (progress.get("state") == "error" and not fresh)
+                or (progress.get("state") == "success" and age < 60 and not fresh)):
+            return {"state": progress["state"], "current": current,
+                    "target": progress.get("target", ""), "message": str(progress.get("message", ""))[:300]}
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        pass
+    with UPDATE_CHECK_LOCK:
+        if (not fresh and _update_cache["data"] is not None and _update_cache["current"] == current
+                and time.monotonic() - _update_cache["at"] < 60):
+            return dict(_update_cache["data"])
+        env = os.environ.copy()
+        env.update(HOME="/nonexistent", GIT_CONFIG_GLOBAL="/dev/null",
+                   GIT_CONFIG_NOSYSTEM="1", GIT_TERMINAL_PROMPT="0", GIT_ALLOW_PROTOCOL="https")
+        try:
+            result = subprocess.run(["git", "ls-remote", UPDATE_REPO_URL, f"refs/heads/{UPDATE_BRANCH}"],
+                                    check=True, capture_output=True, text=True, timeout=8, env=env)
+            latest = result.stdout.split()[0]
+            if not UPDATE_SHA_RE.fullmatch(latest):
+                raise ValueError("Invalid commit from GitHub")
+            value = {"state": "up_to_date" if latest == current else "available",
+                     "current": current, "latest": latest}
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError, ValueError, IndexError):
+            value = {"state": "check_failed", "current": current,
+                     "message": "Could not check GitHub. Try again shortly."}
+        _update_cache.update(at=time.monotonic(), current=current, data=value)
+        return dict(value)
+
+
+def request_update(version: str) -> dict:
+    if not isinstance(version, str) or not UPDATE_SHA_RE.fullmatch(version):
+        raise ValueError("Choose a valid available update")
+    status = update_status(fresh=True)
+    if status.get("state") != "available" or status.get("latest") != version:
+        raise ValueError("That update is no longer available; refresh and try again")
+    with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=STATE_DIR,
+                                     prefix=".update-request-", delete=False) as stream:
+        temporary = Path(stream.name)
+        json.dump({"version": version}, stream)
+        stream.flush()
+        os.fsync(stream.fileno())
+    try:
+        os.link(temporary, UPDATE_REQUEST_PATH)
+    except FileExistsError as exc:
+        raise ValueError("An update is already queued") from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+    return {"state": "queued", "current": status["current"], "target": version}
 
 
 def catalog_body() -> bytes:
@@ -248,6 +328,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, json.loads(STATUS_PATH.read_text()))
             except (FileNotFoundError, ValueError, json.JSONDecodeError):
                 self._json(200, {"state": "starting", "nearby": []})
+        elif path == "/api/update":
+            self._json(200, update_status(fresh=parse_qs(urlsplit(self.path).query).get("fresh") == ["1"]))
         else:
             self._json(404, {"error": "Not found"})
 
@@ -296,6 +378,11 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0:
                 raise ValueError("Request is empty")
             data = json.loads(self.rfile.read(length))
+            if path == "/api/update":
+                if not isinstance(data, dict) or set(data) != {"version"}:
+                    raise ValueError("Send only the selected version")
+                self._json(202, request_update(data["version"]))
+                return
             if path == "/api/preview":
                 settings = load_settings(DEFAULT_PATH)
                 frames = render_previews(data, settings, self._library())

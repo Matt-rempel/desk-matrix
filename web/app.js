@@ -49,7 +49,8 @@ function route() {
   main.replaceChildren();
   document.body.dataset.route = r.name;
   const page = h('div', { class: 'page' });
-  if (r.top) page.append(shellHeader(), navBar(r.name));
+  if (r.top) page.append(shellHeader(), updateBanner(), navBar(r.name));
+  else page.append(updateBanner());
   const body = h('div', { class: 'page-body' });
   page.append(body);
   main.append(page);
@@ -74,6 +75,10 @@ function logo() {
 
 let pillEl = null;
 let powerEl = null;
+let updateEl = null;
+let updateData = null;
+let updateBusy = false;
+let pendingVersion = '';
 
 function shellHeader() {
   pillEl = h('span', { class: 'pill', role: 'status', 'aria-live': 'polite' }, h('i', { 'aria-hidden': 'true' }), h('span', { class: 'pill-text' }, 'Connecting'));
@@ -86,6 +91,86 @@ function shellHeader() {
   updateShell();
   return el;
 }
+
+function updateBanner() {
+  updateEl = h('aside', { class: 'update-banner', role: 'status', 'aria-live': 'polite', hidden: true });
+  renderUpdateBanner();
+  return updateEl;
+}
+
+function renderUpdateBanner() {
+  if (!updateEl) return;
+  const data = updateData;
+  const state = data?.state;
+  updateEl.replaceChildren();
+  updateEl.hidden = !['available', 'queued', 'installing', 'error'].includes(state) && !updateBusy;
+  if (updateEl.hidden) return;
+  const title = state === 'available' ? 'Update available'
+    : state === 'error' ? 'Update failed' : 'Updating Desk Matrix';
+  const detail = state === 'available' ? 'A new version is ready for this Pi.'
+    : state === 'error' ? (data.message || 'The previous version is still running.')
+      : state === 'queued' ? 'Waiting for the Pi to start the update.'
+        : (data?.message || 'The settings page may briefly reconnect.');
+  const target = state === 'available' ? data.latest : state === 'error' ? data.target : '';
+  const button = target && !updateBusy
+    ? h('button', { type: 'button', class: 'btn btn-primary update-button', on: { click: () => installUpdate(target) } },
+      state === 'error' ? 'Try again' : 'Install update')
+    : null;
+  updateEl.append(h('div', { class: 'update-copy' },
+    h('strong', {}, title), h('span', {}, detail)), button);
+}
+
+async function installUpdate(version) {
+  if (updateBusy) return;
+  updateBusy = true;
+  pendingVersion = version;
+  updateData = { state: 'queued', message: 'Sending update request' };
+  renderUpdateBanner();
+  try {
+    updateData = await api.installUpdate(version);
+    renderUpdateBanner();
+    pollUpdate();
+  } catch (error) {
+    updateBusy = false;
+    pendingVersion = '';
+    toast(error.message, 'error');
+    pollUpdate(true);
+  }
+}
+
+let updateTimer = 0;
+let updatePolling = false;
+async function pollUpdate(fresh = false) {
+  if (!hasKey() || !loaded || updatePolling) return;
+  updatePolling = true;
+  try {
+    const data = await api.updateStatus(fresh);
+    updateData = data;
+    renderUpdateBanner();
+    if (updateBusy && data.current === pendingVersion && ['up_to_date', 'success'].includes(data.state)) {
+      location.reload();
+    } else if (updateBusy && data.state === 'error') {
+      updateBusy = false;
+      pendingVersion = '';
+      renderUpdateBanner();
+    }
+  } catch (error) {
+    // A service restart temporarily interrupts polling; keep the progress state visible.
+    if (updateBusy && error.status !== 401) updateData = { state: 'installing', message: 'Reconnecting to the Pi…' };
+    renderUpdateBanner();
+  } finally {
+    updatePolling = false;
+  }
+}
+
+function scheduleUpdatePolling() {
+  clearInterval(updateTimer);
+  updateTimer = 0;
+  if (document.hidden || !loaded) return;
+  pollUpdate();
+  updateTimer = setInterval(pollUpdate, 5000);
+}
+document.addEventListener('visibilitychange', scheduleUpdatePolling);
 
 // ---- Theme toggle: System → Light → Dark ----------------------------------------
 const THEME_NAMES = { system: 'System', light: 'Light', dark: 'Dark' };
@@ -230,6 +315,7 @@ document.addEventListener('visibilitychange', schedulePolling);
 function showPairing(message = pairingMessage) {
   if (cleanup) { try { cleanup(); } catch { /* ignore */ } cleanup = null; }
   clearInterval(pollTimer);
+  clearInterval(updateTimer);
   document.body.dataset.route = 'pairing';
   document.title = 'Pair · Desk Matrix';
   const input = h('input', {
@@ -277,6 +363,7 @@ async function start() {
     loaded = true;
     route();
     schedulePolling();
+    scheduleUpdatePolling();
     return true;
   } catch (error) {
     if (error.status === 401) return false; // handler already showed pairing

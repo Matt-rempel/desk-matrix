@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 from threading import Thread
 import time
@@ -31,6 +32,8 @@ class ServerTestCase(unittest.TestCase):
         self.data_path = root / "data.json"
         (root / "web-token").write_text(KEY)
         (root / "public-host").write_text("flightboard.example.ts.net\n")
+        self.update_root = root / "updater"
+        self.update_root.mkdir()
         patches = [
             patch.object(web_server, "DEFAULT_PATH", self.settings_path),
             patch.object(web_server, "LIBRARY_PATH", self.library_path),
@@ -38,11 +41,15 @@ class ServerTestCase(unittest.TestCase):
             patch.object(web_server, "STATUS_PATH", root / "status.json"),
             patch.object(web_server, "TOKEN_PATH", root / "web-token"),
             patch.object(web_server, "PUBLIC_HOST_PATH", root / "public-host"),
+            patch.object(web_server, "UPDATE_INSTALLED_PATH", self.update_root / "installed.sha"),
+            patch.object(web_server, "UPDATE_STATUS_PATH", self.update_root / "status.json"),
+            patch.object(web_server, "UPDATE_REQUEST_PATH", root / "update-request.json"),
         ]
         for item in patches:
             item.start()
             self.addCleanup(item.stop)
         web_server._data_cache.update(key=None, data=None)
+        web_server._update_cache.update(at=0.0, current="", data=None)
         self.server = web_server.BoundedHTTPServer(("127.0.0.1", 0), web_server.Handler)
         self.thread = Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
@@ -320,6 +327,48 @@ class SettingsApiTests(ServerTestCase):
         self.assertStatus(400, self.post, "/api/display", {"display_enabled": True, "x": 1})
         self.assertTrue(self.post("/api/display", {"display_enabled": True})["display_enabled"])
         self.assertTrue(json.loads(self.settings_path.read_text())["display_enabled"])
+
+    def test_phone_update_requires_pairing_origin_and_exact_remote_commit(self):
+        current, latest = "a" * 40, "b" * 40
+        (self.update_root / "installed.sha").write_text(current + "\n")
+        remote = subprocess.CompletedProcess([], 0, stdout=f"{latest}\trefs/heads/main\n")
+        with patch.object(web_server.subprocess, "run", return_value=remote) as run:
+            self.assertEqual(self.get_json("/api/update"),
+                             {"state": "available", "current": current, "latest": latest})
+            self.assertStatus(401, self.get, "/api/update", key=None)
+            self.assertStatus(401, self.post, "/api/update", {"version": latest}, key=None)
+            self.assertStatus(403, self.post, "/api/update", {"version": latest},
+                              origin="https://attacker.example")
+            for bad in ({"version": current}, {"version": latest, "repo": "https://evil.example"},
+                        {"version": "main"}, {"command": "sudo reboot"}):
+                self.assertStatus(400, self.post, "/api/update", bad)
+            queued = self.post("/api/update", {"version": latest})
+            self.assertEqual(queued["state"], "queued")
+            self.assertEqual(json.loads((Path(self.directory.name) / "update-request.json").read_text()),
+                             {"version": latest})
+            self.assertStatus(400, self.post, "/api/update", {"version": latest})
+            self.assertEqual(run.call_args.args[0][1:3], ["ls-remote", web_server.UPDATE_REPO_URL])
+
+    def test_phone_update_reports_setup_and_progress_without_running_git(self):
+        self.assertEqual(self.get_json("/api/update")["state"], "not_configured")
+        (self.update_root / "installed.sha").write_text("a" * 40 + "\n")
+        (self.update_root / "status.json").write_text(json.dumps({
+            "state": "installing", "updated_at": datetime.now().astimezone().isoformat(),
+            "target": "b" * 40, "message": "Checking files"}))
+        with patch.object(web_server.subprocess, "run") as run:
+            progress = self.get_json("/api/update")
+            self.assertEqual((progress["state"], progress["message"]), ("installing", "Checking files"))
+            run.assert_not_called()
+
+    def test_phone_update_reports_recent_success_during_page_reload(self):
+        (self.update_root / "installed.sha").write_text("b" * 40 + "\n")
+        (self.update_root / "status.json").write_text(json.dumps({
+            "state": "success", "updated_at": datetime.now().astimezone().isoformat(),
+            "target": "b" * 40, "message": "Update installed"}))
+        with patch.object(web_server.subprocess, "run") as run:
+            progress = self.get_json("/api/update")
+            self.assertEqual((progress["state"], progress["current"]), ("success", "b" * 40))
+            run.assert_not_called()
 
 
 if __name__ == "__main__":

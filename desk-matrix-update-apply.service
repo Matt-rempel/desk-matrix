@@ -1,0 +1,12 @@
+[Unit]
+Description=Install a selected Desk Matrix update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/flightboard-updater/updater.py apply
+TimeoutStartSec=15min
+PrivateTmp=true
+NoNewPrivileges=true
+

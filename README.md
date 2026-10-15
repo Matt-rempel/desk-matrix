@@ -131,20 +131,35 @@ flight data, or pairing key.
 
 ### Update
 
-On the Pi, from the repository checkout:
+Once the current installer has run, the paired settings page checks the public
+`Matt-rempel/desk-matrix` `main` branch. When a newer commit is available, an
+**Update available** banner appears above the tabs. Tap **Install update** on
+your phone to update that Pi. The page reports progress and reconnects after
+the services restart. A failed health check restores the previous application.
+No Pi password is needed for later phone updates.
+
+The first setup or upgrade from an older installation still needs one sudo
+password entry. On the Pi, from a clean repository checkout, run:
 
 ```sh
 git pull --ff-only
-sh install.sh
+sh install.sh --no-pairing-link
 ```
 
 The installer preserves `/var/lib/flightboard` (settings, your screens and
 lineup in `library.json`, and the pairing key). It reuses an existing matrix
 driver environment and restarts the two services after checking imports. If
 an update fails while switching services, it restores the previous
-application files, `web/` directory and units. The full private pairing
-link is shown again after a successful update. To suppress it in a captured
-terminal log, run `sh install.sh --no-pairing-link`.
+application files, `web/` directory and units. Omit `--no-pairing-link` only if
+you want the full private pairing link printed in the terminal.
+
+Phone updates are deliberately limited to the exact current commit on this
+public repository's `main` branch. The web page cannot supply a Git URL or a
+shell command. A root-owned systemd service performs the install after a paired,
+same-origin request. Treat write access to `main` as permission to ship code to
+the Pi; review contributions before merging them. Phone updates replace the
+application and web files, not OS packages or the matrix driver. If a release
+needs new system dependencies, run the full installer manually.
 
 **Upgrading from the mode-based version:** nothing to do by hand. On first
 start, your settings are migrated into `library.json`: custom clock screens
