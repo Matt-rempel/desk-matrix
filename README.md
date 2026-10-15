@@ -138,6 +138,11 @@ your phone to update that Pi. The page reports progress and reconnects after
 the services restart. A failed health check restores the previous application.
 No Pi password is needed for later phone updates.
 
+To verify the update watcher on the Pi, run
+`systemctl is-active desk-matrix-update-apply.path`. It should print `active`.
+The installed commit is recorded in
+`/var/lib/desk-matrix-updater/installed.sha`.
+
 The first setup or upgrade from an older installation still needs one sudo
 password entry. On the Pi, from a clean repository checkout, run:
 
