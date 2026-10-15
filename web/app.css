@@ -345,8 +345,8 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .input[type="time"], .input[type="date"] { color-scheme: dark; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .field-pair .field { margin-top: 0; }
-.night-time-pair { grid-template-columns: repeat(auto-fit, minmax(min(100%, 180px), 1fr)); }
-.night-time-pair .input { min-width: 0; max-width: 100%; }
+.night-time-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.night-time-pair .input { min-width: 0; max-width: 100%; padding-inline: 6px; }
 .input-row { display: flex; gap: 8px; }
 .input-row .input { flex: 1; min-width: 0; }
 .inline-field { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
@@ -559,6 +559,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
   .ink-row { justify-content: flex-start; }
   .btn-row { flex-wrap: wrap; }
   .field-pair { grid-template-columns: 1fr; }
+  .night-time-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .draw-top { flex-direction: column; align-items: stretch; }
   .bezel-sm { width: 100%; }
 }
