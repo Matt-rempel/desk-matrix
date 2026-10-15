@@ -305,7 +305,7 @@ export function render(root, { params }) {
       return h('div', { class: 'sub-rows' },
         h('div', { class: 'field pad-row' }, h('label', { class: 'field-label', for: inputId }, 'Screen to follow'), select,
           h('p', { class: 'card-note' }, 'Clone NHL game in Sports to choose another team or look.')),
-        h('div', { class: 'field pad-row' }, h('div', { class: 'field-label' }, 'When it appears'), mode),
+        h('div', { class: 'field pad-row nhl-mode-field' }, h('div', { class: 'field-label' }, 'When it appears'), mode),
         cfg.mode === 'brief' ? paramRow('Show for', stepper({ label: 'seconds', value: cfg.seconds,
           min: 5, max: 120, step: 5, format: (v) => `${v} s`, onChange: (v) => { cfg.seconds = v; refresh(); } })) : null);
     }

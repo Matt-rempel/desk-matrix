@@ -308,6 +308,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .row-line { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .sub-rows { border-top: 1px solid var(--line-soft); background: var(--sub-rows-bg); }
 .pad-row { padding: 8px 16px 0 28px; }
+.sub-rows > .nhl-mode-field:last-child { padding-bottom: 16px; }
 .group { margin: 0 var(--gutter); }
 .group-title { margin: 26px 16px 8px; }
 
