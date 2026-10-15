@@ -38,7 +38,7 @@ export function render(root, { id, go }) {
 
   // Preview with slot outline
   const matrix = createMatrix({ pitch: 10, glow: true, label: 'Screen preview' });
-  const live = livePreview(matrix, { onError: (e) => msg.error(e) });
+  const live = livePreview(matrix, { animated: true, onError: (e) => msg.error(e) });
   const outline = h('div', { class: 'slot-outline', 'aria-hidden': 'true' });
   const host = h('div', { class: 'overlay-host' }, matrix.el, outline);
   const nameInput = h('input', { id: 'sname', class: 'input', value: work.name, maxlength: '32', autocomplete: 'off', required: true });

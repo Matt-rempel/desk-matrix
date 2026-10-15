@@ -189,7 +189,9 @@ screens grouped into shelves:
 | Data | Market, Score, Transit, Pi health |
 
 Previews are rendered on the Pi by the same code that drives the panel, so
-what you see is what the LEDs show. **Customize** changes a screen's palette,
+what you see is what the LEDs show. The Customize and Build editors play the
+selected motion and show a clock's blinking colon as it changes. **Customize**
+changes a screen's palette,
 clock style, second line, options and motion, then **Show now** pins it to the
 panel until you return to the lineup, or **Add to lineup** keeps it in
 rotation. Pomodoro timers start, pause and reset from the phone; habit

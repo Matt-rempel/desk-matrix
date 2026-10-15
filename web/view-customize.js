@@ -47,7 +47,7 @@ export function render(root, { id, go }) {
   const dirty = () => JSON.stringify(screenForSave(work)) !== savedJSON;
   const msg = messageLine();
   const matrix = createMatrix({ pitch: 10, glow: true, label: `${work.name} preview` });
-  const live = livePreview(matrix, { onError: (e) => msg.error(e) });
+  const live = livePreview(matrix, { animated: true, onError: (e) => msg.error(e) });
   const bezel = h('div', { class: 'bezel' }, matrix.el);
   const palName = h('span', { class: 'mono-note' });
   const refresh = () => {

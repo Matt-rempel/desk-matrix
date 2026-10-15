@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 
 import blocks
 import catalog
+from player import apply_motion
 from library import LIBRARY_PATH, apply_action, load_library, save_library, validate_art, validate_screen
 from settings import (DEFAULT_PATH, LEGACY_FIELDS, STATE_DIR, load_settings, save_settings,
                       validate_settings)
@@ -102,14 +103,17 @@ def frame_hex(pixels) -> str:
 
 def render_previews(body, settings, lib: dict) -> list[str]:
     """Validate a /api/preview body and render each screen to a frame string."""
-    if not isinstance(body, dict) or set(body) - {"screens", "elapsed", "art"} or "screens" not in body:
-        raise ValueError("Send {screens: [...], elapsed?, art?}")
+    if not isinstance(body, dict) or set(body) - {"screens", "elapsed", "art", "animate"} or "screens" not in body:
+        raise ValueError("Send {screens: [...], elapsed?, art?, animate?}")
     screens = body["screens"]
     if not isinstance(screens, list) or len(screens) > MAX_PREVIEW_SCREENS:
         raise ValueError(f"Preview at most {MAX_PREVIEW_SCREENS} screens at once")
     elapsed = body.get("elapsed", 0)
     if isinstance(elapsed, bool) or not isinstance(elapsed, (int, float)) or not 0 <= elapsed <= 86400:
         raise ValueError("elapsed must be 0–86400 seconds")
+    animate = body.get("animate", False)
+    if not isinstance(animate, bool):
+        raise ValueError("animate must be a boolean")
     art = {**catalog.BUILTIN_ART, **{item["id"]: item for item in lib["art"]}}
     drafts = body.get("art", [])
     if not isinstance(drafts, list) or len(drafts) > MAX_PREVIEW_ART:
@@ -135,7 +139,13 @@ def render_previews(body, settings, lib: dict) -> list[str]:
         now=datetime.now(zone), elapsed=float(elapsed), data=preview_data(),
         units={"temp": settings.temp_unit, "distance": settings.distance_unit}, art=art,
         habits={**sample.habits, **lib["habits"]}, timers={**sample.timers, **lib["timers"]})
-    return [frame_hex(blocks.frame(screen, ctx)) for screen in clean_screens]
+    frames = []
+    for screen in clean_screens:
+        pixels = blocks.frame(screen, ctx)
+        if animate:
+            pixels = apply_motion(pixels, screen["style"]["motion"], ctx.elapsed)
+        frames.append(frame_hex(pixels))
+    return frames
 
 
 class BoundedHTTPServer(ThreadingHTTPServer):

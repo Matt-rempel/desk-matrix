@@ -1,4 +1,6 @@
 import http.client
+import copy
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -218,10 +220,34 @@ class ApiTests(ServerTestCase):
         del loose["id"], loose["name"]
         self.assertEqual(len(self.post("/api/preview", {"screens": [loose]})["frames"]), 1)
         for bad in ({"screens": [CUSTOM_SCREEN] * 41}, {"screens": "x"}, {}, {"screens": [], "x": 1},
-                    {"screens": [], "elapsed": -1}, {"screens": [{**CUSTOM_SCREEN, "layout": "nope"}]},
+                    {"screens": [], "elapsed": -1}, {"screens": [], "animate": 1},
+                    {"screens": [{**CUSTOM_SCREEN, "layout": "nope"}]},
                     {"screens": [{**CUSTOM_SCREEN, "id": "../x"}]}, []):
             with self.subTest(bad=bad):
                 self.assertStatus(400, self.post, "/api/preview", bad)
+
+    def test_preview_plays_clock_and_motion_frames(self):
+        screen = copy.deepcopy(CUSTOM_SCREEN)
+        screen["slots"][0]["options"]["colon_blink"] = True
+        with patch.object(web_server, "datetime") as clock:
+            clock.now.return_value = datetime.fromisoformat("2026-10-14T10:24:00-06:00")
+            colon_on = self.post("/api/preview", {"screens": [screen], "animate": True})["frames"][0]
+            clock.now.return_value = datetime.fromisoformat("2026-10-14T10:24:01-06:00")
+            colon_off = self.post("/api/preview", {"screens": [screen], "animate": True})["frames"][0]
+        self.assertNotEqual(colon_on, colon_off)
+
+        screen["style"]["motion"] = "slide"
+        initial = self.post("/api/preview", {"screens": [screen], "animate": True, "elapsed": 0})["frames"][0]
+        finished = self.post("/api/preview", {"screens": [screen], "animate": True, "elapsed": 0.4})["frames"][0]
+        static = self.post("/api/preview", {"screens": [screen], "elapsed": 0})["frames"][0]
+        self.assertEqual(set(initial), {"0"})
+        self.assertNotEqual(set(finished), {"0"})
+        self.assertNotEqual(set(static), {"0"})  # Gallery previews stay readable.
+
+        screen["style"]["motion"] = "breathe"
+        bright = self.post("/api/preview", {"screens": [screen], "animate": True, "elapsed": 1})["frames"][0]
+        dim = self.post("/api/preview", {"screens": [screen], "animate": True, "elapsed": 3})["frames"][0]
+        self.assertNotEqual(bright, dim)
 
     def test_preview_uses_units_fresh_data_and_draft_art(self):
         temp = {"id": "", "name": "T", "layout": "full",

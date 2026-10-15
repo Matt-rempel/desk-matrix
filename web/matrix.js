@@ -1,6 +1,6 @@
 // <canvas> LED matrix: paints a 3072-hex frame (512 × RRGGBB, row-major) as dots.
 
-import { preview, cachedPreview, debounce } from './api.js';
+import { preview, previewFrame, cachedPreview, debounce } from './api.js';
 
 export const COLS = 32;
 export const ROWS = 16;
@@ -169,12 +169,56 @@ export function screenMatrix(screen, opts = {}) {
 
 /**
  * Keep a matrix in sync with an editor's working copy: debounced (150 ms)
- * and ignoring responses that arrive after a newer request.
+ * and ignoring responses that arrive after a newer request. The customize
+ * editor opts into fresh frames for time and motion effects.
  */
-export function livePreview(matrix, { onError, ms = 150 } = {}) {
+export function livePreview(matrix, { onError, ms = 150, animated = false } = {}) {
   let seq = 0;
+  let timer = null;
+  let started = 0;
+  let errorReported = false;
+
+  const stop = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = null;
+    matrix.el.classList.remove('matrix-busy');
+  };
+  const hasBlink = (screen) => (screen.slots || []).some((slot) =>
+    slot.block === 'time' && slot.options?.colon_blink === true);
+  const isAnimated = (screen) => animated && ((screen.style?.motion || 'still') !== 'still' || hasBlink(screen));
+
+  const nextFrame = (screen, mine) => {
+    if (mine !== seq) return;
+    if (document.hidden) {
+      timer = setTimeout(() => nextFrame(screen, mine), 1000);
+      return;
+    }
+    const motion = screen.style?.motion || 'still';
+    const elapsed = (performance.now() - started) / 1000;
+    // Slide only plays for 0.4 s on the panel. Replay it every three seconds
+    // so it can be seen while editing.
+    const phase = motion === 'slide' ? elapsed % 3 : Math.min(elapsed, 86400);
+    previewFrame(screen, phase).then((frame) => {
+      if (mine === seq) { matrix.setFrame(frame); errorReported = false; }
+    }).catch((error) => {
+      if (mine === seq && !errorReported && onError) { onError(error); errorReported = true; }
+    }).finally(() => {
+      if (mine !== seq) return;
+      const delay = errorReported ? 1000 : motion === 'slide'
+        ? phase < 0.5 ? 75 : Math.min(hasBlink(screen) ? 400 : 3000, Math.max(75, (3 - phase) * 1000))
+        : motion === 'still' ? 400 : 160;
+      timer = setTimeout(() => nextFrame(screen, mine), delay);
+    });
+  };
   const run = (screen) => {
     const mine = ++seq;
+    stop();
+    if (isAnimated(screen)) {
+      started = performance.now();
+      errorReported = false;
+      nextFrame(screen, mine);
+      return;
+    }
     const cached = cachedPreview(screen);
     if (cached) { matrix.setFrame(cached); return; }
     matrix.el.classList.add('matrix-busy');
@@ -190,10 +234,12 @@ export function livePreview(matrix, { onError, ms = 150 } = {}) {
   return {
     now: (screen) => { debounced.cancel(); run(screen); },
     update: (screen) => {
-      const cached = cachedPreview(screen);
+      stop();
+      seq++;
+      const cached = isAnimated(screen) ? null : cachedPreview(screen);
       if (cached) { debounced.cancel(); seq++; matrix.setFrame(cached); return; }
       debounced(screen);
     },
-    cancel: () => { debounced.cancel(); seq++; },
+    cancel: () => { debounced.cancel(); seq++; stop(); },
   };
 }

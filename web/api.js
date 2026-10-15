@@ -130,6 +130,16 @@ export function preview(screen) {
   return promise;
 }
 
+/** Fetch a fresh editor frame at the same elapsed time used by the panel. */
+export async function previewFrame(screen, elapsed) {
+  const data = await request('/api/preview', {
+    method: 'POST', body: { screens: [previewable(screen)], elapsed, animate: true },
+  });
+  const frame = data?.frames?.[0];
+  if (typeof frame !== 'string' || frame.length !== 3072) throw new ApiError('Preview unavailable', 500);
+  return frame;
+}
+
 /** Strip UI-only fields before sending a screen to the renderer. */
 export function previewable(screen) {
   const out = {

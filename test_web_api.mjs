@@ -91,3 +91,28 @@ test('forgetting in another tab reloads an open paired tab', async () => {
     delete globalThis.location;
   }
 });
+
+test('animated preview requests a fresh frame at the selected elapsed time', async () => {
+  globalThis.localStorage = memoryStorage();
+  globalThis.sessionStorage = memoryStorage();
+  const api = await loadApi();
+  api.setKey(KEY);
+  const originalFetch = globalThis.fetch;
+  let sent;
+  globalThis.fetch = async (path, init) => {
+    sent = { path, init };
+    return { ok: true, status: 200, json: async () => ({ frames: ['f'.repeat(3072)] }) };
+  };
+  try {
+    const screen = { layout: 'full', slots: [{ block: 'time', options: { colon_blink: true } }],
+      style: { motion: 'slide' } };
+    assert.equal(await api.previewFrame(screen, 0.2), 'f'.repeat(3072));
+    assert.equal(sent.path, '/api/preview');
+    assert.equal(sent.init.headers['X-Flightboard-Key'], KEY);
+    assert.deepEqual(JSON.parse(sent.init.body), {
+      screens: [api.previewable(screen)], elapsed: 0.2, animate: true,
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
