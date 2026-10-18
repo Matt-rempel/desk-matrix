@@ -118,14 +118,13 @@ h1[tabindex="-1"]:focus { outline: none; }
 .skip-link { position: absolute; left: 8px; top: -60px; z-index: 50; padding: 10px 14px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-weight: 600; text-decoration: none; }
 .skip-link:focus { top: 8px; }
 
-.app { max-width: 440px; margin: 0 auto; min-height: 100vh; }
+.app { width: 100%; min-height: 100vh; }
 main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; }
 .boot, .noscript { padding: 40px var(--gutter); color: var(--muted); }
 .page-body { display: block; }
 @media (max-width: 359px) { :root { --gutter: 16px; } }
-@media (min-width: 600px) {
-  body { padding: 24px 0; }
-  .app { border-left: 1px solid var(--line-soft); border-right: 1px solid var(--line-soft); }
+@media (min-width: 500px) and (max-width: 799px) {
+  .hero .matrix, .preview-pane .matrix, .preview-pane .overlay-host { max-width: 100%; }
 }
 
 /* ---- Typography helpers ---------------------------------------------------- */
@@ -506,7 +505,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .item-name { font-size: 14px; font-weight: 500; }
 .item-actions { grid-area: actions; display: flex; gap: 6px; justify-content: flex-end; }
 .moment > .item-list { margin-top: 12px; }
-.savebar { position: fixed; left: 50%; bottom: 0; z-index: 30; width: min(440px, 100%); transform: translateX(-50%); display: flex; align-items: center; gap: 8px; padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom)); background: var(--savebar-bg); border-top: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.savebar { position: fixed; left: 0; bottom: 0; z-index: 30; width: 100%; display: flex; align-items: center; gap: 8px; padding: 12px var(--gutter) calc(12px + env(safe-area-inset-bottom)); background: var(--savebar-bg); border-top: 1px solid var(--line); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .savebar-text { flex: 1; font-size: 13px; color: var(--muted); }
 .has-savebar main { padding-bottom: 120px; }
 
@@ -599,7 +598,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 
 @media (min-width: 800px) {
   body { padding: 0; }
-  .app { max-width: 1240px; border: 0; }
+  .app { border: 0; }
   .page { position: relative; }
   .topbar { padding: 20px 32px 12px; }
   .segnav { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); width: 380px; margin: 0; }
