@@ -1,7 +1,8 @@
 # Desk Matrix
 
 Desk Matrix turns a Raspberry Pi and a HUB75 RGB matrix into a configurable
-desk display. **The current release is built for one 32×16 panel.** Everything
+desk display. It supports one **32×16 panel**, or a **64×32 panel with each
+layout pixel doubled in both directions**. Everything
 it shows is a *screen*: clocks, nearby and followed flights, weather, METAR,
 the sun and the ISS, timers, habits, messages, pixel art, NHL scores and
 numbers from your own JSON feeds. A private HTTPS settings page on your phone
@@ -56,12 +57,27 @@ shows how the harness connects to the Bonnet terminals and recommends powering
 the Pi separately. Connect or change wiring only while both supplies are
 unplugged.
 
-**This is a planned build, not a supported configuration yet.** The panel
-dimensions are currently fixed at 32×16 in the renderer and matrix driver
-setup; the installer does not switch sizes. The Bonnet also needs its own GPIO
-mapping. We need to adapt the renderer, layouts, previews, driver settings and
-tests, then verify the 64×32 panel and Zero 2 W on real hardware before using
-the install steps below for that kit.
+The 64×32 panel and Bonnet have passed a colour and orientation test on a Pi 3
+Model B. The Zero 2 W still needs hardware testing. Screen designs and web
+previews retain their logical 32×16 canvas; `--panel-scale 2` expands each
+pixel to a 2×2 block on the physical panel. This fills the panel without
+changing saved screens or adding more layout detail.
+
+For a 64×32 panel with an unmodified Adafruit Bonnet, create a systemd override
+with `sudo systemctl edit flightboard.service` after installing this version:
+
+```ini
+[Service]
+ExecStart=
+ExecStart=/opt/flightboard/.venv/bin/python /opt/flightboard/flightboard.py --panel-scale 2 --mapping adafruit-hat --software-pulse --gpio-slowdown 2
+```
+
+Set the maximum brightness in settings to 10% for the first test, then run
+`sudo systemctl daemon-reload` and `sudo systemctl restart flightboard.service`.
+This uses the Bonnet's convenience mode, without a soldered PWM jumper. The
+override persists across reboots and service-file updates; future app versions
+must include these hardware options. A normal install still defaults to 32×16
+with the `regular` mapping.
 
 A **Raspberry Pi Pico 2 W with headers is not a drop-in alternative** to a
 Zero 2 W. Pico boards are microcontrollers that do not run Raspberry Pi OS or

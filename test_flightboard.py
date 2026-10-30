@@ -310,6 +310,52 @@ class FakeMatrix:
         self.clears += 1
 
 
+class PanelOutputTests(unittest.TestCase):
+    def test_64x32_fills_panel_and_preserves_corner_colours(self):
+        pixels = [(0, 0, 0)] * 512
+        pixels[0] = (255, 0, 0)
+        pixels[31] = (0, 255, 0)
+        pixels[480] = (0, 0, 255)
+        pixels[511] = (255, 255, 255)
+        canvas = FakeCanvas()
+        app.paint_frame(canvas, pixels, 2)
+        self.assertEqual(set(canvas.pixels), {(x, y) for x in range(64) for y in range(32)})
+        for points, color in [
+            ([(0, 0), (1, 0), (0, 1), (1, 1)], (255, 0, 0)),
+            ([(62, 0), (63, 1)], (0, 255, 0)),
+            ([(0, 30), (1, 31)], (0, 0, 255)),
+            ([(62, 30), (63, 31)], (255, 255, 255)),
+        ]:
+            for point in points:
+                self.assertEqual(canvas.pixels[point], color)
+        app.paint_frame(canvas, [(0, 0, 0)] * 512, 2)
+        self.assertTrue(all(color == (0, 0, 0) for color in canvas.pixels.values()))
+
+    def test_default_output_remains_32x16(self):
+        canvas = FakeCanvas()
+        pixels = [(i % 256, 0, 0) for i in range(512)]
+        app.paint_frame(canvas, pixels)
+        self.assertEqual(len(canvas.pixels), 512)
+        self.assertEqual(canvas.pixels[(31, 15)], pixels[-1])
+
+    def test_main_sets_bonnet_geometry_and_timing(self):
+        from types import SimpleNamespace
+        from unittest.mock import Mock
+        options = SimpleNamespace()
+        driver = SimpleNamespace(RGBMatrixOptions=Mock(return_value=options), RGBMatrix=Mock())
+        with patch.dict("sys.modules", {"rgbmatrix": driver}), \
+                patch("flightboard.configured", return_value=Settings(brightness=10)), \
+                patch.object(Path, "read_text", return_value=""), \
+                patch("flightboard.signal.signal"), patch("flightboard.run", return_value=0):
+            self.assertEqual(app.main(["--panel-scale", "2", "--mapping", "adafruit-hat",
+                                       "--software-pulse", "--gpio-slowdown", "2"]), 0)
+        self.assertEqual((options.cols, options.rows), (64, 32))
+        self.assertEqual(options.hardware_mapping, "adafruit-hat")
+        self.assertTrue(options.disable_hardware_pulsing)
+        self.assertEqual(options.gpio_slowdown, 2)
+        self.assertEqual(options.brightness, 10)
+
+
 class FakeProviders:
     def __init__(self):
         self.updates = []

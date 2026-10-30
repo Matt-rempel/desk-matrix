@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Configurable desk display for a 32x16 HUB75 RGB matrix.
+"""Configurable desk display for 32x16 or 64x32 HUB75 RGB matrices.
 
 The main loop plays the lineup from library.json through player.py, with data
 from providers.py and the aircraft provider below (adsb.fi + ADSBdb).
@@ -619,6 +619,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--brightness", type=int)
     parser.add_argument("--mapping", default="regular")
     parser.add_argument("--software-pulse", action="store_true")
+    parser.add_argument("--panel-scale", type=int, choices=(1, 2), default=1,
+                        help="1: 32x16 panel; 2: 64x32 panel with doubled layout pixels")
+    parser.add_argument("--gpio-slowdown", type=int, choices=range(0, 61), default=1)
     parser.add_argument("--once", action="store_true", help="Print nearby flights; do not use GPIO")
     args = parser.parse_args(argv)
     if args.refresh < 5:
@@ -652,6 +655,17 @@ def _mtime(path: Path):
         return path.stat().st_mtime_ns
     except OSError:
         return None
+
+
+def paint_frame(canvas, pixels, scale=1):
+    """Draw the logical 32x16 frame, filling each physical pixel at integer scale."""
+    for y in range(16):
+        row = y * 32
+        for x in range(32):
+            color = pixels[row + x]
+            for dy in range(scale):
+                for dx in range(scale):
+                    canvas.SetPixel(x * scale + dx, y * scale + dy, *color)
 
 
 def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Event | None = None,
@@ -735,10 +749,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
                     brightness = matrix.brightness = wanted
                     shown = None  # brightness applies when pixels are set
                 if pixels != shown:
-                    for y in range(16):
-                        row = y * 32
-                        for x in range(32):
-                            canvas.SetPixel(x, y, *pixels[row + x])
+                    paint_frame(canvas, pixels, args.panel_scale)
                     canvas = matrix.SwapOnVSync(canvas)
                     shown = pixels
             elif shown is not None or brightness is not None:
@@ -782,11 +793,12 @@ def main(argv=None) -> int:
     from rgbmatrix import RGBMatrix, RGBMatrixOptions
 
     options = RGBMatrixOptions()
-    options.rows = 16
-    options.cols = 32
+    options.rows = 16 * args.panel_scale
+    options.cols = 32 * args.panel_scale
     options.chain_length = 1
     options.parallel = 1
     options.hardware_mapping = args.mapping
+    options.gpio_slowdown = args.gpio_slowdown
     options.brightness = effective_brightness(settings)
     options.drop_priv_user = "flightboard"
     options.drop_priv_group = "flightboard"
