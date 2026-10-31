@@ -13,6 +13,11 @@ request, new API account, Pillow or CairoSVG on the Pi.
 
 ## Sources
 
+- American Airlines: `tools/logo-sources/american.png`, the user's supplied
+  red/blue/silver flight symbol with the white background removed using the
+  image tool. The silver eagle head is retained as artwork, not removed with
+  the background. Numeric `AAL` and `AA` callsigns select this mark.
+
 - Delta: `tools/logo-sources/delta.png`, the user's original vertical lockup.
   The red widget is isolated above the tiny dark wordmark for legibility;
   its existing transparency is retained. Numeric `DAL` and `DL` callsigns and the legacy provider's
@@ -43,7 +48,7 @@ identify the airline associated with a flight, not as application branding.
 Build-time dependency: Pillow.
 
 ```sh
-python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png --extra delta tools/logo-sources/delta.png > /tmp/logos.json
+python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png --extra delta tools/logo-sources/delta.png --extra american tools/logo-sources/american.png > /tmp/logos.json
 ```
 
 Use the result as `LOGOS` in `airline_logos.py`; the helper resolves ICAO and

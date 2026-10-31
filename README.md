@@ -18,8 +18,8 @@ the location and time zone in settings for your own desk.**
 
 ## Hardware
 
-Flight cards use larger, bundled Air Canada, WestJet, United and Delta artwork on the native
-64×32 canvas. Nearby and followed flights share the same logo assets and
+Flight cards use larger, bundled Air Canada, WestJet, United, Delta and American
+Airlines artwork on the native 64×32 canvas. Nearby and followed flights share the same logo assets and
 previews. See [airline artwork sources and layout](docs/AIRLINE_LOGOS.md).
 
 ### Tested build
