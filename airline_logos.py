@@ -1,0 +1,96 @@
+"""Bundled, source-derived airline marks. See docs/AIRLINE_LOGOS.md for provenance.
+
+Generated artwork: tools/build_airline_logos.py. No network or imaging packages
+are used by the display or preview server.
+"""
+import re
+
+LOGOS = {
+  "aircanada": {
+    "palette": [
+      "#1C0204",
+      "#6E0610",
+      "#B70A1B",
+      "#EA0D22",
+      "#FD0E26",
+      "#EC0D23",
+      "#F30E24",
+      "#860714",
+      "#DD0C20",
+      "#3F0409",
+      "#ED0C23"
+    ],
+    "rows": [
+      "......0123445210......",
+      ".....156271172667.....",
+      "...02470...0..07480...",
+      "..0839....77....0830..",
+      "..830....0330....088..",
+      ".749....1a55a1....047.",
+      "067.....143341.....760",
+      "140..79.963369.91..061",
+      "2202866776536776622022",
+      "52.1435445555445347.7a",
+      "47.9455335555335a49.74",
+      "67.925a55555555a529.74",
+      "82...965555555569...23",
+      "23...26535aa53562...82",
+      "949..243463364342..949",
+      ".28.08342977924339.82.",
+      ".9470901..11..1090149.",
+      "..141.....11.....141..",
+      "...747....71....747...",
+      "....93570.29.075a1....",
+      "......78385926870.....",
+      "........012.19........"
+    ],
+    "source_sha256": "aba81d1e7e0db2fcc52ac505d8409fe1a90ede919212b043691d69c3cad32ed2"
+  },
+  "westjet": {
+    "palette": [
+      "#000D10",
+      "#064964",
+      "#00A19D",
+      "#00273A",
+      "#00B3AF",
+      "#198C92",
+      "#00A7A3",
+      "#00ABA7",
+      "#146D77",
+      "#0AAFAB",
+      "#A1DADB",
+      "#003866"
+    ],
+    "rows": [
+      ".............01.......",
+      "............022.......",
+      ".........3.0242.03....",
+      "........0452467871....",
+      "........344767645.....",
+      ".....30.14677662031...",
+      ".313148.872279a5842311",
+      ".147727159aaaaa9466473",
+      ".1499aaaaaaaaa9677663.",
+      "08555588bbb5a96766743.",
+      "3bbbbbbbbb8a927674210.",
+      ".3bbbbbbbbaa2764610...",
+      "..3bbbbbb5a277480.....",
+      "...bbbbb8a77723.......",
+      "..3bbbbb852242........",
+      "..00..0b...033........",
+      "......30..............",
+      "......0..............."
+    ],
+    "source_sha256": "5aea1b5fa33a65e76b33e9cba95eb9c52f4a4c6c2a2a86659f300ea1c7e21a1e"
+  }
+}
+
+
+def airline_for(plane):
+    """Resolve known ICAO/IATA callsigns, then the provider's legacy icon hint."""
+    code = re.sub(r'\s+', '', str(plane.get('icao') or plane.get('callsign') or '')).upper()
+    if re.match(r'^(ACA|AC)\d', code):
+        return 'aircanada'
+    if re.match(r'^(WJA|WEN|WS|WR)\d', code):
+        return 'westjet'
+    return {'maple': 'aircanada', 'westjet': 'westjet'}.get(plane.get('icon'))

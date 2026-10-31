@@ -6,6 +6,7 @@
     "render.py",
     "catalog.py",
     "blocks.py",
+    "airline_logos.py",
     "nhl.py",
     "providers.py",
     "library.py",

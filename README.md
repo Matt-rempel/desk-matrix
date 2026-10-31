@@ -18,6 +18,10 @@ the location and time zone in settings for your own desk.**
 
 ## Hardware
 
+Flight cards use larger, bundled Air Canada and WestJet artwork on the native
+64×32 canvas. Nearby and followed flights share the same logo assets and
+previews. See [airline artwork sources and layout](docs/AIRLINE_LOGOS.md).
+
 ### Tested build
 
 - Raspberry Pi 3 Model B, tested with Raspberry Pi OS Lite 64-bit

@@ -11,6 +11,7 @@ from typing import Callable, NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import catalog
+from airline_logos import LOGOS, airline_for
 from render import ICONS, WIDTH, HEIGHT, fit_text, hex_color, jround, measure, mix, rasterize
 
 WHITE = "#FFFFFF"
@@ -508,10 +509,22 @@ def b_flight(s: Slot) -> list[dict]:
         return [T(r, strings[s.opt("field")], s.color)]
     if mode == "follow":
         return _follow_card(s, plane, strings)
-    return [icon(plane.get("icon") or "plane", r.x, r.y, s.icon_color(AMBER)),
-            T(r.sub(9, 0, r.w - 9, 10), strings["callsign"], s.color),
-            T(r.sub(0, 12, r.w, 9), strings["route"], s.accent("#8FD3FF")),
+    return [flight_logo(s, plane),
+            T(r.sub(24, 0, r.w - 24, 10), strings["callsign"], s.color),
+            T(r.sub(24, 12, r.w - 24, 9), strings["route"], s.accent("#8FD3FF")),
             T(r.sub(0, 23, r.w, 9), strings["detail"], s.accent(MUTED))]
+
+
+def flight_logo(s: Slot, plane: dict) -> dict:
+    """Render a source-derived airline mark in a dedicated 22x22 region."""
+    r = s.rect
+    logo = LOGOS.get(airline_for(plane))
+    if not logo:
+        return icon(plane.get("icon") or "plane", r.x, r.y, s.icon_color(AMBER), 22, 22)
+    rows, palette = logo['rows'], logo['palette']
+    return {'t': 'px', 'x': r.x + (22 - len(rows[0])) // 2,
+            'y': r.y + (22 - len(rows)) // 2, 'rows': rows,
+            'pal': {format(i, 'x'): color for i, color in enumerate(palette)}}
 
 
 def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
@@ -520,19 +533,21 @@ def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
     value = max(0.0, min(1.0, float(progress))) if isinstance(progress, (int, float)) else 0.0
     accent = s.accent(MUTED)
     marker = max(r.x + 1, min(r.x + r.w - 2, r.x + jround(value * r.w)))
-    layers = [T(r.sub(0, 0, 39, 10), strings["callsign"][:1], s.color, a="l"),
-              T(r.sub(41, 0, 23, 10), strings["detail"][-1:], accent, a="r"),
-              {"t": "bar", "x": r.x, "y": r.y + 16, "w": r.w, "h": 2, "v": value,
+    layers = [flight_logo(s, plane),
+              T(r.sub(24, 0, 40, 10), strings["callsign"][:1], s.color),
+              T(r.sub(24, 12, 40, 9), strings["route"], accent),
+              {"t": "bar", "x": r.x, "y": r.y + 24, "w": r.w, "h": 2, "v": value,
                "c": s.icon_color(AMBER), "bg": "#2A2A2E"}]
     if isinstance(progress, (int, float)):
-        layers.append({"t": "px", "x": marker - 1, "y": r.y + 15, "rows": [".#.", "###", ".#."],
+        layers.append({"t": "px", "x": marker - 1, "y": r.y + 23, "rows": [".#.", "###", ".#."],
                        "pal": {"#": solid(s.color)}})
     origin = str(plane.get("origin") or "").upper()
     destination = str(plane.get("destination") or "").upper()
     if not (origin and destination) and ">" in str(plane.get("route") or ""):
         origin, destination = str(plane["route"]).upper().split(">", 1)
-    layers += [T(r.sub(0, 23, 31, 9), [origin or "---"], accent, a="l"),
-               T(r.sub(33, 23, 31, 9), [destination or "---"], accent, a="r")]
+    if origin and destination:
+        layers[2] = T(r.sub(24, 12, 40, 9), [f'{origin}>{destination}'], accent)
+    layers.append(T(r.sub(0, 27, r.w, 5), strings['detail'], accent))
     return layers
 
 
