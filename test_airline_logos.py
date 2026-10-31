@@ -17,14 +17,17 @@ class AirlineLogoTests(unittest.TestCase):
             self.assertEqual(airline_for({'callsign': code}), 'westjet')
         for code in ('UAL123', 'UA123', 'UA 123'):
             self.assertEqual(airline_for({'callsign': code}), 'united')
+        for code in ('DAL123', 'DL123', 'DL 123'):
+            self.assertEqual(airline_for({'callsign': code}), 'delta')
+        self.assertEqual(airline_for({'callsign': 'XYZ123', 'icon': 'delta'}), 'delta')
         self.assertEqual(airline_for({'callsign': 'AC150', 'icao': 'ACA150'}), 'aircanada')
         self.assertEqual(airline_for({'callsign': 'XYZ123', 'icon': 'maple'}), 'aircanada')
-        for code in ('ACME12', 'WSH12', 'UALPHA12', 'UAV123', 'CGABC', '', None):
+        for code in ('ACME12', 'WSH12', 'UALPHA12', 'UAV123', 'DLAB123', 'CGABC', '', None):
             self.assertIsNone(airline_for({'callsign': code}))
 
     def test_art_is_large_source_derived_and_valid(self):
         root = Path(__file__).parent / 'tools' / 'logo-sources'
-        for name, extension in (('aircanada', 'png'), ('westjet', 'png'), ('united', 'png')):
+        for name, extension in (('aircanada', 'png'), ('westjet', 'png'), ('united', 'png'), ('delta', 'png')):
             logo = LOGOS[name]
             self.assertEqual(logo['source_sha256'], hashlib.sha256((root / f'{name}.{extension}').read_bytes()).hexdigest())
             self.assertTrue(18 <= len(logo['rows']) <= 22)
@@ -42,9 +45,13 @@ class AirlineLogoTests(unittest.TestCase):
         self.assertTrue(any(min(int(c[i:i+2], 16) for i in (1, 3, 5)) > 220 for c in united['palette']))
         self.assertTrue(any(int(c[5:7], 16) > 120 and int(c[1:3], 16) < 80 for c in united['palette']))
         self.assertNotEqual(united['rows'][0][0], '.')
+        delta = LOGOS['delta']
+        self.assertEqual(delta['rows'][0][0], '.')
+        self.assertTrue(any(int(c[1:3], 16) > 180 and int(c[3:5], 16) < 70 for c in delta['palette']))
+        self.assertTrue(any(80 < int(c[1:3], 16) < 180 and int(c[3:5], 16) < 70 for c in delta['palette']))
 
     def test_nearby_and_follow_preserve_data_beside_logo(self):
-        for callsign in ('ACA150', 'WJA123', 'UAL123', 'CGABC'):
+        for callsign in ('ACA150', 'WJA123', 'UAL123', 'DAL123', 'CGABC'):
             for mode in ('nearby', 'follow'):
                 ctx = blocks.sample_context()
                 plane = {'callsign': callsign, 'route': 'YYC>YVR', 'distance_nm': 3.2,

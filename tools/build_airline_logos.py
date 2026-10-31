@@ -55,6 +55,9 @@ for name, source in sources.items():
     if name == 'westjet':
         # The official horizontal lockup places the leaf right of the wordmark.
         image = image.crop((round(image.width * .79), 0, image.width, image.height))
+    elif name == 'delta':
+        # Supplied vertical lockup: retain the red widget above the wordmark.
+        image = image.crop((0, 0, image.width, round(image.height * .8)))
     logos[name] = encode(image)
     logos[name]['source_sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
 print(json.dumps(logos, indent=2))

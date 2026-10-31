@@ -13,6 +13,11 @@ request, new API account, Pillow or CairoSVG on the Pi.
 
 ## Sources
 
+- Delta: `tools/logo-sources/delta.png`, the user's original vertical lockup.
+  The red widget is isolated above the tiny dark wordmark for legibility;
+  its existing transparency is retained. Numeric `DAL` and `DL` callsigns and the legacy provider's
+  `delta` hint select this artwork.
+
 - United white globe on blue: `tools/logo-sources/united.png`, supplied by the
   user. The blue square is retained as part of the artwork. `UAL` and `UA`
   numeric callsigns select this mark; unrelated regional operators are not
@@ -38,7 +43,7 @@ identify the airline associated with a flight, not as application branding.
 Build-time dependency: Pillow.
 
 ```sh
-python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png > /tmp/logos.json
+python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png --extra delta tools/logo-sources/delta.png > /tmp/logos.json
 ```
 
 Use the result as `LOGOS` in `airline_logos.py`; the helper resolves ICAO and
