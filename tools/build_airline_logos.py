@@ -1,12 +1,14 @@
 """Build LED-ready logo data from the cited source files (build-time Pillow).
 
 Usage: python tools/build_airline_logos.py AC.png WestJet.png > /tmp/logos.json
+Additional square/standalone marks: --extra united United.png
 The runtime uses only the generated palette/rows, without image dependencies.
 """
 import json
-import sys
+import argparse
 import hashlib
 from pathlib import Path
+import re
 
 from PIL import Image
 
@@ -37,12 +39,22 @@ def encode(image):
     return {'palette': colors, 'rows': rows}
 
 
-ac_path, wj_path = map(Path, sys.argv[1:])
-ac = Image.open(ac_path)
-wj = Image.open(wj_path).convert('RGBA')
-# The official horizontal lockup places the leaf to the right of the wordmark.
-wj = wj.crop((round(wj.width * .79), 0, wj.width, wj.height))
-logos = {'aircanada': encode(ac), 'westjet': encode(wj)}
-for name, source in [('aircanada', ac_path), ('westjet', wj_path)]:
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('aircanada', type=Path)
+parser.add_argument('westjet', type=Path)
+parser.add_argument('--extra', nargs=2, action='append', default=[], metavar=('NAME', 'PNG'))
+args = parser.parse_args()
+sources = {'aircanada': args.aircanada, 'westjet': args.westjet}
+for name, path in args.extra:
+    if not re.fullmatch(r'[a-z][a-z0-9_]*', name) or name in sources:
+        parser.error('Extra logos need unique lowercase identifiers')
+    sources[name] = Path(path)
+logos = {}
+for name, source in sources.items():
+    image = Image.open(source).convert('RGBA')
+    if name == 'westjet':
+        # The official horizontal lockup places the leaf right of the wordmark.
+        image = image.crop((round(image.width * .79), 0, image.width, image.height))
+    logos[name] = encode(image)
     logos[name]['source_sha256'] = hashlib.sha256(source.read_bytes()).hexdigest()
 print(json.dumps(logos, indent=2))

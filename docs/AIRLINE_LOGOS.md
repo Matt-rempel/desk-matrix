@@ -13,6 +13,11 @@ request, new API account, Pillow or CairoSVG on the Pi.
 
 ## Sources
 
+- United white globe on blue: `tools/logo-sources/united.png`, supplied by the
+  user. The blue square is retained as part of the artwork. `UAL` and `UA`
+  numeric callsigns select this mark; unrelated regional operators are not
+  assumed to be United solely from their own operator code.
+
 - Air Canada red rondelle: `tools/logo-sources/aircanada.png`, the user's
   supplied Air Canada roundel with its white background removed using the
   image tool. Both the exterior and interior negative spaces are transparent.
@@ -33,7 +38,7 @@ identify the airline associated with a flight, not as application branding.
 Build-time dependency: Pillow.
 
 ```sh
-python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png > /tmp/logos.json
+python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png > /tmp/logos.json
 ```
 
 Use the result as `LOGOS` in `airline_logos.py`; the helper resolves ICAO and

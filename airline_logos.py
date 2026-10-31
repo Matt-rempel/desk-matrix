@@ -82,6 +82,51 @@ LOGOS = {
       "......0..............."
     ],
     "source_sha256": "5aea1b5fa33a65e76b33e9cba95eb9c52f4a4c6c2a2a86659f300ea1c7e21a1e"
+  },
+  "united": {
+    "palette": [
+      "#1717D3",
+      "#1414D2",
+      "#1515D2",
+      "#1111D2",
+      "#0909D0",
+      "#2727D5",
+      "#4444DB",
+      "#0101CD",
+      "#8585E8",
+      "#A7A7EE",
+      "#BCBCF2",
+      "#9595EA",
+      "#7474E4",
+      "#5C5CE0",
+      "#E0E0F9",
+      "#FEFEFF"
+    ],
+    "rows": [
+      "0120002222222222222210",
+      "0134444320211111111110",
+      "4356666547402111111110",
+      "89aab8aa9c643011111110",
+      "b8ccb8cd9b885401111110",
+      "98b8cab9c99aed42211110",
+      "bbc8dbd65cc6ce84211110",
+      "d9cbc9effcad5888701110",
+      "8abc58445defeb58c70110",
+      "a68a8feb5c60d9fce53210",
+      "e96788af9bb0789eb84010",
+      "5eec97766efec8469a5420",
+      "676ef9678b9f8ad79ac400",
+      "95acefa6a73dcffcc69310",
+      "6ed75a6ae544bafb84e530",
+      "ffa0379ffe6d878cfda640",
+      "dff9799bffda5479fbad40",
+      "7ba69947bccfb36b88a640",
+      "346afd707dfffd8679e640",
+      "58efffd7dacfada75a9640",
+      "e908ffdde57c6efdc6b530",
+      "674296df67079fec85b400"
+    ],
+    "source_sha256": "10f943dd8e95556c7cfaf79930d5682a6a11fd0b34c63fa7fbe68bd3c365c5f2"
   }
 }
 
@@ -93,4 +138,6 @@ def airline_for(plane):
         return 'aircanada'
     if re.match(r'^(WJA|WEN|WS|WR)\d', code):
         return 'westjet'
+    if re.match(r'^(UAL|UA)\d', code):
+        return 'united'
     return {'maple': 'aircanada', 'westjet': 'westjet'}.get(plane.get('icon'))
