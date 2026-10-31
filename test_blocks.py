@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import blocks
 import catalog
 from blocks import RenderContext, data_needs, frame, render_screen, sample_context
-from render import rasterize
+from render import rasterize, WIDTH, HEIGHT
 
 PLAN_IDS = {
     "time-big", "time-classic", "time-analog", "time-words", "time-daybar", "sky-nearby",
@@ -18,7 +18,7 @@ MDT = timezone(timedelta(hours=-6))
 
 
 def lit(pixels):
-    return {(i % 32, i // 32) for i, p in enumerate(pixels) if any(p)}
+    return {(i % WIDTH, i // WIDTH) for i, p in enumerate(pixels) if any(p)}
 
 
 def screen(layout, *slots, palette=None, sid="custom-test"):
@@ -39,8 +39,8 @@ class CatalogTests(unittest.TestCase):
         # CONTRIBUTING.md asks for this preview when a screen is added to catalog.py.
         screen = next(s for s in catalog.BUILTIN_SCREENS if s["id"] == "time-classic")
         lines = blocks.ascii_preview(screen).splitlines()
-        self.assertEqual(len(lines), 16)
-        self.assertTrue(all(len(line) == 32 and set(line) <= {"#", "."} for line in lines))
+        self.assertEqual(len(lines), HEIGHT)
+        self.assertTrue(all(len(line) == WIDTH and set(line) <= {"#", "."} for line in lines))
         self.assertIn("#", "".join(lines))
 
     def test_builtins_are_valid_screens(self):
@@ -95,7 +95,7 @@ class BuiltinRenderTests(unittest.TestCase):
         for item in catalog.BUILTIN_SCREENS:
             for ctx in (sample, RenderContext(now=sample.now), RenderContext(now=sample.now, elapsed=33.3)):
                 pixels = rasterize(render_screen(item, ctx, strict=True), ctx.elapsed)
-                self.assertEqual(len(pixels), 512)
+                self.assertEqual(len(pixels), WIDTH * HEIGHT)
                 self.assertTrue(lit(pixels), item["id"])
 
     def test_design_previews(self):
@@ -107,13 +107,13 @@ class BuiltinRenderTests(unittest.TestCase):
         words = texts(render_screen(catalog.BUILTINS["time-words"], ctx))
         self.assertEqual([w[0] for w in words], ["NEARLY", "HALF", "PAST TEN"])
         nearby = texts(render_screen(catalog.BUILTINS["sky-nearby"], ctx))
-        self.assertEqual(nearby, [["WJA123", "WJA"], ["YYC>YVR"]])
+        self.assertEqual(nearby, [["WJA123", "WJA"], ["YYC>YVR"], ["3.2NM 12K", "3.2NM"]])
         self.assertEqual(texts(render_screen(catalog.BUILTINS["focus-countdown"], ctx))[1][-1], "12D")
         self.assertEqual(texts(render_screen(catalog.BUILTINS["focus-pomodoro"], ctx))[0], ["18:42"])
         self.assertEqual(texts(render_screen(catalog.BUILTINS["focus-nextup"], ctx))[0][0], "NEXT 9:30")
         self.assertEqual(texts(render_screen(catalog.BUILTINS["sky-sun"], ctx))[0][0], "SET 6:51")
         sun = [l for l in render_screen(catalog.BUILTINS["sky-sun"], ctx) if l["t"] == "rect" and l["w"] == 2]
-        self.assertEqual((sun[0]["x"], sun[0]["y"]), (21, 3))
+        self.assertTrue(32 <= sun[0]["x"] < WIDTH and 0 <= sun[0]["y"] < 21)
 
     def test_everything_fits_its_slot(self):
         contexts = (sample_context(), RenderContext(now=sample_context().now))
@@ -135,7 +135,7 @@ class BuiltinRenderTests(unittest.TestCase):
         ctx = sample_context()
         for bad in ({}, {"layout": "nope", "slots": "x"}, {"layout": "two", "slots": [None, {"block": "zzz"}]},
                     {"layout": "full", "slots": [{"block": "time", "color": "red", "options": {"h24": "x", "font": 3}}]}):
-            self.assertEqual(len(frame(bad, ctx)), 512)
+            self.assertEqual(len(frame(bad, ctx)), WIDTH * HEIGHT)
 
 
 class BlockBehaviourTests(unittest.TestCase):
@@ -222,8 +222,9 @@ class BlockBehaviourTests(unittest.TestCase):
 
     def test_habit_week(self):
         layers = self.render(catalog.BUILTINS["focus-streak"])
-        dots = [l for l in layers if l["t"] == "dots"][0]
-        self.assertEqual(dots["on"], [1, 1, 1, 1, 1, 0, 0])
+        squares = [l for l in layers if l["t"] == "rect"]
+        self.assertEqual(len(squares), 7)
+        self.assertEqual([l["c"] == squares[0]["c"] for l in squares], [True] * 5 + [False] * 2)
         self.assertEqual(texts(layers)[1], ["12"])
         layers = self.render(catalog.BUILTINS["focus-streak"], habits={})
         self.assertEqual(texts(layers)[1], ["0"])
@@ -275,7 +276,7 @@ class BlockBehaviourTests(unittest.TestCase):
         layers = self.render(catalog.BUILTINS["sky-radar"])
         points = [l for l in layers if l["t"] == "pts"][0]["p"]
         self.assertEqual(len(points), 8)
-        self.assertTrue(all(0 <= x < 15 and 0 <= y < 15 for x, y, _ in points))
+        self.assertTrue(all(0 <= x < 31 and 0 <= y < 31 for x, y, _ in points))
         self.assertEqual(texts(layers)[0], ["7"])
 
 

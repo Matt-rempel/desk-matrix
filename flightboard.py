@@ -584,7 +584,8 @@ def build_status(settings, info: dict, pixels, data: dict, now: float | None = N
         "updated_at": datetime.fromtimestamp(now, timezone.utc).isoformat(),
         "nearby": [{key: plane.get(key) for key in ("callsign", "distance_nm", "altitude_ft", "route")}
                    for plane in (aircraft.get("nearby") or [])[:10] if isinstance(plane, dict)],
-        "frame": render.to_hex(pixels if on else [render.BLACK] * 512),
+        "frame": render.to_hex(pixels if on else [render.BLACK] * (render.WIDTH * render.HEIGHT)),
+        "display": {"width": render.WIDTH, "height": render.HEIGHT},
         "screen_id": info.get("screen_id"),
         "screen_name": info.get("screen_name"),
         "moment": None if pin else info.get("moment"),
@@ -619,8 +620,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--brightness", type=int)
     parser.add_argument("--mapping", default="regular")
     parser.add_argument("--software-pulse", action="store_true")
-    parser.add_argument("--panel-scale", type=int, choices=(1, 2), default=1,
-                        help="1: 32x16 panel; 2: 64x32 panel with doubled layout pixels")
+    parser.add_argument("--panel-scale", type=int, choices=(1, 2), default=2,
+                        help="2: native 64x32 panel (default); 1: downsample for legacy 32x16 hardware")
     parser.add_argument("--gpio-slowdown", type=int, choices=range(0, 61), default=1)
     parser.add_argument("--once", action="store_true", help="Print nearby flights; do not use GPIO")
     args = parser.parse_args(argv)
@@ -657,15 +658,17 @@ def _mtime(path: Path):
         return None
 
 
-def paint_frame(canvas, pixels, scale=1):
-    """Draw the logical 32x16 frame, filling each physical pixel at integer scale."""
-    for y in range(16):
-        row = y * 32
-        for x in range(32):
-            color = pixels[row + x]
-            for dy in range(scale):
-                for dx in range(scale):
-                    canvas.SetPixel(x * scale + dx, y * scale + dy, *color)
+def paint_frame(canvas, pixels, scale=2):
+    """Send native pixels unchanged; average 2x2 cells only for legacy hardware."""
+    step = 1 if scale == 2 else 2
+    for y in range(0, render.HEIGHT, step):
+        for x in range(0, render.WIDTH, step):
+            color = pixels[y * render.WIDTH + x]
+            if step == 2:
+                cells = [pixels[(y + dy) * render.WIDTH + x + dx]
+                         for dy in range(2) for dx in range(2)]
+                color = tuple(sum(p[c] for p in cells) // 4 for c in range(3))
+            canvas.SetPixel(x // step, y // step, *color)
 
 
 def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Event | None = None,
@@ -696,7 +699,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
     brightness = None
     snapshot: dict = {}
     data: dict = {}
-    pixels, info = [render.BLACK] * 512, {}
+    pixels, info = [render.BLACK] * (render.WIDTH * render.HEIGHT), {}
     next_reload = next_snapshot = next_status = 0.0
     next_data = monotonic() + DATA_S
     frames = 0

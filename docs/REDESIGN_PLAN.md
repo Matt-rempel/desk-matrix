@@ -1,5 +1,9 @@
 # Settings redesign: implementation plan
 
+Historical design reference: the current frame sizes and layout contract are
+documented in [Native 64×32 display](NATIVE_RESOLUTION.md), which supersedes
+the 32×16 dimensions below.
+
 This plan turns the "screen gallery" design (Gallery, Customize, Build your
 own, Pixel studio, Lineup, Device) into working software. The design files
 are the `.dc.html` artboards in the Design canvas; their pixel layouts

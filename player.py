@@ -1,6 +1,6 @@
 """Lineup player: pin, moments, interruptions, timers, transitions and motion.
 
-`Player.tick(now_monotonic, data)` returns the 512 pixels to show and a small
+`Player.tick(now_monotonic, data)` returns the native panel pixels and a small
 `info` dict. The player reads `library.json` contents (Contract 4) and
 settings but never writes either; timer phases are computed from `ends_at`
 at render time. Standard library only.

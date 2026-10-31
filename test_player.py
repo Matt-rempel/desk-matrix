@@ -5,7 +5,9 @@ from zoneinfo import ZoneInfo
 import catalog
 import player
 from player import Player, apply_motion, blend, in_window, resolve_screen, timer_at
-from render import BLACK, mix, parse_color
+from render import BLACK, WIDTH, HEIGHT, mix, parse_color
+
+PIXELS = WIDTH * HEIGHT
 from settings import validate_settings
 
 UTC = ZoneInfo("UTC")
@@ -193,36 +195,36 @@ class EffectTests(unittest.TestCase):
         self.assertTrue(p.tick(5.0, {})[0] == new)
 
     def test_blend_math(self):
-        old = [(200, 0, 0)] * 512
-        new = [(0, 0, 200)] * 512
-        self.assertEqual(blend(old, new, "dissolve", 0.5), [mix(old[0], new[0], 0.5)] * 512)
+        old = [(200, 0, 0)] * PIXELS
+        new = [(0, 0, 200)] * PIXELS
+        self.assertEqual(blend(old, new, "dissolve", 0.5), [mix(old[0], new[0], 0.5)] * PIXELS)
         wiped = blend(old, new, "wipe", 0.5)
-        self.assertEqual(sum(p == new[0] for p in wiped), 256)
+        self.assertEqual(sum(p == new[0] for p in wiped), PIXELS // 2)
         self.assertEqual(blend(old, new, "wipe", 0.5), wiped)  # fixed order
-        old_cols = [(x, 0, 0) for _ in range(16) for x in range(32)]
+        old_cols = [(x, 0, 0) for _ in range(HEIGHT) for x in range(WIDTH)]
         slid = blend(old_cols, new, "slide", 0.5)
-        self.assertEqual(slid[:16], old_cols[16:32])
-        self.assertEqual(slid[16:32], new[:16])
+        self.assertEqual(slid[:WIDTH // 2], old_cols[WIDTH // 2:WIDTH])
+        self.assertEqual(slid[WIDTH // 2:WIDTH], new[:WIDTH // 2])
         self.assertEqual(blend(old, new, "cut", 0.1), new)
         self.assertEqual(blend(old, new, "dissolve", 1.0), new)
 
     def test_motions(self):
-        base = [BLACK] * 512
-        base[5 * 32 + 3] = (200, 100, 0)
-        base[6 * 32 + 10] = (0, 200, 0)
+        base = [BLACK] * PIXELS
+        base[5 * WIDTH + 3] = (200, 100, 0)
+        base[6 * WIDTH + 10] = (0, 200, 0)
         self.assertIs(apply_motion(base, "still", 1), base)
         dim = apply_motion(base, "breathe", 3.0)  # sin = -1 -> 70 %
-        self.assertEqual(dim[5 * 32 + 3], (140, 70, 0))
-        self.assertEqual(apply_motion(base, "breathe", 1.0)[5 * 32 + 3], (200, 100, 0))
+        self.assertEqual(dim[5 * WIDTH + 3], (140, 70, 0))
+        self.assertEqual(apply_motion(base, "breathe", 1.0)[5 * WIDTH + 3], (200, 100, 0))
         self.assertEqual(lit(apply_motion(base, "slide", 0.0)), [])
         partial = apply_motion(base, "slide", 0.1)
         self.assertTrue(lit(partial))
-        self.assertGreater(lit(partial)[0] % 32, 3)
+        self.assertGreater(lit(partial)[0] % WIDTH, 3)
         self.assertEqual(apply_motion(base, "slide", 0.4), base)
         changed = set()
         for step in range(20):
             frame = apply_motion(base, "sparkle", step * player.SPARKLE_STEP_S + player.SPARKLE_STEP_S / 2)
-            diff = [i for i in range(512) if frame[i] != base[i]]
+            diff = [i for i in range(PIXELS) if frame[i] != base[i]]
             self.assertLessEqual(len(diff), player.SPARKLE_COUNT)
             for i in diff:
                 self.assertNotEqual(base[i], BLACK)
@@ -395,12 +397,12 @@ class InterruptTests(unittest.TestCase):
         clock.value += 2
         pixels, info = p.tick(10, {})
         self.assertEqual((info["screen_id"], info["interrupt"]), ("focus-pomodoro", "timer_done"))
-        self.assertEqual(len(lit(pixels)), 512)
+        self.assertEqual(len(lit(pixels)), PIXELS)
         self.assertEqual(lit(p.tick(10.3, {})[0]), [])
-        self.assertEqual(len(lit(p.tick(10.5, {})[0])), 512)
+        self.assertEqual(len(lit(p.tick(10.5, {})[0])), PIXELS)
         pixels, info = p.tick(11.6, {})
         self.assertEqual(info["interrupt"], "timer_done")
-        self.assertLess(len(lit(pixels)), 512)
+        self.assertLess(len(lit(pixels)), PIXELS)
         # The timer screen now shows the break phase computed from ends_at.
         ctx = p._context(p._local(clock.value), clock.value, 0, {})
         self.assertEqual(ctx.timers["focus-pomodoro"]["phase"], "break")

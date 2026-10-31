@@ -58,7 +58,7 @@ class NHLTests(unittest.TestCase):
         self.assertNotIn("nhl:INVALID", provider._sources)
         provider.update({"nhl:INVALID"})
 
-    def test_render_two_line_states_and_team_need(self):
+    def test_scores_and_status_stay_visible_together(self):
         screen = catalog.BUILTINS["data-score"]
         self.assertEqual(blocks.data_needs(screen), {"nhl:CGY"})
         current = {"team": "CGY", "state": "live", "home": "CGY", "away": "EDM",
@@ -66,14 +66,14 @@ class NHLTests(unittest.TestCase):
                    "clock": "12:34", "age_s": 20}
         ctx = blocks.RenderContext(now=NOW, data={"nhl": {"CGY": current}})
         self.assertEqual([x["s"][0] for x in blocks.render_screen(screen, ctx) if x["t"] == "text"],
-                         ["CGY 2", "EDM 1"])
+                         ["CGY 2", "EDM 1", "P3 12:34"])
         ctx.elapsed = 10
         self.assertEqual([x["s"][0] for x in blocks.render_screen(screen, ctx) if x["t"] == "text"],
-                         ["CGY 2", "P3 12:34"])
+                         ["CGY 2", "EDM 1", "P3 12:34"])
         current["age_s"] = 190
-        self.assertEqual(blocks.render_screen(screen, ctx)[1]["s"], ["STALE"])
+        self.assertEqual(blocks.render_screen(screen, ctx)[2]["s"], ["STALE"])
         current["state"] = "final"
-        self.assertEqual(blocks.render_screen(screen, ctx)[1]["s"], ["FINAL"])
+        self.assertEqual(blocks.render_screen(screen, ctx)[2]["s"], ["FINAL"])
         current.update(state="upcoming", start="2026-10-14T02:00:00+00:00", away="VAN")
         ctx.now = NOW.astimezone(blocks.ZoneInfo("America/Edmonton"))
         self.assertEqual([x["s"][0] for x in blocks.render_screen(screen, ctx) if x["t"] == "text"],

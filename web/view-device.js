@@ -17,7 +17,7 @@ export function render(root) {
     h('div', { class: 'thumb-bezel' }, mini.el),
     h('div', { class: 'device-text' },
       h('div', { class: 'row-title strong' }, 'Desk Matrix'),
-      h('div', { class: 'row-detail' }, '32 × 16 panel · Raspberry Pi'),
+      h('div', { class: 'row-detail' }, '64 × 32 panel · Raspberry Pi'),
       showing),
     power));
 

@@ -1,14 +1,15 @@
-// Pixel studio: draw 7×7 icons, 16×16 sprites or full-panel art, with frames.
+// Pixel studio: native icons, sprites and full-panel art; legacy drawings stay editable.
 
 import { state, act, layoutOf, blockOf } from './store.js';
 import { createMatrix, livePreview } from './matrix.js';
+import { COLS, ROWS, PIXELS } from './display.js';
 import { h, header, messageLine, toast, confirmSheet, busy, stepper, paint, nextId, splitLayout } from './ui.js';
 import { saveScreen } from './controls.js';
 
 const SIZES = [
-  { id: '7', name: '7 × 7 icon', w: 7, h: 7, note: 'Icons sit beside text in any layout.' },
-  { id: '16', name: '16 × 16 sprite', w: 16, h: 16, note: 'Sprites fill half the panel; text goes beside.' },
-  { id: '32', name: 'Full 32 × 16', w: 32, h: 16, note: 'Full-panel art for messages and ambient screens.' },
+  { id: 'icon', name: '14 × 14 icon', w: 14, h: 14, note: 'Icons sit beside two rows of text.' },
+  { id: 'sprite', name: '32 × 32 sprite', w: 32, h: 32, note: 'Sprites are centered on the panel.' },
+  { id: 'full', name: 'Full 64 × 32', w: COLS, h: ROWS, note: 'Use every pixel for messages and ambient screens.' },
 ];
 const INKS = [
   { c: '#FF3D5A', name: 'Red' }, { c: '#FF7AB6', name: 'Pink' }, { c: '#FFB23F', name: 'Amber' },
@@ -49,7 +50,7 @@ export function render(root, { id, go }) {
   const existing = id ? (state.library?.art || []).find((a) => a.id === id) : null;
   const art = existing
     ? { id: existing.id, name: existing.name, w: existing.w, h: existing.h, fps: existing.fps || 4, frames: decodeArt(existing) }
-    : { id: '', name: 'My drawing', w: 16, h: 16, fps: 4, frames: [new Array(256).fill(null)] };
+    : { id: '', name: 'My drawing', w: 32, h: 32, fps: 4, frames: [new Array(1024).fill(null)] };
   let frameIdx = 0;
   let tool = 'pen';
   let mirror = false;
@@ -57,7 +58,10 @@ export function render(root, { id, go }) {
   let savedJSON = JSON.stringify([art.name, art.w, art.h, art.fps, art.frames]);
   const undo = [];
   const dirty = () => JSON.stringify([art.name, art.w, art.h, art.fps, art.frames]) !== savedJSON;
-  const sizeOf = () => SIZES.find((s) => s.w === art.w && s.h === art.h) || SIZES[1];
+  const sizeOf = () => SIZES.find((s) => s.w === art.w && s.h === art.h) || {
+    id: 'legacy', name: `${art.w} × ${art.h}`, w: art.w, h: art.h,
+    note: 'Original artwork is preserved and enlarged to fit the display.',
+  };
 
   const msg = messageLine();
   const saveLink = h('button', { type: 'button', class: 'subbar-link subbar-strong' }, 'Save');
@@ -127,7 +131,7 @@ export function render(root, { id, go }) {
   function layoutGrid() {
     const avail = Math.min(gridWrap.clientWidth || 350, 640) - 16;
     const g = gap();
-    cell = Math.max(6, Math.floor((avail - g * (art.w - 1)) / art.w));
+    cell = Math.max(2, Math.floor((avail - g * (art.w - 1)) / art.w));
     if (art.w === 7) cell = Math.min(cell, 38);
     const cssW = art.w * cell + (art.w - 1) * g;
     const cssH = art.h * cell + (art.h - 1) * g;
@@ -179,7 +183,8 @@ export function render(root, { id, go }) {
 
   function renderSizes() {
     const cur = sizeOf();
-    sizeGroup.replaceChildren(...SIZES.map((s) => {
+    const sizes = cur.id === 'legacy' ? [cur, ...SIZES] : SIZES;
+    sizeGroup.replaceChildren(...sizes.map((s) => {
       const btn = h('button', { type: 'button', class: 'seg-btn', 'aria-pressed': String(s.id === cur.id) }, s.name);
       btn.addEventListener('click', () => resize(s));
       return btn;
@@ -364,7 +369,7 @@ export function render(root, { id, go }) {
 
   let animTimer = 0;
   function artScreen(artId) {
-    const small = art.w <= 7 && layoutOf('icon2');
+    const small = art.w <= 14 && art.h <= 14 && layoutOf('icon2');
     const slots = small
       ? [{ block: 'art', color: null, options: { art_id: artId } },
         { block: blockOf('time') ? 'time' : 'none', color: '#F4F2EE', options: {} },
@@ -396,15 +401,20 @@ export function render(root, { id, go }) {
   }
 
   function localFrame(cells) {
-    const px = new Array(512).fill('000000');
-    const ox = art.w <= 7 ? 0 : art.w <= 16 ? 8 : 0;
-    const oy = art.h <= 7 ? 4 : 0;
+    const px = new Array(PIXELS).fill('000000');
+    const width = art.w <= 14 && art.h <= 14 ? 14 : COLS;
+    const scale = Math.max(1, Math.min(Math.floor(width / art.w), Math.floor(ROWS / art.h)));
+    const ox = Math.floor((width - art.w * scale) / 2);
+    const oy = Math.floor((ROWS - art.h * scale) / 2);
     for (let y = 0; y < art.h; y++) {
       for (let x = 0; x < art.w; x++) {
         const c = cells[y * art.w + x];
-        const X = x + ox;
-        const Y = y + oy;
-        if (c && X < 32 && Y < 16) px[Y * 32 + X] = c.slice(1).toLowerCase();
+        if (!c) continue;
+        for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) {
+          const X = x * scale + ox + dx;
+          const Y = y * scale + oy + dy;
+          if (X >= 0 && Y >= 0 && X < COLS && Y < ROWS) px[Y * COLS + X] = c.slice(1).toLowerCase();
+        }
       }
     }
     return px.join('');

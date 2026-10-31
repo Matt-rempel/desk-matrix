@@ -312,31 +312,37 @@ class FakeMatrix:
 
 class PanelOutputTests(unittest.TestCase):
     def test_64x32_fills_panel_and_preserves_corner_colours(self):
-        pixels = [(0, 0, 0)] * 512
+        pixels = [(0, 0, 0)] * 2048
         pixels[0] = (255, 0, 0)
-        pixels[31] = (0, 255, 0)
-        pixels[480] = (0, 0, 255)
-        pixels[511] = (255, 255, 255)
+        pixels[63] = (0, 255, 0)
+        pixels[1984] = (0, 0, 255)
+        pixels[2047] = (255, 255, 255)
         canvas = FakeCanvas()
         app.paint_frame(canvas, pixels, 2)
         self.assertEqual(set(canvas.pixels), {(x, y) for x in range(64) for y in range(32)})
         for points, color in [
-            ([(0, 0), (1, 0), (0, 1), (1, 1)], (255, 0, 0)),
-            ([(62, 0), (63, 1)], (0, 255, 0)),
-            ([(0, 30), (1, 31)], (0, 0, 255)),
-            ([(62, 30), (63, 31)], (255, 255, 255)),
+            ([(0, 0)], (255, 0, 0)),
+            ([(63, 0)], (0, 255, 0)),
+            ([(0, 31)], (0, 0, 255)),
+            ([(63, 31)], (255, 255, 255)),
+            ([(1, 0), (0, 1), (62, 31)], (0, 0, 0)),
         ]:
             for point in points:
                 self.assertEqual(canvas.pixels[point], color)
-        app.paint_frame(canvas, [(0, 0, 0)] * 512, 2)
+        app.paint_frame(canvas, [(0, 0, 0)] * 2048, 2)
         self.assertTrue(all(color == (0, 0, 0) for color in canvas.pixels.values()))
 
-    def test_default_output_remains_32x16(self):
+    def test_default_output_is_native_and_legacy_output_averages(self):
         canvas = FakeCanvas()
-        pixels = [(i % 256, 0, 0) for i in range(512)]
+        pixels = [(i % 256, 0, 0) for i in range(2048)]
         app.paint_frame(canvas, pixels)
+        self.assertEqual(len(canvas.pixels), 2048)
+        self.assertEqual(canvas.pixels[(63, 31)], pixels[-1])
+        canvas = FakeCanvas()
+        app.paint_frame(canvas, pixels, 1)
         self.assertEqual(len(canvas.pixels), 512)
-        self.assertEqual(canvas.pixels[(31, 15)], pixels[-1])
+        self.assertEqual(canvas.pixels[(0, 0)], (32, 0, 0))
+        self.assertEqual(app.parse_args([]).panel_scale, 2)
 
     def test_main_sets_bonnet_geometry_and_timing(self):
         from types import SimpleNamespace
@@ -424,7 +430,7 @@ class RunLoopTests(unittest.TestCase):
         self.assertEqual(status["detail"], "Always on")
         self.assertIsNone(status["pinned"])
         self.assertIsNone(status["moment"])
-        self.assertEqual(len(status["frame"]), 3072)
+        self.assertEqual(len(status["frame"]), 12288)
         self.assertEqual(status["frame"], status["frame"].lower())
         self.assertEqual(status["data_age"]["weather"], 120)
         self.assertEqual(status["nearby"], [])
@@ -440,7 +446,7 @@ class RunLoopTests(unittest.TestCase):
         self.assertGreaterEqual(matrix.clears, 1)
         status = json.loads((self.dir / "status.json").read_text())
         self.assertEqual((status["state"], status["title"]), ("off", "DISPLAY OFF"))
-        self.assertEqual(status["frame"], "0" * 3072)
+        self.assertEqual(status["frame"], "0" * 12288)
 
     def test_library_reload_on_change(self):
         save_settings(Settings(), self.settings_path)
@@ -482,7 +488,7 @@ class RunLoopTests(unittest.TestCase):
                 "feeds": {"feed-0a1b2c3d": {"value": "5 MIN", "updated_at": "2026-10-09T16:00:00Z",
                                             "error": "HTTP 404"}}}
         now = datetime(2026, 10, 9, 16, 0, 30, tzinfo=timezone.utc).timestamp()
-        status = app.build_status(Settings(), info, [(255, 0, 0)] * 512, data, now)
+        status = app.build_status(Settings(), info, [(255, 0, 0)] * 2048, data, now)
         self.assertEqual(status["progress_percent"], 42)
         self.assertEqual(status["detail"], "Morning")
         self.assertEqual(status["moment"], "Morning")

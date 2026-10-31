@@ -5,8 +5,8 @@ from __future__ import annotations
 import math
 from functools import lru_cache
 
-WIDTH = 32
-HEIGHT = 16
+WIDTH = 64
+HEIGHT = 32
 BLACK = (0, 0, 0)
 Pixel = tuple[int, int, int]
 
@@ -108,8 +108,9 @@ ICONS = {
 }
 
 SPACE = {"5x7": 2, "3x5": 1}
-FONTS = {"big": ("3x5", 2, 10), "5x7": ("5x7", 1, 7), "3x5": ("3x5", 1, 5)}
-AUTO_ORDER = ("big", "5x7", "3x5")
+FONTS = {"display": ("3x5", 4, 20), "large": ("5x7", 2, 14),
+         "big": ("3x5", 2, 10), "5x7": ("5x7", 1, 7), "3x5": ("3x5", 1, 5)}
+AUTO_ORDER = ("display", "large", "big", "5x7", "3x5")
 SCROLL_HOLD = 2.0
 SCROLL_SPEED = 8.0
 
@@ -167,10 +168,10 @@ def measure(text: str, font: str) -> tuple[int, int]:
 def fit_text(strings, width: int, height: int = HEIGHT) -> tuple[str, str, bool]:
     """Pick (font, string, scroll) the way `auto` text does."""
     candidates = [strings] if isinstance(strings, str) else [str(s) for s in strings] or [""]
-    for font in AUTO_ORDER:
-        if FONTS[font][2] > height:
-            continue
-        for text in candidates:
+    for text in candidates:
+        for font in AUTO_ORDER:
+            if FONTS[font][2] > height:
+                continue
             if measure(text, font)[0] <= width:
                 return font, text, False
     return "3x5", candidates[-1], True
@@ -216,12 +217,17 @@ def scroll_offset(overflow: int, elapsed: float) -> int:
 class _Canvas:
     def __init__(self):
         self.buf: list[Pixel] = [BLACK] * (WIDTH * HEIGHT)
+        self.clip = None
 
     def set(self, x: float, y: float, color, clip: tuple[int, int] | None = None) -> None:
         color = parse_color(color)
         if color is None:
             return
         x, y = jround(x), jround(y)
+        if self.clip:
+            rx, ry, rw, rh = self.clip
+            if not (rx <= x < rx + rw and ry <= y < ry + rh):
+                return
         if clip and not clip[0] <= x < clip[1]:
             return
         if 0 <= x < WIDTH and 0 <= y < HEIGHT:
@@ -300,12 +306,14 @@ def _text(canvas: _Canvas, layer: dict, elapsed: float) -> None:
 def _icon(canvas: _Canvas, layer: dict) -> None:
     rows = layer.get("rows") or ICONS.get(layer.get("n"), ())
     iw = len(rows[0]) if rows else 0
-    x = (layer.get("x") or 0) + ((layer["w"] - iw) // 2 if layer.get("w") else 0)
-    y = (layer.get("y") or 0) + ((layer["h"] - len(rows)) // 2 if layer.get("h") else 0)
+    scale = max(1, min(layer.get("w", iw) // max(1, iw),
+                       layer.get("h", len(rows)) // max(1, len(rows))))
+    x = (layer.get("x") or 0) + ((layer["w"] - iw * scale) // 2 if layer.get("w") else 0)
+    y = (layer.get("y") or 0) + ((layer["h"] - len(rows) * scale) // 2 if layer.get("h") else 0)
     for j, row in enumerate(rows):
         for i, char in enumerate(row):
             if char == "#":
-                canvas.set(x + i, y + j, layer.get("c"))
+                canvas.rect(x + i * scale, y + j * scale, scale, scale, layer.get("c"))
 
 
 def _analog(canvas: _Canvas, L: dict) -> None:
@@ -387,16 +395,17 @@ def _draw(canvas: _Canvas, L: dict, elapsed: float) -> None:
 
 
 def rasterize(layers, elapsed: float = 0.0) -> list[Pixel]:
-    """Paint layer dicts onto a black 32x16 frame (row-major RGB tuples)."""
+    """Paint layers onto a native 64x32 frame (row-major RGB tuples)."""
     canvas = _Canvas()
     for layer in layers or ():
         if isinstance(layer, dict):
+            canvas.clip = layer.get("_clip")
             _draw(canvas, layer, elapsed)
     return canvas.buf
 
 
 def to_hex(pixels) -> str:
-    """Encode 512 pixels as 3072 lowercase hex characters."""
+    """Encode row-major RGB pixels as six lowercase hex characters each."""
     return "".join("%02x%02x%02x" % tuple(p) for p in pixels)
 
 

@@ -4,31 +4,31 @@ from __future__ import annotations
 
 import copy
 
-from render import ICONS
+from render import ICONS, WIDTH, HEIGHT
 from nhl import TEAMS, TEAM_NAMES
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
 
 LAYOUTS = {
     "icon2": {"name": "Icon + 2 rows", "slots": [
-        {"x": 0, "y": 0, "w": 7, "h": 16, "where": "Left column"},
-        {"x": 8, "y": 0, "w": 24, "h": 7, "where": "Top right"},
-        {"x": 8, "y": 9, "w": 24, "h": 7, "where": "Bottom right"}]},
+        {"x": 0, "y": 0, "w": 14, "h": 32, "where": "Left column"},
+        {"x": 16, "y": 0, "w": 48, "h": 15, "where": "Top right"},
+        {"x": 16, "y": 17, "w": 48, "h": 15, "where": "Bottom right"}]},
     "two": {"name": "Two rows", "slots": [
-        {"x": 0, "y": 0, "w": 32, "h": 7, "where": "Top row"},
-        {"x": 0, "y": 9, "w": 32, "h": 7, "where": "Bottom row"}]},
+        {"x": 0, "y": 0, "w": 64, "h": 15, "where": "Top row"},
+        {"x": 0, "y": 17, "w": 64, "h": 15, "where": "Bottom row"}]},
     "bigsmall": {"name": "Big + small", "slots": [
-        {"x": 0, "y": 0, "w": 32, "h": 10, "where": "Large top"},
-        {"x": 0, "y": 11, "w": 32, "h": 5, "where": "Thin bottom"}]},
+        {"x": 0, "y": 0, "w": 64, "h": 21, "where": "Large top"},
+        {"x": 0, "y": 23, "w": 64, "h": 9, "where": "Thin bottom"}]},
     "three": {"name": "Three rows", "slots": [
-        {"x": 0, "y": 0, "w": 32, "h": 5, "where": "Row 1"},
-        {"x": 0, "y": 6, "w": 32, "h": 5, "where": "Row 2"},
-        {"x": 0, "y": 11, "w": 32, "h": 5, "where": "Row 3"}]},
+        {"x": 0, "y": 0, "w": 64, "h": 9, "where": "Row 1"},
+        {"x": 0, "y": 11, "w": 64, "h": 9, "where": "Row 2"},
+        {"x": 0, "y": 22, "w": 64, "h": 9, "where": "Row 3"}]},
     "split": {"name": "Side by side", "slots": [
-        {"x": 0, "y": 0, "w": 15, "h": 16, "where": "Left half"},
-        {"x": 17, "y": 0, "w": 15, "h": 16, "where": "Right half"}]},
+        {"x": 0, "y": 0, "w": 31, "h": 32, "where": "Left half"},
+        {"x": 33, "y": 0, "w": 31, "h": 32, "where": "Right half"}]},
     "full": {"name": "Full panel", "slots": [
-        {"x": 0, "y": 0, "w": 32, "h": 16, "where": "Whole panel"}]},
+        {"x": 0, "y": 0, "w": WIDTH, "h": HEIGHT, "where": "Whole panel"}]},
 }
 for _id, _layout in LAYOUTS.items():
     _layout["id"] = _id
@@ -120,7 +120,7 @@ CITIES = {
 BLOCKS = {
     "time": _block("Time", "10:24", "time", {
         "h24": _bool(True), "colon_blink": _bool(False),
-        "font": _enum("auto", "auto", "big", "5x7", "3x5")}, 17, 5),
+        "font": _enum("auto", "auto", "display", "large", "big", "5x7", "3x5")}, 17, 5),
     "date": _block("Date", "OCT 9", "time", {
         "style": _enum("long", "short", "long", "stack"), "accent": _color()}, 7, 5),
     "weekday": _block("Weekday", "FRI", "time", {}, 7, 5),
@@ -304,9 +304,9 @@ BUILTIN_SCREENS = [
             "system", "SD card space", "On the Pi"),
     _screen("data-health", "Pi health", "full", [_slot("health", "#5AE08A", accent=AMBER)],
             "data", "Temp · network · feed", "This Pi"),
-    _screen("night-clock", "Night clock", "full", [_slot("time", "#B3261E", font="5x7")],
+    _screen("night-clock", "Night clock", "full", [_slot("time", "#B3261E", font="large")],
             "clock", "Dim red time", "Offline"),
-    _screen("time-simple", "Time only", "full", [_slot("time", "#FFFFFF", font="5x7")],
+    _screen("time-simple", "Time only", "full", [_slot("time", "#FFFFFF", font="display")],
             "clock", "Time", "Offline"),
     _screen("time-weekday", "Time & weekday", "two", [
         _slot("time", "#FFFFFF"), _slot("weekday", "#FFB86C")], "clock", "Time · weekday", "Offline"),
@@ -444,6 +444,7 @@ def sample_data() -> dict:
 def catalog_json() -> dict:
     """The JSON body for GET /api/catalog."""
     return copy.deepcopy({
+        "display": {"width": WIDTH, "height": HEIGHT},
         "layouts": LAYOUTS, "palettes": PALETTES, "blocks": BLOCKS,
         "icons": {name: list(rows) for name, rows in ICONS.items()},
         "motions": MOTIONS, "transitions": TRANSITIONS, "colors": COLORS,

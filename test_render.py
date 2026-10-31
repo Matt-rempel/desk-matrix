@@ -6,7 +6,7 @@ from render import fit_text, from_hex, measure, rasterize, scroll_offset, to_hex
 
 
 def lit(pixels):
-    return {(i % 32, i // 32) for i, p in enumerate(pixels) if any(p)}
+    return {(i % render.WIDTH, i // render.WIDTH) for i, p in enumerate(pixels) if any(p)}
 
 
 class FontTests(unittest.TestCase):
@@ -45,7 +45,7 @@ class AutoFitTests(unittest.TestCase):
         self.assertEqual(fit_text(["10:24"], 32, 16), ("big", "10:24", False))
         self.assertEqual(fit_text(["10:24"], 32, 7), ("5x7", "10:24", False))
         self.assertEqual(fit_text(["10:24"], 32, 5), ("3x5", "10:24", False))
-        self.assertEqual(fit_text(["WJA123", "WJA"], 24, 7), ("5x7", "WJA", False))
+        self.assertEqual(fit_text(["WJA123", "WJA"], 24, 7), ("3x5", "WJA123", False))
         self.assertEqual(fit_text(["FRI OCT 9", "OCT 9"], 32, 5), ("3x5", "FRI OCT 9", False))
 
     def test_nothing_fits_scrolls_last_candidate(self):
@@ -61,12 +61,12 @@ class AutoFitTests(unittest.TestCase):
 class RasterTests(unittest.TestCase):
     def test_blank_frame(self):
         pixels = rasterize([])
-        self.assertEqual(len(pixels), 512)
+        self.assertEqual(len(pixels), 2048)
         self.assertTrue(all(p == (0, 0, 0) for p in pixels))
 
     def test_centering_and_alignment(self):
         layer = {"t": "text", "s": "I", "f": "5x7", "y": 0, "c": "#FFFFFF"}
-        self.assertEqual(sorted(x for x, y in lit(rasterize([layer])) if y == 0), [13, 14, 15, 16, 17])
+        self.assertEqual(sorted(x for x, y in lit(rasterize([layer])) if y == 0), [29, 30, 31, 32, 33])
         left = lit(rasterize([{**layer, "a": "l", "x": 2, "w": 20}]))
         self.assertEqual(min(x for x, _ in left), 2)
         right = lit(rasterize([{**layer, "a": "r", "x": 0, "w": 20}]))
@@ -77,7 +77,7 @@ class RasterTests(unittest.TestCase):
     def test_clipping(self):
         pixels = rasterize([{"t": "text", "s": "WIDE TEXT", "f": "5x7", "x": 28, "y": 12, "c": "#FFFFFF"},
                             {"t": "rect", "x": -3, "y": -3, "w": 5, "h": 5, "c": "#FF0000"}])
-        self.assertEqual(len(pixels), 512)
+        self.assertEqual(len(pixels), 2048)
         self.assertIn((0, 0), lit(pixels))
         clipped = lit(rasterize([{"t": "text", "s": "MMMMMM", "f": "5x7", "x": 4, "w": 10, "a": "l",
                                   "clip": True, "c": "#FFFFFF"}]))
@@ -119,13 +119,13 @@ class RasterTests(unittest.TestCase):
         ])
         self.assertEqual(pixels[4], (255, 255, 255))
         self.assertEqual(pixels[5], (17, 17, 17))
-        self.assertTrue(all(pixels[2 * 32 + x] == (0, 255, 0) for x in range(32)))
-        self.assertEqual([pixels[4 * 32 + x] for x in (0, 2, 4)],
+        self.assertTrue(all(pixels[2 * render.WIDTH + x] == (0, 255, 0) for x in range(32)))
+        self.assertEqual([pixels[4 * render.WIDTH + x] for x in (0, 2, 4)],
                          [(255, 255, 255), (34, 34, 34), (255, 255, 255)])
-        self.assertEqual((pixels[6 * 32], pixels[6 * 32 + 1], pixels[6 * 32 + 2]),
+        self.assertEqual((pixels[6 * render.WIDTH], pixels[6 * render.WIDTH + 1], pixels[6 * render.WIDTH + 2]),
                          ((255, 0, 0), (0, 0, 0), (0, 0, 255)))
-        self.assertEqual(pixels[15 * 32 + 31], (0xAB, 0xCD, 0xEF))
-        self.assertEqual(pixels[6 * 32 + 21], (255, 0, 0))
+        self.assertEqual(pixels[15 * render.WIDTH + 31], (0xAB, 0xCD, 0xEF))
+        self.assertEqual(pixels[6 * render.WIDTH + 21], (255, 0, 0))
 
     def test_circle_analog_spark(self):
         circle = lit(rasterize([{"t": "circle", "cx": 7, "cy": 7, "r": 7, "c": "#FFFFFF"}]))
@@ -154,7 +154,7 @@ class RasterTests(unittest.TestCase):
     def test_hex_round_trip_and_tint(self):
         pixels = rasterize([{"t": "rect", "x": 0, "y": 0, "w": 2, "h": 1, "c": "#A1B2C3"}])
         encoded = to_hex(pixels)
-        self.assertEqual(len(encoded), 3072)
+        self.assertEqual(len(encoded), 12288)
         self.assertEqual(encoded[:12], "a1b2c3a1b2c3")
         self.assertEqual(encoded, encoded.lower())
         self.assertEqual(from_hex(encoded), pixels)

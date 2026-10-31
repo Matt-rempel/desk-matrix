@@ -11,7 +11,7 @@ from typing import Callable, NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import catalog
-from render import ICONS, fit_text, hex_color, jround, measure, mix, rasterize
+from render import ICONS, WIDTH, HEIGHT, fit_text, hex_color, jround, measure, mix, rasterize
 
 WHITE = "#FFFFFF"
 INK, MUTED, FAINT, AMBER = catalog.INK, catalog.MUTED, catalog.FAINT, catalog.AMBER
@@ -42,7 +42,7 @@ class Rect(NamedTuple):
 
     @property
     def full(self) -> bool:
-        return self.w >= 32 and self.h >= 16
+        return self.w >= WIDTH and self.h >= HEIGHT
 
     @property
     def icon_fits(self) -> bool:
@@ -235,8 +235,9 @@ def b_date(s: Slot) -> list[dict]:
     wd, mon, day = WEEKDAYS[now.weekday()][:3], MONTHS[now.month - 1], str(now.day)
     style = s.opt("style")
     if style == "stack" and r.h >= 14:
-        return [T(r.sub(0, 0, r.w, 7), _weekday_strings(now, r.w), s.color),
-                T(r.sub(0, 9, r.w, 7), [day], s.accent(s.color))]
+        half = (r.h - 2) // 2
+        return [T(r.sub(0, 0, r.w, half), _weekday_strings(now, r.w), s.color),
+                T(r.sub(0, half + 2, r.w, half), [day], s.accent(s.color))]
     if style == "short":
         return [T(r, [f"{wd} {day}", f"{mon} {day}", day], s.color)]
     return [T(r, [f"{wd} {mon} {day}", f"{mon} {day}", f"{wd} {day}", day], s.color)]
@@ -285,10 +286,9 @@ def b_world(s: Slot) -> list[dict]:
     if there.date() != s.ctx.now.date():
         offset = [WEEKDAYS[there.weekday()][:3]]
     if r.full:
-        label_w = measure(label, "3x5")[0]
-        return [T(r.sub(0, 0, r.w, 10), [value], color),
-                T(r.sub(0, 11, label_w, 5), [label], s.color, a="l"),
-                T(r.sub(label_w + 2, 11, r.w - label_w - 2, 5), offset, dim(s.color, .7), a="r")]
+        return [T(r.sub(0, 0, r.w, 21), [value], color),
+                T(r.sub(0, 23, 31, 9), [label], s.color, a="l"),
+                T(r.sub(33, 23, 31, 9), offset, dim(s.color, .7), a="r")]
     return [T(r, [f"{label} {value}", value], color)]
 
 
@@ -303,11 +303,11 @@ def b_analog(s: Slot) -> list[dict]:
     face = s.opt("face") if not s.forced and s.opt("face") else dim(s.color, 0.25)
     layers = [{"t": "analog", "cx": cx, "cy": cy, "r": radius, "hr": now.hour, "mn": now.minute,
                "c": solid(face), "hc": solid(s.color), "mc": solid(s.accent(s.color))}]
-    side = r.sub(2 * radius + 1, 0, r.w - 2 * radius - 1, 7 if r.h >= 16 else r.h)
+    side = r.sub(2 * radius + 2, 0, r.w - 2 * radius - 2, (r.h - 2) // 2)
     if wide:
         layers.append(T(side, _weekday_strings(now, side.w)[1:], s.color))
     if wide and r.h >= 16:
-        layers.append(T(side._replace(y=r.y + 9), [str(now.day)], s.accent(s.color)))
+        layers.append(T(side._replace(y=r.y + side.h + 2), [str(now.day)], s.accent(s.color)))
     return layers
 
 
@@ -332,9 +332,10 @@ def b_fuzzy(s: Slot) -> list[dict]:
     r = s.rect
     prefix, middle, last = fuzzy_words(s.ctx.now)
     if r.h >= 16:
-        return [T(r.sub(0, 0, r.w, 5), [prefix], dim(s.color, 0.38)),
-                T(r.sub(0, 6, r.w, 5), [middle], s.color),
-                T(r.sub(0, 11, r.w, 5), last, s.accent(s.color))]
+        height = (r.h - 2) // 3
+        return [T(r.sub(0, 0, r.w, height), [prefix], dim(s.color, 0.38)),
+                T(r.sub(0, height + 1, r.w, height), [middle], s.color),
+                T(r.sub(0, 2 * (height + 1), r.w, height), last, s.accent(s.color))]
     return [T(r, [f"{middle} {last[0]}", f"{middle} {last[-1]}", middle], s.color)]
 
 
@@ -352,9 +353,9 @@ def b_temp(s: Slot) -> list[dict]:
     if r.full and which in ("now", "sky"):
         value = [f"{now}°"] if now is not None else ["--°"]
         return [icon(code if code in WEATHER else "cloud", r.x, r.y,
-                     s.icon_color(words[2]) if code in WEATHER else dim(s.color)),
-                T(r.sub(8, 0, r.w - 8, 7), value, s.color if now is not None else dim(s.color)),
-                T(r.sub(0, 10, r.w, 5), hilo, s.accent(MUTED))]
+                     s.icon_color(words[2]) if code in WEATHER else dim(s.color), 14, 21),
+                T(r.sub(16, 0, r.w - 16, 21), value, s.color if now is not None else dim(s.color)),
+                T(r.sub(0, 23, r.w, 9), hilo, s.accent(MUTED))]
     unit = units.get("temp", "C")
     options = {"now": [f"{now}°{unit}", f"{now}°"] if now is not None else None,
                "high": [f"H{high}", f"{high}°"] if high is not None else None,
@@ -390,9 +391,9 @@ def b_rain(s: Slot) -> list[dict]:
         value, label, small = "DRY", "NO RAIN", ["NO RAIN", "DRY"]
     if not r.full:
         return [T(r, small, s.color)]
-    return [icon("rain", r.x, r.y, s.icon_color("#7CB8FF")),
-            T(r.sub(8, 1, r.w - 8, 5), [label, label.split()[0]], s.accent(MUTED)),
-            T(r.sub(8, 9, r.w - 8, 7), [value], s.color)]
+    return [icon("rain", r.x, r.y, s.icon_color("#7CB8FF"), 14, 32),
+            T(r.sub(16, 0, r.w - 16, 9), [label, label.split()[0]], s.accent(MUTED)),
+            T(r.sub(16, 11, r.w - 16, 21), [value], s.color)]
 
 
 def b_hourly(s: Slot) -> list[dict]:
@@ -403,8 +404,9 @@ def b_hourly(s: Slot) -> list[dict]:
         return s.placeholder(["NO DATA", "--"])
     layers = []
     if r.h >= 12:
-        layers.append(T(r.sub(0, 0, r.w, 5), [f"NEXT {len(temps)}H", "NEXT"], MUTED))
-        r = r.sub(0, 6, r.w, r.h - 6)
+        header = 9 if r.h >= 24 else 5
+        layers.append(T(r.sub(0, 0, r.w, header), [f"NEXT {len(temps)}H", "NEXT"], MUTED))
+        r = r.sub(0, header + 2, r.w, r.h - header - 2)
     return layers + [spark(r, temps, s.color, s.accent(None))]
 
 
@@ -440,10 +442,10 @@ def b_metar(s: Slot) -> list[dict]:
     else:
         wind = [f"{kt}KT", str(kt)]
     if r.full:
-        return [T(r.sub(0, 0, r.w, 5), [station], s.color, a="l"),
-                T(r.sub(0, 0, r.w, 5), [category], cat_color, a="r"),
-                icon("wind", r.x, r.y + 8, s.icon_color("#8FD3FF")),
-                T(r.sub(9, 8, r.w - 9, 7), wind, s.color)]
+        return [T(r.sub(0, 0, 31, 9), [station], s.color, a="l"),
+                T(r.sub(33, 0, 31, 9), [category], cat_color, a="r"),
+                icon("wind", r.x, r.y + 11, s.icon_color("#8FD3FF"), 14, 21),
+                T(r.sub(16, 11, r.w - 16, 21), wind, s.color)]
     field_ = s.opt("field")
     if field_ == "station":
         return [T(r, [station], s.color)]
@@ -498,17 +500,18 @@ def b_flight(s: Slot) -> list[dict]:
         if not r.full:
             return s.placeholder(["NO PLANES", "NONE", "--"])
         label = ["IN RANGE"] if mode == "nearby" else [_callsign(s.opt("callsign")) or "--"]
-        return [icon("plane", r.x, r.y, dim(s.icon_color(AMBER))),
-                T(r.sub(8, 0, r.w - 8, 7), ["NONE", "--"] if mode == "nearby" else ["NOT SEEN", "--"], dim(s.color)),
-                T(r.sub(0, 10, r.w, 5), label, dim(s.accent(MUTED)))]
+        return [icon("plane", r.x, r.y, dim(s.icon_color(AMBER)), 14, 21),
+                T(r.sub(16, 0, r.w - 16, 21), ["NONE", "--"] if mode == "nearby" else ["NOT SEEN", "--"], dim(s.color)),
+                T(r.sub(0, 23, r.w, 9), label, dim(s.accent(MUTED)))]
     strings = _flight_strings(s, plane, mode)
     if not r.full:
         return [T(r, strings[s.opt("field")], s.color)]
     if mode == "follow":
         return _follow_card(s, plane, strings)
     return [icon(plane.get("icon") or "plane", r.x, r.y, s.icon_color(AMBER)),
-            T(r.sub(8, 0, r.w - 8, 7), strings["callsign"], s.color),
-            T(r.sub(0, 10, r.w, 5), strings["route"], s.accent("#8FD3FF"))]
+            T(r.sub(9, 0, r.w - 9, 10), strings["callsign"], s.color),
+            T(r.sub(0, 12, r.w, 9), strings["route"], s.accent("#8FD3FF")),
+            T(r.sub(0, 23, r.w, 9), strings["detail"], s.accent(MUTED))]
 
 
 def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
@@ -517,19 +520,19 @@ def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
     value = max(0.0, min(1.0, float(progress))) if isinstance(progress, (int, float)) else 0.0
     accent = s.accent(MUTED)
     marker = max(r.x + 1, min(r.x + r.w - 2, r.x + jround(value * r.w)))
-    layers = [T(r.sub(0, 0, r.w, 5), strings["callsign"][:1], s.color, a="l"),
-              T(r.sub(0, 0, r.w, 5), strings["detail"][-1:], accent, a="r"),
-              {"t": "bar", "x": r.x, "y": r.y + 7, "w": r.w, "h": 1, "v": value,
+    layers = [T(r.sub(0, 0, 39, 10), strings["callsign"][:1], s.color, a="l"),
+              T(r.sub(41, 0, 23, 10), strings["detail"][-1:], accent, a="r"),
+              {"t": "bar", "x": r.x, "y": r.y + 16, "w": r.w, "h": 2, "v": value,
                "c": s.icon_color(AMBER), "bg": "#2A2A2E"}]
     if isinstance(progress, (int, float)):
-        layers.append({"t": "px", "x": marker - 1, "y": r.y + 6, "rows": [".#.", "###", ".#."],
+        layers.append({"t": "px", "x": marker - 1, "y": r.y + 15, "rows": [".#.", "###", ".#."],
                        "pal": {"#": solid(s.color)}})
     origin = str(plane.get("origin") or "").upper()
     destination = str(plane.get("destination") or "").upper()
     if not (origin and destination) and ">" in str(plane.get("route") or ""):
         origin, destination = str(plane["route"]).upper().split(">", 1)
-    layers += [T(r.sub(0, 11, r.w, 5), [origin or "---"], accent, a="l"),
-               T(r.sub(0, 11, r.w, 5), [destination or "---"], accent, a="r")]
+    layers += [T(r.sub(0, 23, 31, 9), [origin or "---"], accent, a="l"),
+               T(r.sub(33, 23, 31, 9), [destination or "---"], accent, a="r")]
     return layers
 
 
@@ -583,8 +586,8 @@ def b_radar(s: Slot) -> list[dict]:
     count = str(len(planes)) if isinstance(nearby, list) else "--"
     side = r.sub(2 * radius + 2, 0, r.w - 2 * radius - 2, r.h)
     if wide and r.h >= 15:
-        layers += [T(side._replace(y=r.y + 1, h=7), [count], s.color),
-                   T(side._replace(y=r.y + 10, h=5), ["NEAR"], s.accent(dim(color, 0.7)))]
+        layers += [T(side._replace(h=r.h - 11), [count], s.color),
+                   T(side._replace(y=r.y + r.h - 9, h=9), ["NEAR"], s.accent(dim(color, 0.7)))]
     elif wide:
         layers.append(T(side, [count], s.color))
     return layers
@@ -596,8 +599,8 @@ def b_iss(s: Slot) -> list[dict]:
     if not isinstance(km, (int, float)):
         return s.placeholder(["--"]) if not r.full else [
             icon("iss", r.x + 1, r.y + 1, dim(s.icon_color("#C9D2FF"))),
-            T(r.sub(10, 1, r.w - 10, 5), ["ISS"], dim(s.icon_color("#C9D2FF")), a="l"),
-            T(r.sub(0, 9, r.w, 7), ["--"], dim(s.color))]
+            T(r.sub(10, 0, r.w - 10, 9), ["ISS"], dim(s.icon_color("#C9D2FF")), a="l"),
+            T(r.sub(0, 11, r.w, 21), ["--"], dim(s.color))]
     direction = str(iss.get("direction") or "--").upper()
     if iss.get("overhead"):
         value = ["OVERHEAD", "ABOVE", "UP"]
@@ -608,9 +611,9 @@ def b_iss(s: Slot) -> list[dict]:
     if r.full:
         brand = s.icon_color("#C9D2FF")
         return [icon("iss", r.x + 1, r.y + 1, brand),
-                T(r.sub(10, 1, r.w - 10, 5), ["ISS"], brand, a="l"),
-                T(r.sub(10, 1, r.w - 10, 5), [direction], s.accent(MUTED), a="r"),
-                T(r.sub(0, 9, r.w, 7), value, s.color)]
+                T(r.sub(10, 0, 25, 9), ["ISS"], brand, a="l"),
+                T(r.sub(37, 0, r.w - 37, 9), [direction], s.accent(MUTED), a="r"),
+                T(r.sub(0, 11, r.w, 21), value, s.color)]
     field_ = s.opt("field")
     if field_ == "direction":
         return [T(r, [direction], s.color)]
@@ -643,8 +646,9 @@ def b_sun_arc(s: Slot) -> list[dict]:
     if r.w < 24 or r.h < 12:
         return b_sun_time(s)
     found = _sun_event(s, "next")
-    cx, horizon = r.x + (r.w - 1) // 2, r.y + r.h - 7
-    radius = min(8, horizon - r.y - 1, (r.w - 1) // 2)
+    footer = 9 if r.h >= 24 else 5
+    cx, horizon = r.x + (r.w - 1) // 2, r.y + r.h - footer - 2
+    radius = min(horizon - r.y - 1, (r.w - 1) // 2)
     line = dim(s.color, 0.35 if found else 0.2)
     layers = [{"t": "arc", "cx": cx, "cy": horizon, "r": radius, "c": line, "dotted": True},
               {"t": "rect", "x": r.x, "y": horizon, "w": r.w, "h": 1, "c": line}]
@@ -654,7 +658,7 @@ def b_sun_arc(s: Slot) -> list[dict]:
         sx, sy = cx + radius * math.cos(angle), horizon - radius * math.sin(angle)
         layers.append({"t": "rect", "x": jround(sx) - 1, "y": jround(sy) - 1, "w": 2, "h": 2,
                        "c": solid(s.color)})
-    label = r.sub(0, r.h - 5, r.w, 5)
+    label = r.sub(0, r.h - footer, r.w, footer)
     if not found:
         return layers + [T(label, ["--:--"], dim(s.color))]
     name, moment = found
@@ -680,7 +684,7 @@ def b_countdown(s: Slot) -> list[dict]:
         value = ["DONE", "--"]
     if r.full:
         top = [f"{label} IN", label] if label and days > 0 else [label or "COUNTDOWN", "DAYS"]
-        return [T(r.sub(0, 1, r.w, 5), top, s.accent(MUTED)), T(r.sub(0, 8, r.w, 7), value, s.color)]
+        return [T(r.sub(0, 0, r.w, 9), top, s.accent(MUTED)), T(r.sub(0, 11, r.w, 21), value, s.color)]
     if label and days > 0:
         return [T(r, [f"{label} {value[-1]}", *value], s.color)]
     return [T(r, value, s.color)]
@@ -712,10 +716,10 @@ def b_timer(s: Slot) -> list[dict]:
     value = f"{remaining // 60}:{remaining % 60:02d}"
     if not r.full:
         return [T(r, [value], color)]
-    return [T(r.sub(0, 0, r.w, 10), [value], color),
-            {"t": "bar", "x": r.x + 1, "y": r.y + 12, "w": r.w - 2, "h": 2, "v": progress,
+    return [T(r.sub(0, 0, r.w, 21), [value], color),
+            {"t": "bar", "x": r.x + 1, "y": r.y + 23, "w": r.w - 2, "h": 3, "v": progress,
              "c": solid(color), "bg": dim(color, 0.23)},
-            {"t": "dots", "x": r.x + (r.w - 10) // 2, "y": r.y + 15, "n": 4, "size": 1, "gap": 2,
+            {"t": "dots", "x": r.x + (r.w - 14) // 2, "y": r.y + 29, "n": 4, "size": 2, "gap": 2,
              "on": [1 if i < cycles % 4 else 0 for i in range(4)], "c": solid(color),
              "off": dim(color, 0.23)}]
 
@@ -733,6 +737,16 @@ def b_habit(s: Slot) -> list[dict]:
         streak, day = streak + 1, day - timedelta(days=1)
     if r.w < 27 or r.h < 10:
         return [T(r, [f"{streak} DAYS", f"{streak}D", str(streak)], s.color)]
+    if r.full:
+        label = str(s.opt("label") or "HABIT").upper()
+        layers = [T(r.sub(0, 0, 46, 9), [label], s.accent(MUTED), a="l"),
+                  T(r.sub(48, 0, 16, 9), [str(streak)], s.color, a="r")]
+        for i, letter in enumerate("MTWTFSS"):
+            layers += [{"t": "rect", "x": r.x + 4 + i * 8, "y": r.y + 13,
+                        "w": 6, "h": 6, "c": solid(s.color) if week[i] else dim(s.color, .2)},
+                       T(r.sub(4 + i * 8, 23, 6, 9), letter,
+                         MUTED if i == today.weekday() else FAINT, f="5x7")]
+        return layers
     x = r.x + (r.w - 27) // 2
     dots = {"t": "dots", "n": 7, "size": 3, "gap": 1, "on": week, "c": solid(s.color),
             "off": dim(s.color, 0.2), "x": x}
@@ -771,8 +785,8 @@ def b_progress(s: Slot) -> list[dict]:
     layers = []
     if r.h >= 12:
         text = [f"{label} {jround(value * 100)}%", f"{jround(value * 100)}%"] if value is not None else ["--"]
-        layers.append(T(r.sub(0, 0, r.w, 7), text, s.color if value is not None else dim(s.color)))
-        bar = r.sub(1, 9, r.w - 2, 3)
+        layers.append(T(r.sub(0, 0, r.w, r.h - 7), text, s.color if value is not None else dim(s.color)))
+        bar = r.sub(1, r.h - 6, r.w - 2, 3)
     elif r.h >= 6:
         bar = r.sub(1, 1, r.w - 2, 3)
     else:
@@ -799,7 +813,7 @@ def b_calendar(s: Slot) -> list[dict]:
     times = [f"NEXT {when}", when, clock]
     title = str(event.get("title") or "EVENT").upper()
     if r.full:
-        return [T(r.sub(0, 0, r.w, 5), times, s.accent(MUTED)), long_text(r.sub(0, 8, r.w, 7), title, s.color)]
+        return [T(r.sub(0, 0, r.w, 9), times, s.accent(MUTED)), long_text(r.sub(0, 11, r.w, 21), title, s.color)]
     if s.opt("field") == "time":
         return [T(r, times, s.color)]
     return [long_text(r, title, s.color)]
@@ -837,8 +851,8 @@ def b_alert(s: Slot) -> list[dict]:
     color = s.color if value != "--" else dim(s.color)
     if r.full:
         return [icon(icon_name, r.x, r.y, s.icon_color(solid(s.color))),
-                T(r.sub(9, 1, r.w - 9, 5), [label, label[:4]], s.accent(MUTED), a="l"),
-                T(r.sub(0, 9, r.w, 7), [value], color)]
+                T(r.sub(9, 0, r.w - 9, 9), [label, label[:4]], s.accent(MUTED), a="l"),
+                T(r.sub(0, 11, r.w, 21), [value], color)]
     return [T(r, [f"{label} {value}", value], color)]
 
 
@@ -861,23 +875,23 @@ def b_feed(s: Slot) -> list[dict]:
     name = s.opt("icon")
     if name in ICONS:
         return [icon(name, r.x, r.y, s.icon_color(solid(s.color))),
-                T(r.sub(9, 1, r.w - 9, 5), [label], accent, a="l"),
-                long_text(r.sub(0, 9, r.w, 7), text, value_color)]
+                T(r.sub(9, 0, r.w - 9, 9), [label], accent, a="l"),
+                long_text(r.sub(0, 11, r.w, 21), text, value_color)]
     if len(series) >= 2:
-        return [T(r.sub(0, 0, r.w, 5), [label], accent, a="l"),
-                T(r.sub(0, 0, r.w, 5), [text], value_color, a="r" if label else "c"),
-                {"t": "spark", "line": True, "x": r.x, "y": r.y + 7, "w": r.w, "h": r.h - 7,
+        return [T(r.sub(0, 0, 23, 9), [label], accent, a="l"),
+                T(r.sub(25, 0, r.w - 25, 9), [text], value_color, a="r" if label else "c"),
+                {"t": "spark", "line": True, "x": r.x, "y": r.y + 11, "w": r.w, "h": r.h - 11,
                  "d": series[-r.w:], "c": solid(s.color), "fill": dim(s.color, 0.2)}]
-    return [T(r.sub(0, 1, r.w, 5), [label], accent), long_text(r.sub(0, 8, r.w, 7), text, value_color)]
+    return [T(r.sub(0, 0, r.w, 9), [label], accent), long_text(r.sub(0, 11, r.w, 21), text, value_color)]
 
 
 def b_nhl(s: Slot) -> list[dict]:
-    """Two large lines on the original panel; game status replaces row two briefly."""
+    """Keep both scores and game status visible together."""
     r, team = s.rect, s.opt("team")
     game = (s.source("nhl") or {}).get(team) or {}
     if not r.full:
         return s.placeholder([team])
-    top, bottom = r.sub(0, 0, 32, 7), r.sub(0, 9, 32, 7)
+    top, bottom = r.sub(0, 0, r.w, 10), r.sub(0, 11, r.w, 10)
     accent = s.accent("#FF9A3D")
     state = game.get("state")
     if state == "upcoming":
@@ -903,10 +917,9 @@ def b_nhl(s: Slot) -> list[dict]:
             status = f"{period} {game.get('clock') or ''}".strip()
             if game.get("age_s") is not None and game["age_s"] > 180:
                 status = "STALE"
-        detail = int(s.ctx.elapsed) % 14 >= 9
         return [T(top, [f"{team} {score(own)}"], s.color),
-                T(bottom, [status] if detail else [f"{opponent or '---'} {score(other)}"],
-                  accent)]
+                T(bottom, [f"{opponent or '---'} {score(other)}"], accent),
+                T(r.sub(0, 23, r.w, 9), [status], s.accent(MUTED))]
     label = "OFFLINE" if game.get("error") else "NO GAME" if state == "none" else "LOADING"
     return [T(top, [f"{team} NHL"], s.color), T(bottom, [label], accent)]
 
@@ -938,8 +951,8 @@ def b_health(s: Slot) -> list[dict]:
                      s.color if net else s.accent(AMBER)),
              "feed": ([f"FEED {age}", age], s.accent(AMBER))}
     if r.full:
-        return [T(r.sub(0, y, r.w, 5), *lines[key], a="l")
-                for y, key in ((0, "cpu"), (6, "net"), (11, "feed"))]
+        return [T(r.sub(0, y, r.w, 9), *lines[key], a="l")
+                for y, key in ((0, "cpu"), (11, "net"), (23, "feed"))]
     strings, color = lines[s.opt("field")]
     return [T(r, strings, color)]
 
@@ -965,7 +978,7 @@ def b_text(s: Slot) -> list[dict]:
         return []
     if not fit_text([text], r.w, r.h)[2]:
         return [T(r, [text], s.color)]
-    for font, height, gap in (("5x7", 7, 2), ("3x5", 5, 1)):
+    for font, height, gap in (("large", 14, 2), ("big", 10, 2), ("5x7", 7, 2), ("3x5", 5, 1)):
         lines = _wrap(text, font, r.w)
         if not lines or len(lines) < 2:
             continue
@@ -995,15 +1008,19 @@ def b_art(s: Slot) -> list[dict]:
     frames = art["frames"]
     fps = max(1, min(12, int(art.get("fps") or 1)))
     cells = str(frames[int(s.ctx.elapsed * fps) % len(frames)])
-    ox, oy = r.x + (r.w - w) // 2, r.y + (r.h - h) // 2
+    scale = max(1, min(r.w // max(1, w), r.h // max(1, h)))
+    ox, oy = r.x + (r.w - w * scale) // 2, r.y + (r.h - h * scale) // 2
     points = []
     for index, char in enumerate(cells[:w * h]):
         if char == ".":
             continue
         slot = int(char, 16) if char in "0123456789abcdefABCDEF" else -1
-        x, y = ox + index % w, oy + index // w
-        if 0 <= slot < len(palette) and r.x <= x < r.x + r.w and r.y <= y < r.y + r.h:
-            points.append([x, y, palette[slot]])
+        if 0 <= slot < len(palette):
+            for dy in range(scale):
+                for dx in range(scale):
+                    x, y = ox + (index % w) * scale + dx, oy + (index // w) * scale + dy
+                    if r.x <= x < r.x + r.w and r.y <= y < r.y + r.h:
+                        points.append([x, y, palette[slot]])
     return [{"t": "pts", "p": points}]
 
 
@@ -1111,16 +1128,17 @@ def render_screen(screen: dict, ctx: RenderContext, palette: str | None = None,
                  _slot_color(slot.get("color"), index, pal, forced), options, pal, forced,
                  str(screen.get("id") or ""), ctx)
         try:
-            layers += RENDERERS[block](s)
+            slot_layers = RENDERERS[block](s)
         except Exception:
             if strict:
                 raise
-            layers += s.placeholder(["?"])
+            slot_layers = s.placeholder(["?"])
+        layers += [{**layer, "_clip": tuple(s.rect)} for layer in slot_layers]
     return layers
 
 
 def frame(screen: dict, ctx: RenderContext, palette: str | None = None) -> list[tuple[int, int, int]]:
-    """Render a screen to 512 RGB pixels."""
+    """Render a screen to native row-major RGB pixels."""
     return rasterize(render_screen(screen, ctx, palette), ctx.elapsed)
 
 
@@ -1180,10 +1198,10 @@ def sample_context(now: datetime | None = None, elapsed: float = 0.0) -> RenderC
 
 
 def ascii_preview(screen: dict, ctx: RenderContext | None = None) -> str:
-    """16 lines of 32 characters ('#' lit, '.' dark) for reviewing a screen in a terminal."""
+    """Native panel rows ('#' lit, '.' dark) for reviewing a screen in a terminal."""
     pixels = frame(screen, ctx or sample_context())
-    return "\n".join("".join("#" if any(pixels[y * 32 + x]) else "." for x in range(32))
-                     for y in range(16))
+    return "\n".join("".join("#" if any(pixels[y * WIDTH + x]) else "." for x in range(WIDTH))
+                     for y in range(HEIGHT))
 
 
 if __name__ == "__main__":

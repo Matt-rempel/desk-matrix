@@ -1,4 +1,5 @@
 // HTTP helpers: pairing key, JSON requests, error handling and batched previews.
+import { FRAME_HEX_LENGTH } from './display.js';
 
 const KEY_NAME = 'flightboard-key';
 const KEY_RE = /^[0-9a-fA-F]{64}$/;
@@ -138,7 +139,7 @@ export async function previewFrame(screen, elapsed) {
     method: 'POST', body: { screens: [previewable(screen)], elapsed, animate: true },
   });
   const frame = data?.frames?.[0];
-  if (typeof frame !== 'string' || frame.length !== 3072) throw new ApiError('Preview unavailable', 500);
+  if (typeof frame !== 'string' || frame.length !== FRAME_HEX_LENGTH) throw new ApiError('Preview unavailable', 500);
   return frame;
 }
 
@@ -170,7 +171,7 @@ async function flush() {
       const frames = (data && data.frames) || [];
       chunk.forEach((item, n) => {
         const frame = frames[n];
-        if (typeof frame === 'string' && frame.length === 3072) {
+        if (typeof frame === 'string' && frame.length === FRAME_HEX_LENGTH) {
           remember(item.k, frame);
           item.resolve(frame);
         } else {

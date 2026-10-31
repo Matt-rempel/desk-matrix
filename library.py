@@ -34,7 +34,7 @@ MAX_HABITS = 50
 MAX_HABIT_DATES = 100
 MAX_TIMERS = 50
 HABIT_DAYS = 60
-ART_SIZES = ((7, 7), (16, 16), (32, 16))
+ART_SIZES = ((7, 7), (16, 16), (32, 16), (14, 14), (32, 32), (64, 32))
 MAX_ART_COLORS = 16
 MAX_ART_FRAMES = 8
 SHOW_NOW_MAX_S = 24 * 3600
@@ -260,8 +260,8 @@ def validate_art(art) -> dict:
     _check(isinstance(art["id"], str) and ART_ID_RE.fullmatch(art["id"]) is not None,
            "Invalid art ID")
     name = _name(art["name"], "Art name")
-    w, h = _int(art["w"], 1, 32, "Art width"), _int(art["h"], 1, 16, "Art height")
-    _check((w, h) in ART_SIZES, "Art must be 7×7, 16×16 or 32×16")
+    w, h = _int(art["w"], 1, 64, "Art width"), _int(art["h"], 1, 32, "Art height")
+    _check((w, h) in ART_SIZES, "Art must be 14×14, 32×32 or 64×32 (legacy sizes also supported)")
     palette = art["palette"]
     _check(isinstance(palette, list) and 1 <= len(palette) <= MAX_ART_COLORS,
            f"Art needs 1–{MAX_ART_COLORS} palette colors")

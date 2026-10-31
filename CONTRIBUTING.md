@@ -1,7 +1,7 @@
 # Contributing
 
 Desk Matrix is a small Raspberry Pi project shared through a public GitHub
-repository. Please keep changes easy to test on the 32×16 panel. Anyone can
+repository. Please keep changes easy to test on the 64×32 panel. Anyone can
 clone it; pushing a branch requires write access or a fork.
 
 1. Pull the latest `main`, create a descriptive branch, and make your change.
@@ -24,7 +24,7 @@ To add a built-in screen, add it to `BUILTIN_SCREENS` in `catalog.py` (a
 layout and one block per slot) and list it in a shelf in `SHELVES`. A new
 kind of content is a block: declare it with its options in `BLOCKS` and draw
 it in `blocks.py`. Missing data must show a placeholder, never raise. Paste
-the screen's ASCII preview into the pull request so readability on 32×16 can
+the screen's ASCII preview into the pull request so readability on 64×32 can
 be reviewed before deployment:
 
 ```sh

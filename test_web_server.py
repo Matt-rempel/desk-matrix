@@ -219,7 +219,7 @@ class ApiTests(ServerTestCase):
         self.assertLess(time.perf_counter() - started, 1.0)
         self.assertEqual(len(frames), 40)
         for frame in frames:
-            self.assertRegex(frame, r"^[0-9a-f]{3072}$")
+            self.assertRegex(frame, r"^[0-9a-f]{12288}$")
         self.assertTrue(any(set(frame) != {"0"} for frame in frames))
         self.assertEqual(self.post("/api/preview", {"screens": []})["frames"], [])
         # Builtin ids, missing ids and missing names are all fine for working copies.

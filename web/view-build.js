@@ -1,7 +1,7 @@
 // Build your own: layout, slots, blocks, block options and colors.
 
 import { state, findScreen, isBuiltin, clone, layoutOf, blockOf, defaultOptions, act, customs } from './store.js';
-import { createMatrix, livePreview } from './matrix.js';
+import { createMatrix, livePreview, COLS, ROWS } from './matrix.js';
 import { h, header, messageLine, toast, confirmSheet, busy, eyebrow, chips, paint, splitLayout } from './ui.js';
 import { optionsForm, colorPicker } from './options.js';
 import { saveScreen, showNow } from './controls.js';
@@ -92,7 +92,7 @@ export function render(root, { id, go }) {
       const on = l.id === work.layout;
       const mini = h('span', { class: 'mini-layout', 'aria-hidden': 'true' }, l.slots.map((r, i) => h('i', {
         class: on ? (i === sel ? 'sel' : 'on') : '',
-        css: { left: `${(r.x / 32) * 100}%`, top: `${(r.y / 16) * 100}%`, width: `${(r.w / 32) * 100}%`, height: `${(r.h / 16) * 100}%` },
+        css: { left: `${(r.x / COLS) * 100}%`, top: `${(r.y / ROWS) * 100}%`, width: `${(r.w / COLS) * 100}%`, height: `${(r.h / ROWS) * 100}%` },
       })));
       const btn = h('button', { type: 'button', class: 'layout-btn', 'aria-pressed': String(on) }, mini, h('span', null, l.name));
       btn.addEventListener('click', () => { switchLayout(l.id); });
@@ -201,10 +201,10 @@ export function render(root, { id, go }) {
     const r = rects()[sel];
     if (!r) { outline.hidden = true; return; }
     outline.hidden = false;
-    outline.style.left = `calc(${(r.x / 32) * 100}% - 3px)`;
-    outline.style.top = `calc(${(r.y / 16) * 100}% - 3px)`;
-    outline.style.width = `calc(${(r.w / 32) * 100}% + 6px)`;
-    outline.style.height = `calc(${(r.h / 16) * 100}% + 6px)`;
+    outline.style.left = `calc(${(r.x / COLS) * 100}% - 3px)`;
+    outline.style.top = `calc(${(r.y / ROWS) * 100}% - 3px)`;
+    outline.style.width = `calc(${(r.w / COLS) * 100}% + 6px)`;
+    outline.style.height = `calc(${(r.h / ROWS) * 100}% + 6px)`;
   }
 
   function update() { live.update(work); }

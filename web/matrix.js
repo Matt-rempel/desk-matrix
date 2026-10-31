@@ -1,12 +1,12 @@
-// <canvas> LED matrix: paints a 3072-hex frame (512 × RRGGBB, row-major) as dots.
+// <canvas> LED matrix: paints native RRGGBB row-major frames as dots.
 
 import { preview, previewFrame, cachedPreview, debounce } from './api.js';
 
-export const COLS = 32;
-export const ROWS = 16;
+import { COLS, ROWS, FRAME_HEX_LENGTH } from './display.js';
+export { COLS, ROWS } from './display.js';
 const UNLIT = '#1A1A1D';
 const BACKGROUND = '#060607';
-const BLANK = '0'.repeat(3072);
+const BLANK = '0'.repeat(FRAME_HEX_LENGTH);
 
 const observed = new WeakMap();
 let resizeObserver = null;
@@ -31,6 +31,8 @@ function observer() {
  * @param {string} [opts.label] accessible description
  */
 export function createMatrix({ pitch = 10, glow = true, label = '', className = '' } = {}) {
+  // Keep existing preview footprints while showing twice as many LEDs per axis.
+  pitch /= 2;
   const wrap = document.createElement('div');
   wrap.className = 'matrix' + (className ? ' ' + className : '');
   wrap.style.setProperty('--matrix-max', `${COLS * pitch}px`);
@@ -52,7 +54,7 @@ export function createMatrix({ pitch = 10, glow = true, label = '', className = 
     get frame() { return frame; },
     setLabel(text) { canvas.setAttribute('aria-label', text || 'LED matrix preview'); },
     setFrame(hex) {
-      if (typeof hex !== 'string' || hex.length !== 3072) hex = BLANK;
+      if (typeof hex !== 'string' || hex.length !== FRAME_HEX_LENGTH) hex = BLANK;
       if (hex === frame && drawnKey) return;
       frame = hex;
       drawnKey = '';

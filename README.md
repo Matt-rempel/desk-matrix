@@ -1,8 +1,8 @@
 # Desk Matrix
 
 Desk Matrix turns a Raspberry Pi and a HUB75 RGB matrix into a configurable
-desk display. It supports one **32×16 panel**, or a **64×32 panel with each
-layout pixel doubled in both directions**. Everything
+desk display. Screens render natively on one **64×32 panel** (2,048 individually
+addressable pixels). Everything
 it shows is a *screen*: clocks, nearby and followed flights, weather, METAR,
 the sun and the ISS, timers, habits, messages, pixel art, NHL scores and
 numbers from your own JSON feeds. A private HTTPS settings page on your phone
@@ -21,16 +21,15 @@ the location and time zone in settings for your own desk.**
 ### Tested build
 
 - Raspberry Pi 3 Model B, tested with Raspberry Pi OS Lite 64-bit
-- One 32×16 HUB75 RGB matrix, wired with the driver's
-  [`regular` GPIO mapping](https://github.com/hzeller/rpi-rgb-led-matrix/blob/master/wiring.md)
+- One 64×32 P3 HUB75 RGB matrix and Adafruit RGB Matrix Bonnet
 - A separate **5 V, at least 2.5 A** micro-USB supply for the Pi
 - A separate, correctly polarized 5 V supply sized for the LED panel
 - A common ground through the HUB75 signal connector
 - MicroSD card and a network connection for the Pi
 
 Check the panel's input connector, GPIO wiring, and power polarity with the
-power disconnected. The install script assumes one 32×16 panel and the
-`regular` mapping; it does not detect or correct wiring. Use a HUB75 adapter
+power disconnected. The app defaults to 64×32 geometry and the
+`regular` mapping; configure the Bonnet override below. It does not detect wiring. Use a HUB75 adapter
 board if you want a simpler and sturdier connection than individual jumpers.
 The Pi and panel must each have adequate power; do not power the matrix from
 the Pi's GPIO header.
@@ -58,10 +57,15 @@ the Pi separately. Connect or change wiring only while both supplies are
 unplugged.
 
 The 64×32 panel and Bonnet have passed a colour and orientation test on a Pi 3
-Model B. The Zero 2 W still needs hardware testing. Screen designs and web
-previews retain their logical 32×16 canvas; `--panel-scale 2` expands each
-pixel to a 2×2 block on the physical panel. This fills the panel without
-changing saved screens or adding more layout detail.
+Model B. The Zero 2 W still needs hardware testing. Screen designs, transitions,
+pixel art and web previews now use a native 64×32 canvas. `--panel-scale 2`
+sends those pixels directly to the panel. Existing layout IDs and saved screen
+selections are retained; old pixel art is enlarged at render time without
+rewriting the original artwork. The drawing studio supports 14×14 icons,
+32×32 sprites and full 64×32 artwork, and can still edit older drawings.
+
+`--panel-scale 1` is a compatibility option for older 32×16 hardware: it averages
+each 2×2 group into one physical pixel. Fine text loses detail in that mode.
 
 For a 64×32 panel with an unmodified Adafruit Bonnet, create a systemd override
 with `sudo systemctl edit flightboard.service` after installing this version:
@@ -76,7 +80,7 @@ Set the maximum brightness in settings to 10% for the first test, then run
 `sudo systemctl daemon-reload` and `sudo systemctl restart flightboard.service`.
 This uses the Bonnet's convenience mode, without a soldered PWM jumper. The
 override persists across reboots and service-file updates; future app versions
-must include these hardware options. A normal install still defaults to 32×16
+must include these hardware options. A normal install defaults to 64×32
 with the `regular` mapping.
 
 A **Raspberry Pi Pico 2 W with headers is not a drop-in alternative** to a
@@ -85,7 +89,7 @@ use a microSD card, while this application requires Linux, Python packages,
 systemd and the Pi matrix driver. A Pico-based display would be a different
 hardware and software project. See [Raspberry Pi's Pico documentation](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html).
 
-## Install on a new Pi (tested 32×16 build)
+## Install on a new Pi
 
 1. Use [Raspberry Pi Imager](https://www.raspberrypi.com/software/) to flash
    Raspberry Pi OS Lite 64-bit. In Imager's customization screen, set a unique
