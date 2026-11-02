@@ -242,7 +242,7 @@ def validate_screen(screen, *, preview: bool = False) -> dict:
     style = screen.get("style", {"palette": None, "motion": "still"})
     _object(style, "Style", (), ("palette", "motion"))
     palette = style.get("palette")
-    _check(palette is None or (isinstance(palette, str) and palette in catalog.PALETTES),
+    _check(palette is None or (isinstance(palette, str) and palette in catalog.PALETTE_LOOKUP),
            "Unknown palette")
     motion = style.get("motion", "still")
     _check(isinstance(motion, str) and motion in catalog.MOTIONS, "Unknown motion")

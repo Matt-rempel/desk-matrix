@@ -342,7 +342,8 @@ class BlockBehaviourTests(unittest.TestCase):
     def test_palettes(self):
         item = screen("two", ("time", None, {}), ("date", None, {}), palette="phosphor")
         layers = self.render(item)
-        self.assertEqual((layers[0]["c"], layers[1]["c"]), ("#7CFF8A", "#2F8A48"))
+        self.assertEqual(layers[0]["grad"], ["#C2FF70", "#36D99C"])
+        self.assertEqual(layers[1]["c"], "#2F8A48")
         plain = self.render(screen("two", ("time", None, {}), ("date", "#123456", {})))
         self.assertEqual((plain[0]["c"], plain[1]["c"]), ("#FFFFFF", "#123456"))
         night = render_screen(catalog.BUILTINS["time-classic"], self.ctx, palette="night")

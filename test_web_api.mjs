@@ -5,6 +5,18 @@ const KEY = 'a'.repeat(64);
 const NAME = 'flightboard-key';
 let moduleNumber = 0;
 
+test('retired palettes remain resolvable without appearing in either picker', async () => {
+  const { normalizeCatalog } = await import('./web/store.js');
+  const catalog = normalizeCatalog({
+    palettes: { aurora: { name: 'Aurora', primary: ['#53F5C8', '#8B9CFF'] } },
+    legacy_palettes: { paper: { name: 'Paper', primary: '#F4F2EE' },
+      night: { name: 'Night red', primary: '#FF3B2F' } },
+  });
+  assert.deepEqual(catalog.palettes.map((p) => p.id), ['aurora']);
+  assert.equal(catalog.paletteById.get('paper').primary, '#F4F2EE');
+  assert.equal(catalog.paletteById.get('night').primary, '#FF3B2F');
+});
+
 function memoryStorage() {
   const entries = new Map();
   return {

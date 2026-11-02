@@ -607,5 +607,5 @@ class Player:
         if isinstance(first, str) and blocks.COLOR_RE.fullmatch(first):
             color = first
         if night:
-            color = catalog.PALETTES["night"]["primary"]
+            color = catalog.LEGACY_PALETTES["night"]["primary"]
         return [parse_color(color)] * PIXELS

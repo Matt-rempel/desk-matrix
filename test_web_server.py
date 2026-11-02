@@ -180,6 +180,19 @@ class ApiTests(ServerTestCase):
             self.assertIn(key, value)
         self.assertEqual(value, json.loads(json.dumps(catalog.catalog_json())))
 
+    def test_palette_picker_only_offers_gradients_that_render(self):
+        palettes = self.get_json("/api/catalog")["palettes"]
+        self.assertNotIn("paper", palettes)
+        self.assertNotIn("night", palettes)
+        screens = [{**CUSTOM_SCREEN, "layout": "full", "slots": [
+            {"block": "text", "color": None, "options": {"text": "COLOR"}}],
+                    "style": {"palette": pid, "motion": "still"}} for pid in palettes]
+        frames = self.post("/api/preview", {"screens": screens})["frames"]
+        for pid, frame in zip(palettes, frames):
+            with self.subTest(palette=pid):
+                colors = {frame[i:i + 6] for i in range(0, len(frame), 6)} - {"000000"}
+                self.assertGreater(len(colors), 8)
+
     def test_block_font_preview_and_save_use_the_same_choice(self):
         self.data_path.write_text(json.dumps({"weather": {"temp_c": 7, "high_c": 11, "low_c": -5,
                                                            "code": "sun"}}))

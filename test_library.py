@@ -45,6 +45,17 @@ def act(lib, action, now=NOW, **fields):
 
 
 class ValidationTests(unittest.TestCase):
+    def test_retired_palette_screens_survive_library_reload(self):
+        lib = default_library()
+        lib["screens"] = [screen(style={"palette": "paper", "motion": "still"}),
+                          screen(id="custom-" + "b" * 32,
+                                 style={"palette": "night", "motion": "still"})]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "library.json"
+            save_library(lib, path)
+            loaded = load_library(path)
+        self.assertEqual([s["style"]["palette"] for s in loaded["screens"]], ["paper", "night"])
+
     def test_block_font_persists_on_clock_temperature_and_text(self):
         for block in ("time", "temp", "text", "timer", "countdown", "feed"):
             with self.subTest(block=block):

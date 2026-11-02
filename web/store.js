@@ -90,12 +90,14 @@ export function normalizeCatalog(raw) {
     return { id, name: (!Array.isArray(v) && v.name) || LAYOUT_NAMES[id] || TITLE(id), slots };
   }).sort((a, b) => order(LAYOUT_ORDER, a.id) - order(LAYOUT_ORDER, b.id));
 
-  const palettes = asEntries(c.palettes).map(([id, v]) => ({
+  const normalizePalette = ([id, v]) => ({
     id, name: v.name || TITLE(id),
     primary: v.primary ?? v.a ?? v.grad ?? '#F4F2EE',
     secondary: v.secondary ?? v.b ?? '#8C8A84',
     glow: v.glow || null,
-  }));
+  });
+  const palettes = asEntries(c.palettes).map(normalizePalette);
+  const legacyPalettes = asEntries(c.legacy_palettes).map(normalizePalette);
 
   const blocks = asEntries(c.blocks).map(([id, v]) => ({
     id, name: v.name || TITLE(id), glyph: v.glyph || id.slice(0, 3).toUpperCase(),
@@ -130,7 +132,7 @@ export function normalizeCatalog(raw) {
   return {
     layouts, palettes, blocks, motions, transitions, icons, builtins, shelves, colors, art,
     layoutById: new Map(layouts.map((l) => [l.id, l])),
-    paletteById: new Map(palettes.map((p) => [p.id, p])),
+    paletteById: new Map([...legacyPalettes, ...palettes].map((p) => [p.id, p])),
     blockById: new Map(blocks.map((b) => [b.id, b])),
     builtinById: new Map(builtins.map((b) => [b.id, b])),
   };

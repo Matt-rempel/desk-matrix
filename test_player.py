@@ -247,7 +247,7 @@ class EffectTests(unittest.TestCase):
         self.assertIn(parse_color(catalog.INK), day)
         self.assertEqual(Player(lib, settings(night_enabled=True), now_fn=clock).tick(0, {})[0], day)
         night = Player(lib, settings(night_palette=True, night_enabled=True), now_fn=clock).tick(0, {})[0]
-        red = parse_color(catalog.PALETTES["night"]["primary"])
+        red = parse_color(catalog.LEGACY_PALETTES["night"]["primary"])
         self.assertIn(red, night)
         for pixel in night:
             self.assertTrue(pixel == BLACK or (pixel[0] >= pixel[1] and pixel[0] >= pixel[2]), pixel)

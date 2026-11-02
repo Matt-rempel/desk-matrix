@@ -36,18 +36,38 @@ for _id, _layout in LAYOUTS.items():
 PALETTES = {
     "ember": {"name": "Ember", "primary": ["#FFD23F", "#FF5A36"], "secondary": "#8C8A84",
               "glow": "rgba(255,120,54,0.30)"},
-    "phosphor": {"name": "Phosphor", "primary": "#7CFF8A", "secondary": "#2F8A48",
+    "phosphor": {"name": "Phosphor", "primary": ["#C2FF70", "#36D99C"], "secondary": "#2F8A48",
                  "glow": "rgba(124,255,138,0.22)"},
     "ice": {"name": "Ice", "primary": ["#E8F6FF", "#5AB8FF"], "secondary": "#5A7A99",
             "glow": "rgba(90,184,255,0.25)"},
-    "paper": {"name": "Paper", "primary": "#F4F2EE", "secondary": "#8C8A84",
-              "glow": "rgba(244,242,238,0.14)"},
     "neon": {"name": "Neon", "primary": ["#FF4DD8", "#6B7CFF"], "secondary": "#B98CFF",
              "glow": "rgba(200,90,255,0.28)"},
+    "aurora": {"name": "Aurora", "primary": ["#53F5C8", "#8B9CFF"], "secondary": "#79ABA9",
+               "glow": "rgba(83,245,200,0.28)"},
+    "ocean": {"name": "Ocean", "primary": ["#55E6FF", "#627BFF"], "secondary": "#718EB8",
+              "glow": "rgba(85,180,255,0.28)"},
+    "lagoon": {"name": "Lagoon", "primary": ["#A4FFD5", "#32C5C9"], "secondary": "#6BA6A0",
+               "glow": "rgba(50,197,201,0.28)"},
+    "sunset": {"name": "Sunset", "primary": ["#FFB86B", "#FF5C9F"], "secondary": "#B98598",
+               "glow": "rgba(255,120,145,0.28)"},
+    "orchid": {"name": "Orchid", "primary": ["#D7A4FF", "#FF69C2"], "secondary": "#AB85B6",
+               "glow": "rgba(215,130,255,0.28)"},
+    "citrus": {"name": "Citrus", "primary": ["#FFF078", "#96EC70"], "secondary": "#929F69",
+               "glow": "rgba(210,240,100,0.28)"},
+    "rose": {"name": "Rose", "primary": ["#FFD2BC", "#F778B4"], "secondary": "#B48D9D",
+             "glow": "rgba(255,160,190,0.28)"},
+}
+
+# Retain old IDs for saved screens and the scheduled night look, but do not offer
+# these retired colors in either editor's palette picker.
+LEGACY_PALETTES = {
+    "paper": {"name": "Paper", "primary": "#F4F2EE", "secondary": "#8C8A84",
+              "glow": "rgba(244,242,238,0.14)"},
     "night": {"name": "Night red", "primary": "#FF3B2F", "secondary": "#7A1E18",
               "glow": "rgba(255,59,47,0.22)"},
 }
-for _id, _palette in PALETTES.items():
+PALETTE_LOOKUP = {**LEGACY_PALETTES, **PALETTES}
+for _id, _palette in PALETTE_LOOKUP.items():
     _palette["id"] = _id
 
 MOTIONS = {
@@ -458,6 +478,7 @@ def catalog_json() -> dict:
     return copy.deepcopy({
         "display": {"width": WIDTH, "height": HEIGHT},
         "layouts": LAYOUTS, "palettes": PALETTES, "blocks": BLOCKS,
+        "legacy_palettes": LEGACY_PALETTES,
         "icons": {name: list(rows) for name, rows in ICONS.items()},
         "motions": MOTIONS, "transitions": TRANSITIONS, "colors": COLORS,
         "builtins": BUILTIN_SCREENS, "shelves": SHELVES, "legacy_ids": LEGACY_IDS,

@@ -1157,7 +1157,7 @@ def render_screen(screen: dict, ctx: RenderContext, palette: str | None = None,
     """Build the layer list for a screen. `palette` forces a palette over every slot color."""
     layout = catalog.LAYOUTS.get(screen.get("layout")) or catalog.LAYOUTS["full"]
     style = screen.get("style") if isinstance(screen.get("style"), dict) else {}
-    pal = catalog.PALETTES.get(palette or style.get("palette"))
+    pal = catalog.PALETTE_LOOKUP.get(palette or style.get("palette"))
     forced = palette is not None and pal is not None
     slots = screen.get("slots") if isinstance(screen.get("slots"), list) else []
     layers: list[dict] = []
