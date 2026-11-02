@@ -323,7 +323,7 @@ def _family_glyphs(family: str, width: int, height: int, stroke: int):
                              if source[min(len(source) - 1, x * len(source) // gw)]
                              & (1 << min(rows - 1, y * rows // height))) for x in range(gw))
             if family == "outline" and height >= 10:
-                edge = max(1, height // 15)
+                edge = 1
                 solid = {(x, y) for x, mask in enumerate(cols) for y in range(height) if mask & (1 << y)}
                 cols = tuple(sum(1 << y for y in range(height) if (x, y) in solid and
                                  any((x + dx, y + dy) not in solid
@@ -336,20 +336,31 @@ def _family_glyphs(family: str, width: int, height: int, stroke: int):
             segments = {"0": "abcedf", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc",
                         "5": "afgcd", "6": "afgecd", "7": "abc", "8": "abcdefg", "9": "abfgcd"}
             middle = (height - stroke) // 2
+            upper_height = (height - 1) // 2
+            lower_start = upper_height + 1
             for char, active in segments.items():
                 cols = [0] * width
                 rects = {"a": (stroke, 0, width - 2 * stroke, stroke),
                          "g": (stroke, middle, width - 2 * stroke, stroke),
                          "d": (stroke, height - stroke, width - 2 * stroke, stroke),
-                         "f": (0, stroke + 1, stroke, max(1, middle - stroke - 2)),
-                         "b": (width - stroke, stroke + 1, stroke, max(1, middle - stroke - 2)),
-                         "e": (0, middle + stroke + 1, stroke, max(1, height - middle - 2 * stroke - 2)),
-                         "c": (width - stroke, middle + stroke + 1, stroke, max(1, height - middle - 2 * stroke - 2))}
+                         "f": (0, 0, stroke, upper_height),
+                         "b": (width - stroke, 0, stroke, upper_height),
+                         "e": (0, lower_start, stroke, height - lower_start),
+                         "c": (width - stroke, lower_start, stroke, height - lower_start)}
                 for segment in active:
                     x0, y0, w, h = rects[segment]
                     for x in range(x0, x0 + w):
                         for y in range(y0, min(height, y0 + h)):
                             cols[x] |= 1 << y
+                # These digits lack cap/baseline bars. Keep their stems at
+                # the same full height as 0/8, rather than floating inside.
+                if char == "1":
+                    left = (width - stroke) // 2
+                    cols = [((1 << height) - 1) if left <= x < left + stroke else 0
+                            for x in range(width)]
+                elif char == "4":
+                    for x in range(width - stroke, width):
+                        cols[x] = (1 << height) - 1
                 table[char] = tuple(cols)
     # Match the blank advance used for a blinking colon in every family.
     dot = (1 << stroke) - 1

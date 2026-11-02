@@ -7,8 +7,8 @@ shows a native 64×32 sample produced by the same renderer as the panel.
 | --- | --- |
 | Standard | Fine stroke lettering and familiar clock digits |
 | Block | Solid, chunky pixel cells |
-| Outline | Hollow block lettering with a thin border |
-| Digital | Seven-segment clock digits, with stroke letters for words and units |
+| Outline | Hollow block lettering with a one-pixel border, including Max |
+| Digital | Full-height seven-segment digits, with a centered 1 and stroke letters for words and units |
 
 | Size | Maximum height |
 | --- | --- |
@@ -31,6 +31,10 @@ At Small and Tiny, Outline uses solid pixel cells and Digital uses compact
 digits to stay legible. Long values that cannot fit at Tiny scroll within
 their slot. Gradients and blinking colons work with every family; replacing
 the colon with a blank keeps the digits stationary.
+
+Digital's vertical segments reach the same cap height and baseline as its
+horizontal segments. The 1 is a centered continuous stem, and the 4 has a
+continuous right stem, avoiding the shortened appearance of inset bars.
 
 ## Storage and compatibility
 

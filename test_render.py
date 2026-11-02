@@ -11,6 +11,30 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_max_outline_border_is_one_pixel_thick(self):
+        glyph = render._family_glyphs("outline", 13, 30, 3)["0"]
+        self.assertTrue(all(column & 1 for column in glyph))
+        self.assertTrue(glyph[0] & (1 << 1))
+        self.assertTrue(glyph[-1] & (1 << 1))
+        self.assertTrue(all(not (column & (1 << 1)) for column in glyph[1:-1]))
+        self.assertTrue(all(not (column & (1 << 28)) for column in glyph[1:-1]))
+
+    def test_digital_one_and_four_share_the_other_digits_full_height(self):
+        for height, width, stroke in ((10, 6, 1), (14, 8, 1), (20, 11, 2), (30, 13, 3)):
+            table = render._family_glyphs("digital", width, height, stroke)
+            for digit in "0123456789":
+                with self.subTest(height=height, digit=digit):
+                    points = {(x, y) for x, col in enumerate(table[digit])
+                              for y in range(height) if col >> y & 1}
+                    self.assertEqual(min(y for _, y in points), 0)
+                    self.assertEqual(max(y for _, y in points), height - 1)
+            # A centered, unbroken 1 avoids a floating right-aligned pair of bars.
+            columns = [x for x, col in enumerate(table["1"]) if col]
+            self.assertLessEqual(abs((min(columns) + max(columns)) / 2 - (width - 1) / 2), .5)
+            self.assertTrue(all(table["1"][x] == (1 << height) - 1 for x in columns))
+            # The 4 has a continuous right stem from cap height to baseline.
+            self.assertEqual(table["4"][-1], (1 << height) - 1)
+
     def test_legacy_font_frames_remain_identical(self):
         expected = {
             "auto": "d88586a0b1f6d089925599a8891ee074597e81e01221a3113f6e6887c51843d3",
