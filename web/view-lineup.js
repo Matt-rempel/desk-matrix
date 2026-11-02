@@ -4,7 +4,7 @@ import { state, subscribe, clone, findScreen, customs, liveMomentId, act } from 
 import { screenMatrix } from './matrix.js';
 import { h, toggle, stepper, chips, sheet, toast, messageLine, confirmSheet, busy, nextId } from './ui.js';
 
-const DAY_LETTERS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+const DAY_LETTERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 const INTERRUPTS = [
   { id: 'plane_overhead', name: 'Plane overhead', defaults: { enabled: false, radius_nm: 3, max_alt_ft: 10000, seconds: 20 } },
@@ -38,18 +38,13 @@ export function daysLabel(days) {
   return d.map((i) => DAY_NAMES[i].slice(0, 3)).join(' ');
 }
 
-function glyphFor(m) {
-  const hr = parseInt((m.start || '0').slice(0, 2), 10);
-  if (hr >= 5 && hr < 9) return ['☼', 'tint-sun'];
-  if (hr >= 9 && hr < 17) return ['◷', 'tint-work'];
-  if (hr >= 17 && hr < 22) return ['◑', 'tint-eve'];
-  return ['☾', 'tint-night'];
-}
-
 export function render(root, { params }) {
   let lu = clone(state.library.lineup);
   let savedJSON = JSON.stringify(lu);
   const open = new Set();
+  const moreOpen = new Set();
+  const itemKeys = new WeakMap();
+  let itemSheet = null;
   const dirty = () => JSON.stringify(lu) !== savedJSON;
 
   const list = h('div', { class: 'moments' });
@@ -63,9 +58,9 @@ export function render(root, { params }) {
   const discardBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-small' }, 'Discard');
   saveBar.append(h('span', { class: 'savebar-text' }, 'Unsaved changes'), discardBtn, saveBtn);
 
-  const addMoment = h('button', { type: 'button', class: 'btn btn-dashed' }, '+ Add a time of day');
+  const addMoment = h('button', { type: 'button', class: 'btn btn-secondary lineup-add-schedule' }, '+ Add schedule');
   addMoment.addEventListener('click', () => {
-    const m = { id: `m-${randomHex(8)}`, name: 'New moment', start: '09:00', end: '17:00', days: [0, 1, 2, 3, 4], brightness: null, screens: [] };
+    const m = { id: `m-${randomHex(8)}`, name: 'New schedule', start: '09:00', end: '17:00', days: [0, 1, 2, 3, 4], brightness: null, screens: [] };
     lu.moments.push(m);
     open.add(m.id);
     changed();
@@ -74,21 +69,27 @@ export function render(root, { params }) {
 
   root.append(
     h('section', { class: 'pad intro' },
-      h('h1', { class: 'page-title' }, 'Your day, in screens'),
-      h('p', { class: 'lead' }, 'Each part of the day gets its own set. The matrix steps through the active set and switches sets on its own.')),
-    h('div', { class: 'pad-x' }, list, addMoment),
+      h('h1', { class: 'page-title' }, 'Lineup'),
+      h('p', { class: 'lead' }, 'Your screens play in order. Tap one to adjust its timing.')),
     h('section', { class: 'block', 'aria-labelledby': 'always-h' },
-      h('h2', { id: 'always-h', class: 'section-title' }, 'Any other time'),
-      h('p', { class: 'lead' }, 'Plays when no time of day matches.'), alwaysHost),
-    h('section', { class: 'block', 'aria-labelledby': 'int-h' },
-      h('h2', { id: 'int-h', class: 'section-title' }, 'Interruptions'),
-      h('p', { class: 'lead' }, 'Moments worth breaking into the lineup for.'), intHost),
-    h('section', { class: 'block', 'aria-labelledby': 'pi-h' },
-      h('h2', { id: 'pi-h', class: 'section-title' }, 'Pi alerts'),
-      h('p', { class: 'lead' }, 'Speak up when the Pi itself needs attention. Each one repeats while the problem lasts.'), piHost),
-    h('section', { class: 'block', 'aria-labelledby': 'tr-h' }, h('h2', { id: 'tr-h', class: 'eyebrow' }, 'Between screens'), trHost),
+      h('h2', { id: 'always-h', class: 'section-title' }, 'Default screens'),
+      h('p', { class: 'lead' }, 'Plays whenever no schedule is active.'), alwaysHost),
+    h('section', { class: 'block', 'aria-labelledby': 'schedules-h' },
+      h('h2', { id: 'schedules-h', class: 'section-title' }, 'Schedules'),
+      h('p', { class: 'lead' }, 'Different screens for different parts of your day.'), list, addMoment),
+    h('section', { class: 'block lineup-extras', 'aria-label': 'More lineup settings' },
+      foldout('Live alerts', 'Flights, weather, timers and games.', intHost),
+      foldout('Device alerts', 'Connection, power, temperature and storage.', piHost),
+      foldout('Transitions', 'How screens switch.', trHost)),
     h('div', { class: 'pad-x' }, msg),
     saveBar);
+
+  function foldout(title, description, body) {
+    return h('details', { class: 'lineup-foldout' },
+      h('summary', null, h('span', { class: 'foldout-copy' }, h('strong', null, title),
+        h('span', { class: 'row-detail' }, description)), h('span', { class: 'foldout-arrow', 'aria-hidden': 'true' }, '›')),
+      h('div', { class: 'foldout-body' }, body));
+  }
 
   function changed() {
     renderAll();
@@ -104,85 +105,93 @@ export function render(root, { params }) {
   function renderMoments() {
     const liveId = liveMomentId();
     list.replaceChildren(...lu.moments.map((m, mi) => {
-      const [glyph, tint] = glyphFor(m);
       const isLive = m.id === liveId;
       const editing = open.has(m.id);
       const titleId = `mt-${m.id}`;
-      const editBtn = h('button', { type: 'button', class: 'link-btn', 'aria-expanded': String(editing), 'aria-controls': `ed-${m.id}` }, editing ? 'Done' : 'Edit');
+      const editBtn = h('button', { type: 'button', class: 'link-btn', 'aria-expanded': String(editing), 'aria-controls': editing ? `ed-${m.id}` : null }, editing ? 'Close' : 'Edit schedule');
       editBtn.addEventListener('click', () => { if (editing) open.delete(m.id); else open.add(m.id); renderMoments(); });
       const card = h('section', { class: `moment${isLive ? ' is-live' : ''}`, 'aria-labelledby': titleId, dataset: { id: m.id } },
         h('div', { class: 'moment-head' },
-          h('span', { class: `moment-glyph ${tint}`, 'aria-hidden': 'true' }, glyph),
           h('div', { class: 'moment-titles' },
             h('h2', { id: titleId, class: 'moment-name' }, m.name || 'Untitled'),
             h('div', { class: 'moment-hours' }, `${hours(m)} · ${daysLabel(m.days)}`)),
           isLive ? h('span', { class: 'now-badge' }, 'Now') : null,
           editBtn),
-        screensStrip(m.screens, m.name, editing),
         editing ? momentEditor(m, mi) : null,
-        h('div', { class: 'moment-foot' },
-          h('span', null, ruleText(m.screens)),
-          h('span', null, m.brightness ? `Brightness ${m.brightness}%` : 'Device brightness')));
+        itemsEditor(m.screens, m.name));
       return card;
     }));
-    if (!lu.moments.length) list.append(h('p', { class: 'card-note' }, 'No times of day yet. Everything plays from “Any other time”.'));
+    if (!lu.moments.length) list.append(h('p', { class: 'card-note' }, 'No schedules yet. Your default screens play all day.'));
   }
 
-  function ruleText(items) {
-    if (!items.length) return 'No screens yet';
-    const tr = state.catalog.transitions.find((t) => t.id === lu.transition)?.name || lu.transition;
-    if (items.length === 1) return `One screen · ${items[0].seconds || 10} s`;
-    const secs = [...new Set(items.map((i) => i.seconds))];
-    return `${secs.length === 1 ? `Every ${secs[0]} s` : `${items.length} screens`} · ${tr}`;
+  function itemKey(it) {
+    if (!itemKeys.has(it)) itemKeys.set(it, nextId('queue-item'));
+    return itemKeys.get(it);
   }
 
-  function screensStrip(items, listName, editing) {
-    const strip = h('ul', { class: 'thumb-strip', role: 'list' });
-    if (!editing) {
-      items.forEach((it, i) => {
-        const scr = findScreen(it.screen_id);
-        const name = scr ? scr.name : 'Missing screen';
-        const remove = h('button', { type: 'button', class: 'thumb-remove', 'aria-label': `Remove ${name} from ${listName}` }, '×');
-        remove.addEventListener('click', () => {
-          items.splice(i, 1);
-          changed();
-          toast(`${name} removed. Save the lineup to apply.`);
-        });
-        strip.append(h('li', { class: 'thumb' },
-          h('div', { class: 'thumb-frame' }, scr ? screenMatrix(scr, { pitch: 2.5, glow: false, label: `${name} preview` }).el : h('span', { class: 'thumb-missing' }, '?'), remove),
-          h('span', { class: 'thumb-name' }, name)));
-      });
-    }
-    const add = h('button', { type: 'button', class: 'thumb-add', 'aria-label': `Add a screen to ${listName}` }, '+');
+  function itemsEditor(items, listName) {
+    const ol = h('ol', { class: 'queue-list', 'aria-label': `Screens in ${listName}` });
+    items.forEach((it, i) => {
+      const scr = findScreen(it.screen_id);
+      const name = scr ? scr.name : 'Missing screen';
+      const button = h('button', { type: 'button', id: itemKey(it), class: 'queue-entry',
+        'aria-label': `Edit ${name}, position ${i + 1} in ${listName}` },
+        h('span', { class: 'queue-order', 'aria-hidden': 'true' }, i + 1),
+        h('span', { class: 'queue-thumb' }, scr ? screenMatrix(scr, { pitch: 2, glow: false, label: `${name} preview` }).el : '?'),
+        h('span', { class: 'queue-copy' }, h('span', { class: 'queue-name' }, name),
+          h('span', { class: 'queue-duration' }, `${it.seconds || 10} seconds`)),
+        h('span', { class: 'queue-chevron', 'aria-hidden': 'true' }, '›'));
+      button.addEventListener('click', () => editItem(items, it, listName));
+      ol.append(h('li', null, button));
+    });
+    const add = h('button', { type: 'button', class: 'queue-add', 'aria-label': `Add a screen to ${listName}` }, '+ Add screen');
     add.addEventListener('click', () => pickScreen(listName, (sid) => {
       items.push({ screen_id: sid, seconds: 15 });
       changed();
     }));
-    strip.append(h('li', { class: 'thumb' }, add));
-    return strip;
+    return h('div', { class: 'queue' },
+      h('div', { class: 'queue-heading' }, h('h3', null, 'Screens'),
+        h('span', { class: 'row-detail' }, items.length > 1 ? 'Plays in this order' : '')),
+      items.length ? ol : h('p', { class: 'queue-empty' }, 'Add a screen to start this lineup.'), add);
   }
 
-  function itemsEditor(items) {
-    const ol = h('ol', { class: 'item-list' });
-    items.forEach((it, i) => {
-      const scr = findScreen(it.screen_id);
-      const name = scr ? scr.name : 'Missing screen';
-      const up = h('button', { type: 'button', class: 'mini-btn', 'aria-label': `Move ${name} up`, disabled: i === 0 }, '↑');
-      const down = h('button', { type: 'button', class: 'mini-btn', 'aria-label': `Move ${name} down`, disabled: i === items.length - 1 }, '↓');
-      const remove = h('button', { type: 'button', class: 'mini-btn mini-danger', 'aria-label': `Remove ${name}` }, '×');
-      up.addEventListener('click', () => { [items[i - 1], items[i]] = [items[i], items[i - 1]]; changed(); focusLater(`[aria-label="Move ${cssq(name)} up"]`); });
-      down.addEventListener('click', () => { [items[i + 1], items[i]] = [items[i], items[i + 1]]; changed(); focusLater(`[aria-label="Move ${cssq(name)} down"]`); });
-      remove.addEventListener('click', () => { items.splice(i, 1); changed(); });
-      ol.append(h('li', { class: 'item' },
-        h('div', { class: 'item-thumb' }, scr ? screenMatrix(scr, { pitch: 2, glow: false, label: '' }).el : null),
-        h('div', { class: 'item-main' },
-          h('div', { class: 'item-name' }, name),
-          stepper({ label: `seconds for ${name}`, value: it.seconds || 10, min: 5, max: 300, step: 5, format: (v) => `${v} s`,
-            onChange: (v) => { it.seconds = v; syncBar(); } })),
-        h('div', { class: 'item-actions' }, up, down, remove)));
+  function editItem(items, it, listName) {
+    const scr = findScreen(it.screen_id);
+    const name = scr?.name || 'Missing screen';
+    const durationId = nextId('duration');
+    const values = [...new Set([...Array.from({ length: 60 }, (_, i) => (i + 1) * 5), it.seconds || 10])].sort((a, b) => a - b);
+    const duration = h('select', { id: durationId, class: 'input' }, values.map((seconds) =>
+      h('option', { value: seconds, selected: seconds === (it.seconds || 10) }, `${seconds} seconds`)));
+    duration.addEventListener('change', () => { it.seconds = Number(duration.value); changed(); });
+    const i = items.indexOf(it);
+    const move = (delta) => {
+      const index = items.indexOf(it), next = index + delta;
+      if (index < 0 || next < 0 || next >= items.length) return;
+      [items[index], items[next]] = [items[next], items[index]];
+      itemSheet.close(); changed();
+    };
+    const up = h('button', { type: 'button', class: 'btn btn-secondary', disabled: i === 0 }, 'Move earlier');
+    const down = h('button', { type: 'button', class: 'btn btn-secondary', disabled: i === items.length - 1 }, 'Move later');
+    up.addEventListener('click', () => move(-1)); down.addEventListener('click', () => move(1));
+    const remove = h('button', { type: 'button', class: 'btn btn-danger-quiet' }, 'Remove from lineup');
+    remove.addEventListener('click', () => {
+      const index = items.indexOf(it);
+      if (index < 0) return;
+      items.splice(index, 1); itemSheet.close(); changed();
+      toast(`${name} removed. Save the lineup to apply.`);
     });
-    if (!items.length) ol.append(h('li', { class: 'card-note' }, 'No screens yet.'));
-    return ol;
+    itemSheet = sheet({ title: 'Screen settings', body: [
+      h('div', { class: 'queue-settings-preview' }, scr ? screenMatrix(scr, { pitch: 4, glow: false, label: `${name} preview` }).el : null,
+        h('strong', null, name)),
+      h('div', { class: 'field' }, h('label', { class: 'field-label', for: durationId }, 'Show for'), duration),
+      h('div', { class: 'queue-move' }, up, down), remove,
+      h('p', { class: 'card-note' }, 'Save the lineup to apply your changes.')],
+      onClose: () => {
+        itemSheet = null;
+        const selector = items.includes(it) ? `#${itemKey(it)}` : `[aria-label="Add a screen to ${cssq(listName)}"]`;
+        focusLater(selector);
+      },
+    });
   }
 
   function momentEditor(m, mi) {
@@ -216,18 +225,28 @@ export function render(root, { params }) {
     const brightVal = h('output', { class: 'mono-note' }, ownBright ? `${m.brightness}%` : '');
     const slider = h('input', { type: 'range', min: '1', max: '100', value: String(m.brightness || 60), class: 'range', 'aria-label': `Brightness for ${m.name}`, hidden: !ownBright });
     slider.addEventListener('input', () => { m.brightness = Number(slider.value); brightVal.textContent = `${slider.value}%`; syncBar(); });
-    const brightToggle = toggle({ label: 'Own brightness', pressed: ownBright, onChange: (v) => { m.brightness = v ? Number(slider.value) : null; changed(); } });
-    const del = h('button', { type: 'button', class: 'btn btn-danger-quiet btn-small' }, 'Delete this time of day');
+    const brightToggle = toggle({ label: 'Custom brightness', pressed: ownBright, onChange: (v) => { m.brightness = v ? Number(slider.value) : null; changed(); } });
+    const del = h('button', { type: 'button', class: 'btn btn-danger-quiet btn-small' }, 'Delete schedule');
     del.addEventListener('click', async () => {
       if (!(await confirmSheet({ title: `Delete “${m.name}”?`, text: 'Its screens stay in the gallery. Save the lineup to apply.' }))) return;
       lu.moments.splice(mi, 1);
       changed();
     });
-    const upM = h('button', { type: 'button', class: 'mini-btn', 'aria-label': `Move ${m.name} earlier in the list`, disabled: mi === 0 }, '↑');
-    const downM = h('button', { type: 'button', class: 'mini-btn', 'aria-label': `Move ${m.name} later in the list`, disabled: mi === lu.moments.length - 1 }, '↓');
+    const upM = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-label': `Move ${m.name} earlier in the list`, disabled: mi === 0 }, 'Move earlier');
+    const downM = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-label': `Move ${m.name} later in the list`, disabled: mi === lu.moments.length - 1 }, 'Move later');
     upM.addEventListener('click', () => { [lu.moments[mi - 1], lu.moments[mi]] = [lu.moments[mi], lu.moments[mi - 1]]; changed(); });
     downM.addEventListener('click', () => { [lu.moments[mi + 1], lu.moments[mi]] = [lu.moments[mi], lu.moments[mi + 1]]; changed(); });
 
+    const more = foldout('More schedule options', 'Brightness, priority and deletion.', [
+      h('div', { class: 'row row-flat' }, h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, 'Custom brightness'),
+        h('div', { class: 'row-detail' }, 'Used when Device › Follow the lineup is on')), brightVal, brightToggle), slider,
+      h('p', { class: 'card-note' }, 'If schedules overlap, the earlier one in the list is used.'),
+      h('div', { class: 'queue-move' }, upM, downM), del]);
+    more.open = moreOpen.has(m.id);
+    more.addEventListener('toggle', () => {
+      if (!more.isConnected) return;
+      if (more.open) moreOpen.add(m.id); else moreOpen.delete(m.id);
+    });
     return h('div', { class: 'moment-editor', id: `ed-${m.id}` },
       h('div', { class: 'field' }, h('label', { class: 'field-label', for: nameId }, 'Name'), nameInput),
       h('div', { class: 'field-pair time-pair' },
@@ -235,16 +254,11 @@ export function render(root, { params }) {
         h('div', { class: 'field' }, h('label', { class: 'field-label', for: endId }, 'Ends'), end)),
       m.start === m.end ? h('p', { class: 'msg is-error' }, 'Start and end must differ.') : null,
       h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Days'), days),
-      h('div', { class: 'row row-flat' }, h('div', { class: 'row-text' }, h('div', { class: 'row-title' }, 'Own brightness'), h('div', { class: 'row-detail' }, 'Used when Device › Follow the lineup is on')), brightVal, brightToggle),
-      slider,
-      h('div', { class: 'field-label' }, 'Screens, in order'),
-      itemsEditor(m.screens),
-      h('div', { class: 'row row-flat' }, h('div', { class: 'row-text' }, h('div', { class: 'row-detail' }, 'When times overlap, the first in the list wins.')), upM, downM),
-      del);
+      more);
   }
 
   function renderAlways() {
-    alwaysHost.replaceChildren(h('div', { class: 'moment' }, screensStrip(lu.always, 'Any other time', true), itemsEditor(lu.always)));
+    alwaysHost.replaceChildren(h('div', { class: 'moment default-lineup' }, itemsEditor(lu.always, 'Default screens')));
   }
 
   // ---- interruptions & transitions ---------------------------------------------
@@ -375,7 +389,7 @@ export function render(root, { params }) {
   function addToSheet(screenId, seconds) {
     const scr = findScreen(screenId);
     if (!scr) return;
-    const targets = [{ id: '__always', name: 'Any other time', detail: 'When no time of day matches' },
+    const targets = [{ id: '__always', name: 'Default screens', detail: 'When no schedule is active' },
       ...lu.moments.map((m) => ({ id: m.id, name: m.name, detail: `${hours(m)} · ${daysLabel(m.days)}` }))];
     let s = null;
     const body = [
@@ -421,6 +435,7 @@ export function render(root, { params }) {
     lu = clone(state.library.lineup);
     savedJSON = JSON.stringify(lu);
     open.clear();
+    moreOpen.clear();
     renderAll();
     msg.show('Changes discarded.');
   });
@@ -443,13 +458,14 @@ export function render(root, { params }) {
         if (card.classList.contains('is-live') !== isLive) { renderMoments(); break; }
       }
     } else if (what === 'library' && !dirty()) {
+      itemSheet?.close();
       lu = clone(state.library.lineup);
       renderAll();
       savedJSON = JSON.stringify(lu);
     }
   });
 
-  return () => { unsubscribe(); document.body.classList.remove('has-savebar'); };
+  return () => { itemSheet?.close(); unsubscribe(); document.body.classList.remove('has-savebar'); };
 }
 
 function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }
