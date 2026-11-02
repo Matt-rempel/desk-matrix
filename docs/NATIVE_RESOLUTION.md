@@ -13,6 +13,19 @@ the web frame contract is in `web/display.js`.
   large (14 px), big (10 px), 5×7 and 3×5 fonts; auto text prefers complete
   content before abbreviations. Charts, clock faces, radar and animations
   draw directly at native resolution.
+- Display, large and big text now use original stroke glyphs rasterized directly
+  at 20, 14 and 10 pixels tall. Diagonals and rounded counters use the available
+  pixels instead of magnifying 3×5/5×7 bitmaps. Degree marks are compact superscript
+  rings. This applies to every block using these fonts, including saved screens;
+  the explicit 5×7 and 3×5 styles remain unchanged. Clock colons retain the same
+  width as their blinking blank so the digits do not shift.
+- **Block** is an opt-in chunky font family in the Font picker, alongside Auto,
+  Display, Large, Big, Classic and Tiny. It retains the enlarged pixel style at
+  20, 14 or 10 pixels, fitting the available slot before falling back to the small
+  fonts. The picker is available on text/value blocks in Customize and Build.
+  It changes primary text while preserving smaller labels; saving retains the
+  choice without changing the lineup or pin. Auto continues using the finer
+  native glyphs. Existing screens default to Auto unless they saved another font.
 - Full flight cards show callsign, route and distance/altitude together.
   Hockey cards show both scores and status together. Other built-ins have
   revised spacing, larger values and native graphics.

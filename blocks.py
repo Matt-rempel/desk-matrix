@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import catalog
 from airline_logos import LOGOS, airline_for
-from render import ICONS, WIDTH, HEIGHT, fit_text, hex_color, jround, measure, mix, rasterize
+from render import ICONS, WIDTH, HEIGHT, FONTS, fit_text, hex_color, jround, measure, mix, rasterize
 
 WHITE = "#FFFFFF"
 INK, MUTED, FAINT, AMBER = catalog.INK, catalog.MUTED, catalog.FAINT, catalog.AMBER
@@ -225,7 +225,7 @@ def b_time(s: Slot) -> list[dict]:
     if s.opt("colon_blink") and now.second % 2:
         value = value.replace(":", " ")
     font = s.opt("font")
-    if font != "auto" and measure(value, font)[1] <= r.h:
+    if font == "block" or (font != "auto" and measure(value, font)[1] <= r.h):
         return [{"t": "text", "f": font, "s": value, "x": r.x, "y": r.y, "w": r.w, "h": r.h,
                  "scroll": True, **paint(s.color)}]
     return [T(r, [value], s.color)]
@@ -1014,6 +1014,9 @@ def b_text(s: Slot) -> list[dict]:
     text = " ".join(str(s.opt("text") or "").upper().split())
     if not text:
         return []
+    font = s.opt("font")
+    if font != "auto" and (font == "block" or measure(text, font)[1] <= r.h):
+        return [T(r, [text], s.color, f=font, scroll=True)]
     if not fit_text([text], r.w, r.h)[2]:
         return [T(r, [text], s.color)]
     for font, height, gap in (("large", 14, 2), ("big", 10, 2), ("5x7", 7, 2), ("3x5", 5, 1)):
@@ -1171,6 +1174,17 @@ def render_screen(screen: dict, ctx: RenderContext, palette: str | None = None,
             if strict:
                 raise
             slot_layers = s.placeholder(["?"])
+        # Font selection changes the main value(s), preserving smaller labels.
+        # Block resolves its own size to fit; fixed sizes retain the clock's
+        # established fallback behavior when a slot is too short.
+        font = s.opt("font")
+        if font and font != "auto" and block not in ("time", "text"):
+            text_layers = [layer for layer in slot_layers if layer.get("t") == "text"]
+            main_height = max((layer.get("h", s.rect.h) for layer in text_layers), default=0)
+            if font == "block" or FONTS[font][2] <= main_height:
+                slot_layers = [{**layer, "f": font, "scroll": True}
+                               if layer.get("t") == "text" and layer.get("h", s.rect.h) == main_height
+                               else layer for layer in slot_layers]
         layers += [{**layer, "_clip": tuple(s.rect)} for layer in slot_layers]
     return layers
 

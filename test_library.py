@@ -45,6 +45,16 @@ def act(lib, action, now=NOW, **fields):
 
 
 class ValidationTests(unittest.TestCase):
+    def test_block_font_persists_on_clock_temperature_and_text(self):
+        for block in ("time", "temp", "text", "timer", "countdown", "feed"):
+            with self.subTest(block=block):
+                item = screen(layout="full", slots=[{"block": block, "color": None,
+                                                     "options": {"font": "block"}}])
+                lib = default_library()
+                lib["screens"] = [item]
+                clean = validate_library(json.loads(json.dumps(lib)))
+                self.assertEqual(clean["screens"][0]["slots"][0]["options"]["font"], "block")
+
     def test_good_screen_is_normalized(self):
         clean = validate_screen(screen(name="  Morning glance "))
         self.assertEqual(clean["name"], "Morning glance")

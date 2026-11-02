@@ -31,8 +31,34 @@ class FontTests(unittest.TestCase):
         self.assertEqual(measure("hi", "5x7"), measure("HI", "5x7"))
 
     def test_colon_and_space_share_width_for_blinking(self):
-        for font in ("5x7", "3x5", "big"):
+        for font in ("5x7", "3x5", "big", "large", "display"):
             self.assertEqual(measure("10:24", font), measure("10 24", font))
+
+    def test_display_seven_has_fine_diagonal_and_full_height(self):
+        pixels = lit(rasterize([{"t": "text", "f": "display", "s": "7", "x": 0, "y": 0,
+                                 "a": "l", "c": "#FFFFFF"}]))
+        rows = {tuple(sorted(x for x, py in pixels if py == y)) for y in range(4, 20)}
+        self.assertGreater(len(rows), 5)  # Not three giant staircase positions from 3x5.
+        self.assertEqual(max(y for _, y in pixels), 19)
+
+    def test_large_degree_is_a_small_superscript_ring(self):
+        for font, height in (("display", 20), ("large", 14), ("big", 10)):
+            with self.subTest(font=font):
+                pixels = lit(rasterize([{"t": "text", "f": font, "s": "°", "x": 0, "y": 0,
+                                         "a": "l", "c": "#FFFFFF"}]))
+                self.assertLess(max(y for _, y in pixels), height // 2)
+                self.assertGreater(len(pixels), 4)
+
+    def test_block_style_uses_chunky_pixels_and_adapts_to_short_slots(self):
+        for height, bottom in ((21, 19), (15, 13), (10, 9), (7, 6)):
+            with self.subTest(height=height):
+                pixels = lit(rasterize([{"t": "text", "f": "block", "s": "10:24",
+                                         "x": 0, "y": 0, "w": 64, "h": height, "c": "#FFFFFF"}]))
+                self.assertEqual(max(y for _, y in pixels), bottom)
+        pixels = lit(rasterize([{"t": "text", "f": "block", "s": "7", "a": "l",
+                                 "x": 0, "y": 0, "w": 64, "h": 20, "c": "#FFFFFF"}]))
+        self.assertEqual({(x, y) for x in range(12) for y in range(4)},
+                         {(x, y) for x, y in pixels if y < 4})
 
     def test_design_punctuation_exists_in_both_fonts(self):
         for char in "°%+><!'?":

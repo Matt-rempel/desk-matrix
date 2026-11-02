@@ -107,10 +107,65 @@ ICONS = {
     "delta": ("...#...", "..###..", "..###..", ".##.##.", ".##.##.", "#######", "#######"),
 }
 
-SPACE = {"5x7": 2, "3x5": 1}
-FONTS = {"display": ("3x5", 4, 20), "large": ("5x7", 2, 14),
-         "big": ("3x5", 2, 10), "5x7": ("5x7", 1, 7), "3x5": ("3x5", 1, 5)}
+# Stroke outlines are rasterized at the target pixel size, rather than enlarging
+# a tiny bitmap. Coordinates span 0..10 horizontally and 0..18 vertically.
+# These original glyphs keep diagonals fine and counters open on the LED panel.
+STROKES = {
+    "0": (((2, 0), (8, 0), (10, 3), (10, 15), (8, 18), (2, 18), (0, 15), (0, 3), (2, 0)),),
+    "1": (((2, 3), (5, 0), (5, 18)), ((1, 18), (9, 18))),
+    "2": (((0, 3), (2, 0), (8, 0), (10, 3), (10, 6), (0, 16), (0, 18), (10, 18)),),
+    "3": (((0, 0), (8, 0), (10, 3), (10, 6), (7, 9), (10, 12), (10, 15), (8, 18), (0, 18)),
+          ((3, 9), (7, 9))),
+    "4": (((8, 18), (8, 0), (0, 12), (10, 12)),),
+    "5": (((10, 0), (0, 0), (0, 8), (8, 8), (10, 11), (10, 15), (8, 18), (0, 18)),),
+    "6": (((10, 0), (3, 0), (0, 4), (0, 15), (2, 18), (8, 18), (10, 15), (10, 11), (8, 8), (0, 8)),),
+    "7": (((0, 0), (10, 0), (2, 18)),),
+    "8": (((2, 0), (8, 0), (10, 3), (10, 6), (8, 9), (2, 9), (0, 6), (0, 3), (2, 0)),
+          ((2, 9), (0, 12), (0, 15), (2, 18), (8, 18), (10, 15), (10, 12), (8, 9))),
+    "9": (((10, 10), (2, 10), (0, 7), (0, 3), (2, 0), (8, 0), (10, 3), (10, 14), (7, 18), (0, 18)),),
+    "A": (((0, 18), (0, 6), (5, 0), (10, 6), (10, 18)), ((0, 10), (10, 10))),
+    "B": (((0, 18), (0, 0), (7, 0), (10, 3), (10, 6), (7, 9), (0, 9)),
+          ((7, 9), (10, 12), (10, 15), (7, 18), (0, 18))),
+    "C": (((10, 2), (8, 0), (2, 0), (0, 3), (0, 15), (2, 18), (8, 18), (10, 16)),),
+    "D": (((0, 18), (0, 0), (6, 0), (10, 4), (10, 14), (6, 18), (0, 18)),),
+    "E": (((10, 0), (0, 0), (0, 18), (10, 18)), ((0, 9), (8, 9))),
+    "F": (((10, 0), (0, 0), (0, 18)), ((0, 9), (8, 9))),
+    "G": (((10, 3), (8, 0), (2, 0), (0, 3), (0, 15), (2, 18), (10, 18), (10, 10), (6, 10)),),
+    "H": (((0, 0), (0, 18)), ((10, 0), (10, 18)), ((0, 9), (10, 9))),
+    "I": (((2, 0), (8, 0)), ((5, 0), (5, 18)), ((2, 18), (8, 18))),
+    "J": (((0, 14), (0, 16), (2, 18), (7, 18), (10, 15), (10, 0)),),
+    "K": (((0, 0), (0, 18)), ((10, 0), (0, 10), (10, 18))),
+    "L": (((0, 0), (0, 18), (10, 18)),),
+    "M": (((0, 18), (0, 0), (5, 9), (10, 0), (10, 18)),),
+    "N": (((0, 18), (0, 0), (10, 18), (10, 0)),),
+    "O": (((2, 0), (8, 0), (10, 3), (10, 15), (8, 18), (2, 18), (0, 15), (0, 3), (2, 0)),),
+    "P": (((0, 18), (0, 0), (8, 0), (10, 3), (10, 7), (8, 10), (0, 10)),),
+    "Q": (((2, 0), (8, 0), (10, 3), (10, 14), (7, 18), (2, 18), (0, 15), (0, 3), (2, 0)),
+          ((6, 13), (10, 18))),
+    "R": (((0, 18), (0, 0), (8, 0), (10, 3), (10, 6), (8, 9), (0, 9)), ((5, 9), (10, 18))),
+    "S": (((10, 2), (8, 0), (2, 0), (0, 3), (0, 6), (2, 9), (8, 9), (10, 12), (10, 15), (8, 18), (2, 18), (0, 16)),),
+    "T": (((0, 0), (10, 0)), ((5, 0), (5, 18))),
+    "U": (((0, 0), (0, 15), (2, 18), (8, 18), (10, 15), (10, 0)),),
+    "V": (((0, 0), (5, 18), (10, 0)),),
+    "W": (((0, 0), (0, 18), (5, 10), (10, 18), (10, 0)),),
+    "X": (((0, 0), (10, 18)), ((10, 0), (0, 18))),
+    "Y": (((0, 0), (5, 9), (10, 0)), ((5, 9), (5, 18))),
+    "Z": (((0, 0), (10, 0), (0, 18), (10, 18)),),
+    "-": (((2, 9), (8, 9)),), "+": (((1, 9), (9, 9)), ((5, 4), (5, 14))),
+    "/": (((10, 0), (0, 18)),), ">": (((2, 3), (8, 9), (2, 15)),),
+    "<": (((8, 3), (2, 9), (8, 15)),),
+    "?": (((0, 3), (2, 0), (8, 0), (10, 3), (10, 6), (5, 10), (5, 12)), ((5, 18), (5, 18))),
+    "!": (((5, 0), (5, 12)), ((5, 18), (5, 18))),
+    "'": (((5, 0), (4, 3)),), ".": (((5, 18), (5, 18)),),
+    ",": (((5, 16), (4, 18)),),
+}
+
+SPACE = {"5x7": 2, "3x5": 1, "native20": 2, "native14": 2, "native10": 2}
+FONTS = {"display": ("native20", 1, 20), "large": ("native14", 1, 14),
+         "big": ("native10", 1, 10), "5x7": ("5x7", 1, 7), "3x5": ("3x5", 1, 5),
+         "block": ("3x5", 4, 20), "block-large": ("5x7", 2, 14), "block-big": ("3x5", 2, 10)}
 AUTO_ORDER = ("display", "large", "big", "5x7", "3x5")
+BLOCK_ORDER = ("block", "block-large", "block-big", "5x7", "3x5")
 SCROLL_HOLD = 2.0
 SCROLL_SPEED = 8.0
 
@@ -139,7 +194,47 @@ def _build_glyphs() -> dict[str, dict[str, tuple[int, ...]]]:
     for char, rows in FONT3.items():
         cols = tuple(sum(1 << r for r in range(5) if (rows[r] >> (2 - c)) & 1) for c in range(3))
         three[char] = _trim(cols, char)
-    return {"5x7": five, "3x5": three}
+    return {"5x7": five, "3x5": three,
+            "native20": _stroke_glyphs(11, 20, 2),
+            "native14": _stroke_glyphs(8, 14, 2),
+            "native10": _stroke_glyphs(6, 10, 1)}
+
+
+def _stroke_glyphs(width: int, height: int, stroke: int) -> dict[str, tuple[int, ...]]:
+    glyphs = {}
+    for char, paths in STROKES.items():
+        cols = [0] * width
+        for path in paths:
+            points = [(int(x * (width - stroke) / 10 + .5),
+                       int(y * (height - stroke) / 18 + .5)) for x, y in path]
+            for (x0, y0), (x1, y1) in zip(points, points[1:]):
+                steps = max(abs(x1 - x0), abs(y1 - y0), 1)
+                for i in range(steps + 1):
+                    x = int(x0 + (x1 - x0) * i / steps + .5)
+                    y = int(y0 + (y1 - y0) * i / steps + .5)
+                    for dx in range(stroke):
+                        for dy in range(stroke):
+                            cols[x + dx] |= 1 << (y + dy)
+        glyphs[char] = _trim(tuple(cols), char)
+    # Clock separators keep the same advance when replaced with a blank.
+    dot = (1 << stroke) - 1
+    glyphs[":"] = tuple((dot << (height // 3)) | (dot << (2 * height // 3)) for _ in range(2))
+    ring = {20: ("011110", "110011", "110011", "110011", "110011", "011110"),
+            14: ("0110", "1001", "1001", "0110"),
+            10: ("111", "101", "111")}[height]
+    glyphs["°"] = tuple(sum((row[x] == "1") << y for y, row in enumerate(ring))
+                        for x in range(len(ring[0])))
+    cols = [0] * width
+    for y in range(height):
+        x = int((width - 1) * (height - 1 - y) / (height - 1) + .5)
+        cols[x] |= 1 << y
+    for ox, oy in ((0, 0), (width - 3, height - 3)):
+        for y, row in enumerate(("111", "101", "111")):
+            for x, bit in enumerate(row):
+                if bit == "1":
+                    cols[ox + x] |= 1 << (oy + y)
+    glyphs["%"] = tuple(cols)
+    return glyphs
 
 
 GLYPHS = _build_glyphs()
@@ -165,11 +260,11 @@ def measure(text: str, font: str) -> tuple[int, int]:
     return width, height
 
 
-def fit_text(strings, width: int, height: int = HEIGHT) -> tuple[str, str, bool]:
+def fit_text(strings, width: int, height: int = HEIGHT, *, fonts=AUTO_ORDER) -> tuple[str, str, bool]:
     """Pick (font, string, scroll) the way `auto` text does."""
     candidates = [strings] if isinstance(strings, str) else [str(s) for s in strings] or [""]
     for text in candidates:
-        for font in AUTO_ORDER:
+        for font in fonts:
             if FONTS[font][2] > height:
                 continue
             if measure(text, font)[0] <= width:
@@ -269,8 +364,9 @@ def _text(canvas: _Canvas, layer: dict, elapsed: float) -> None:
     rx, ry = layer.get("x") or 0, layer.get("y") or 0
     rw = layer["w"] if layer.get("w") is not None else WIDTH - rx
     scroll, clip = bool(layer.get("scroll")), bool(layer.get("clip"))
-    if font == "auto":
-        font, text, forced = fit_text(text, rw, layer.get("h") or HEIGHT)
+    if font in ("auto", "block"):
+        order = BLOCK_ORDER if font == "block" else AUTO_ORDER
+        font, text, forced = fit_text(text, rw, layer.get("h") or HEIGHT, fonts=order)
         scroll = scroll or forced
     elif not isinstance(text, str):
         text = text[0] if text else ""
@@ -292,7 +388,7 @@ def _text(canvas: _Canvas, layer: dict, elapsed: float) -> None:
         if index:
             cx += 1
         for ci, mask in enumerate(cols or ()):
-            for r in range(7):
+            for r in range(height // scale):
                 if not (mask >> r) & 1:
                     continue
                 for dx in range(scale):

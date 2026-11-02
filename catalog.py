@@ -196,6 +196,18 @@ BLOCKS = {
     "fire": _block("Ember", "▲", "play", {}, 1, 1),
     "none": _block("Empty", "—", "basic", {}, 1, 1),
 }
+
+# A shared picker keeps saved option values stable and works in both editors.
+TEXT_FONT_BLOCKS = ("time", "date", "weekday", "temp", "rain", "sun_time", "flight",
+                    "plane_count", "countdown", "timer", "text", "progress", "feed", "nhl",
+                    "calendar_next", "metar", "iss", "alert", "health", "world_clock", "fuzzy_time")
+for _block_id in TEXT_FONT_BLOCKS:
+    BLOCKS[_block_id]["options"]["font"] = {
+        "type": "enum", "default": "auto", "label": "Font",
+        "choices": ["auto", "block", "display", "large", "big", "5x7", "3x5"],
+        "labels": {"auto": "Auto", "block": "Block", "display": "Display", "large": "Large",
+                   "big": "Big", "5x7": "Classic", "3x5": "Tiny"},
+    }
 for _id, _meta in BLOCKS.items():
     _meta["id"] = _id
 

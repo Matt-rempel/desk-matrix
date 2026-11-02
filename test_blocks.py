@@ -34,6 +34,30 @@ def texts(layers):
     return [layer["s"] for layer in layers if layer["t"] == "text"]
 
 
+class TextFontSelectionTests(unittest.TestCase):
+    def test_block_temperature_changes_primary_value_but_not_high_low_label(self):
+        ctx = sample_context()
+        automatic = render_screen(one("temp"), ctx, strict=True)
+        chunky = render_screen(one("temp", font="block"), ctx, strict=True)
+        self.assertEqual(chunky[-1], automatic[-1])
+        self.assertEqual(chunky[0], automatic[0])  # Weather icon is unchanged.
+        self.assertEqual(chunky[1]["f"], "block")
+        self.assertNotEqual(rasterize(automatic), rasterize(chunky))
+
+    def test_block_style_renders_in_every_supported_block_and_slot(self):
+        for block in catalog.TEXT_FONT_BLOCKS:
+            options = {"font": "block"}
+            if block == "text":
+                options["text"] = "HELLO"
+            for layout, slots in catalog.LAYOUTS.items():
+                with self.subTest(block=block, layout=layout):
+                    item = screen(layout, *((block, None, options) for _ in slots["slots"]))
+                    layers = render_screen(item, sample_context(), strict=True)
+                    pixels = rasterize(layers)
+                    self.assertEqual(len(pixels), 2048)
+                    self.assertTrue(any(any(p) for p in pixels))
+
+
 class FlightLookupRegressionTests(unittest.TestCase):
     def test_nearby_picker_draft_uses_only_the_selected_aircraft(self):
         plane = {"callsign": "WEN3739", "route": "MSP>YQR"}
