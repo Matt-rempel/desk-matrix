@@ -35,6 +35,22 @@ def texts(layers):
 
 
 class FlightLookupRegressionTests(unittest.TestCase):
+    def test_full_flight_show_selection_changes_the_headline_and_pixels(self):
+        plane = {"callsign": "WS2231", "icao": "WJA2231", "route": "MBJ>YEG",
+                 "origin": "MBJ", "destination": "YEG", "remaining_min": 127,
+                 "distance_nm": 80, "altitude_ft": 38000, "progress": .75}
+        ctx = RenderContext(data={"aircraft": {"nearby": [plane], "tracked": plane}})
+        for source in ("nearby", "follow"):
+            frames = []
+            for field in ("callsign", "route", "detail"):
+                item = one("flight", source=source, callsign="WS2231", field=field)
+                layers = render_screen(item, ctx)
+                expected = {"callsign": "WS2231", "route": "MBJ>YEG",
+                            "detail": "2H07 LEFT" if source == "follow" else "80NM 38K"}[field]
+                self.assertEqual(texts(layers)[0][0], expected, (source, field))
+                frames.append(tuple(frame(item, ctx)))
+            self.assertEqual(len(set(frames)), 3, source)
+
     def test_preview_selects_requested_flight_from_follow_map(self):
         ctx = RenderContext(data={"aircraft": {
             "tracked": {"callsign": "ACA150", "route": "YYC>YYZ"},

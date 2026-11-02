@@ -8,6 +8,13 @@ Tap **Check flight** before saving. It reports the callsign searched and whether
 the live feed has a position. The check does not change the matrix, pin a screen,
 or save edits. After saving, tap **Show now** to display the flight.
 
+**Show → Callsign / Route / Details** chooses the top line of a full-panel flight
+card. The other fields remain below it, with the airline logo and followed-flight
+progress bar retained. Details shows estimated time remaining for a followed
+flight, or distance and altitude for nearby flights. In smaller layout slots,
+Show selects the single field displayed. Previews and the matrix use this same
+selection.
+
 The app asks [adsb.fi](https://github.com/adsbfi/opendata) for live positions,
 globally for a followed flight, independently of the nearby-flight radius.
 [ADSBdb](https://github.com/mrjackwills/adsbdb) translates passenger flight numbers

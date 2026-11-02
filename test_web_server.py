@@ -297,6 +297,18 @@ class ApiTests(ServerTestCase):
 
 
 class FlightCheckApiTests(ServerTestCase):
+    def test_show_selection_produces_three_different_full_flight_previews(self):
+        plane = {"callsign": "WS2231", "icao": "WJA2231", "route": "MBJ>YEG",
+                 "remaining_min": 127, "progress": .75, "distance_nm": 80, "altitude_ft": 38000}
+        self.data_path.write_text(json.dumps({"aircraft": {"nearby": [plane], "tracked": plane}}))
+        for source in ("nearby", "follow"):
+            screens = [{**CUSTOM_SCREEN, "layout": "full", "slots": [
+                {"block": "flight", "color": "#FFFFFF", "options": {
+                    "source": source, "callsign": "WS2231", "field": field}}]}
+                for field in ("callsign", "route", "detail")]
+            frames = self.post("/api/preview", {"screens": screens})["frames"]
+            self.assertEqual(len(set(frames)), 3, source)
+
     def test_check_is_authenticated_validated_and_does_not_save_screen_or_pin(self):
         from flight_lookup import requested_flight
         self.assertStatus(401, self.post, "/api/flight-check", {"callsign": "WS2231"}, key=None)

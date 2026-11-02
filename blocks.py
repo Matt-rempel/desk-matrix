@@ -517,10 +517,19 @@ def b_flight(s: Slot) -> list[dict]:
         return [T(r, strings[s.opt("field")], s.color)]
     if mode == "follow":
         return _follow_card(s, plane, strings)
+    headline, secondary, footer = _flight_card_fields(s, strings)
     return [flight_logo(s, plane),
-            T(r.sub(24, 0, r.w - 24, 10), strings["callsign"], s.color),
-            T(r.sub(24, 12, r.w - 24, 9), strings["route"], s.accent("#8FD3FF")),
-            T(r.sub(0, 23, r.w, 9), strings["detail"], s.accent(MUTED))]
+            T(r.sub(24, 0, r.w - 24, 10), headline, s.color),
+            T(r.sub(24, 12, r.w - 24, 9), secondary, s.accent("#8FD3FF")),
+            T(r.sub(0, 23, r.w, 9), footer, s.accent(MUTED))]
+
+
+def _flight_card_fields(s: Slot, strings: dict) -> tuple[list[str], list[str], list[str]]:
+    """Show chooses the headline; keep the other two fields as context."""
+    order = {"callsign": ("callsign", "route", "detail"),
+             "route": ("route", "callsign", "detail"),
+             "detail": ("detail", "callsign", "route")}[s.opt("field")]
+    return tuple(strings[key] for key in order)
 
 
 def flight_logo(s: Slot, plane: dict) -> dict:
@@ -537,25 +546,24 @@ def flight_logo(s: Slot, plane: dict) -> dict:
 
 def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
     r = s.rect
+    origin = str(plane.get("origin") or "").upper()
+    destination = str(plane.get("destination") or "").upper()
+    if origin and destination:
+        strings = {**strings, "route": [f"{origin}>{destination}"]}
+    headline, secondary, footer = _flight_card_fields(s, strings)
     progress = plane.get("progress")
     value = max(0.0, min(1.0, float(progress))) if isinstance(progress, (int, float)) else 0.0
     accent = s.accent(MUTED)
     marker = max(r.x + 1, min(r.x + r.w - 2, r.x + jround(value * r.w)))
     layers = [flight_logo(s, plane),
-              T(r.sub(24, 0, 40, 10), strings["callsign"][:1], s.color),
-              T(r.sub(24, 12, 40, 9), strings["route"], accent),
+              T(r.sub(24, 0, 40, 10), headline, s.color),
+              T(r.sub(24, 12, 40, 9), secondary, accent),
               {"t": "bar", "x": r.x, "y": r.y + 24, "w": r.w, "h": 2, "v": value,
                "c": s.icon_color(AMBER), "bg": "#2A2A2E"}]
     if isinstance(progress, (int, float)):
         layers.append({"t": "px", "x": marker - 1, "y": r.y + 23, "rows": [".#.", "###", ".#."],
                        "pal": {"#": solid(s.color)}})
-    origin = str(plane.get("origin") or "").upper()
-    destination = str(plane.get("destination") or "").upper()
-    if not (origin and destination) and ">" in str(plane.get("route") or ""):
-        origin, destination = str(plane["route"]).upper().split(">", 1)
-    if origin and destination:
-        layers[2] = T(r.sub(24, 12, 40, 9), [f'{origin}>{destination}'], accent)
-    layers.append(T(r.sub(0, 27, r.w, 5), strings['detail'], accent))
+    layers.append(T(r.sub(0, 27, r.w, 5), footer, accent))
     return layers
 
 
