@@ -230,7 +230,7 @@ export function render(root, { params }) {
 
     return h('div', { class: 'moment-editor', id: `ed-${m.id}` },
       h('div', { class: 'field' }, h('label', { class: 'field-label', for: nameId }, 'Name'), nameInput),
-      h('div', { class: 'field-pair' },
+      h('div', { class: 'field-pair time-pair' },
         h('div', { class: 'field' }, h('label', { class: 'field-label', for: startId }, 'Starts'), start),
         h('div', { class: 'field' }, h('label', { class: 'field-label', for: endId }, 'Ends'), end)),
       m.start === m.end ? h('p', { class: 'msg is-error' }, 'Start and end must differ.') : null,
