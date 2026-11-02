@@ -11,6 +11,7 @@ const TYPES = [
   { id: 'big', layout: 'bigsmall', font: 'big', name: 'Big', note: 'Two-row digits', size: 'lg' },
   { id: 'classic', layout: 'two', font: '5x7', name: 'Classic', note: '5 × 7 pixels', size: 'md' },
   { id: 'tiny', layout: 'three', font: '3x5', name: 'Tiny', note: 'Three lines', size: 'sm' },
+  { id: 'max', layout: 'bigsmall', font: 'max', name: 'Max', note: 'Fills the space', size: 'lg' },
 ];
 const COLOR_OPTIONS = ['accent', 'icon_color'];
 const SECOND = [
@@ -300,7 +301,7 @@ export function render(root, { id, go }) {
 
   function clockSections() {
     const frag = h('div');
-    const typeGroup = h('div', { class: 'grid-3', role: 'group', 'aria-label': 'Type' });
+    const typeGroup = h('div', { class: 'grid-4', role: 'group', 'aria-label': 'Type' });
     const secondGroup = h('div', { class: 'chips', role: 'group', 'aria-label': 'Second line' });
     const redraw = () => {
       const type = typeFromFont(work.slots[0]?.options?.font) || (work.layout === 'full' ? lastType : typeFromLayout(work.layout));

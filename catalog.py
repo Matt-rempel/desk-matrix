@@ -224,8 +224,8 @@ TEXT_FONT_BLOCKS = ("time", "date", "weekday", "temp", "rain", "sun_time", "flig
 for _block_id in TEXT_FONT_BLOCKS:
     BLOCKS[_block_id]["options"]["font"] = {
         "type": "enum", "default": "auto", "label": "Font",
-        "choices": ["auto", "block", "display", "large", "big", "5x7", "3x5"],
-        "labels": {"auto": "Auto", "block": "Block", "display": "Display", "large": "Large",
+        "choices": ["auto", "max", "block", "display", "large", "big", "5x7", "3x5"],
+        "labels": {"auto": "Auto", "max": "Max", "block": "Block", "display": "Display", "large": "Large",
                    "big": "Big", "5x7": "Classic", "3x5": "Tiny"},
     }
 for _id, _meta in BLOCKS.items():

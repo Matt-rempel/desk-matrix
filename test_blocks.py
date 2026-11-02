@@ -45,8 +45,14 @@ class TextFontSelectionTests(unittest.TestCase):
         self.assertNotEqual(rasterize(automatic), rasterize(chunky))
 
     def test_block_style_renders_in_every_supported_block_and_slot(self):
+        self.check_adaptive_font("block")
+
+    def test_max_style_renders_in_every_supported_block_and_slot(self):
+        self.check_adaptive_font("max")
+
+    def check_adaptive_font(self, font):
         for block in catalog.TEXT_FONT_BLOCKS:
-            options = {"font": "block"}
+            options = {"font": font}
             if block == "text":
                 options["text"] = "HELLO"
             for layout, slots in catalog.LAYOUTS.items():

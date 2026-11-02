@@ -194,18 +194,24 @@ class ApiTests(ServerTestCase):
                 self.assertGreater(len(colors), 8)
 
     def test_block_font_preview_and_save_use_the_same_choice(self):
+        self.check_font_preview_and_save("block")
+
+    def test_max_font_preview_and_save_use_the_same_choice(self):
+        self.check_font_preview_and_save("max")
+
+    def check_font_preview_and_save(self, font):
         self.data_path.write_text(json.dumps({"weather": {"temp_c": 7, "high_c": 11, "low_c": -5,
                                                            "code": "sun"}}))
         before = self.get_json("/api/library")
         automatic = {**CUSTOM_SCREEN, "layout": "full", "slots": [
             {"block": "temp", "color": "#FFFFFF", "options": {"which": "now"}}]}
         chunky = copy.deepcopy(automatic)
-        chunky["slots"][0]["options"]["font"] = "block"
+        chunky["slots"][0]["options"]["font"] = font
         frames = self.post("/api/preview", {"screens": [automatic, chunky]})["frames"]
         self.assertNotEqual(frames[0], frames[1])
         self.assertEqual(self.get_json("/api/library"), before)
         saved = self.post("/api/library", {"action": "save_screen", "screen": chunky})
-        self.assertEqual(saved["screens"][-1]["slots"][0]["options"]["font"], "block")
+        self.assertEqual(saved["screens"][-1]["slots"][0]["options"]["font"], font)
         self.assertEqual(saved["pinned"], before["pinned"])
 
     def test_library_round_trip(self):

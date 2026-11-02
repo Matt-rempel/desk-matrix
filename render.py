@@ -160,8 +160,9 @@ STROKES = {
     ",": (((5, 16), (4, 18)),),
 }
 
-SPACE = {"5x7": 2, "3x5": 1, "native20": 2, "native14": 2, "native10": 2}
+SPACE = {"5x7": 2, "3x5": 1, "native20": 2, "native14": 2, "native10": 2, "native30": 3}
 FONTS = {"display": ("native20", 1, 20), "large": ("native14", 1, 14),
+         "max": ("native30", 1, 30),
          "big": ("native10", 1, 10), "5x7": ("5x7", 1, 7), "3x5": ("3x5", 1, 5),
          "block": ("3x5", 4, 20), "block-large": ("5x7", 2, 14), "block-big": ("3x5", 2, 10)}
 AUTO_ORDER = ("display", "large", "big", "5x7", "3x5")
@@ -197,9 +198,11 @@ def _build_glyphs() -> dict[str, dict[str, tuple[int, ...]]]:
     return {"5x7": five, "3x5": three,
             "native20": _stroke_glyphs(11, 20, 2),
             "native14": _stroke_glyphs(8, 14, 2),
-            "native10": _stroke_glyphs(6, 10, 1)}
+            "native10": _stroke_glyphs(6, 10, 1),
+            "native30": _stroke_glyphs(13, 30, 3)}
 
 
+@lru_cache(maxsize=128)
 def _stroke_glyphs(width: int, height: int, stroke: int) -> dict[str, tuple[int, ...]]:
     glyphs = {}
     for char, paths in STROKES.items():
@@ -218,10 +221,17 @@ def _stroke_glyphs(width: int, height: int, stroke: int) -> dict[str, tuple[int,
         glyphs[char] = _trim(tuple(cols), char)
     # Clock separators keep the same advance when replaced with a blank.
     dot = (1 << stroke) - 1
-    glyphs[":"] = tuple((dot << (height // 3)) | (dot << (2 * height // 3)) for _ in range(2))
+    glyphs[":"] = tuple((dot << (height // 3)) | (dot << (2 * height // 3))
+                        for _ in range(max(2, stroke)))
     ring = {20: ("011110", "110011", "110011", "110011", "110011", "011110"),
             14: ("0110", "1001", "1001", "0110"),
-            10: ("111", "101", "111")}[height]
+            10: ("111", "101", "111")}.get(height)
+    if ring is None:
+        size = min(width, max(3, height // 4))
+        radius = (size - 1) / 2
+        inner = max(0, radius - max(1, stroke / 2))
+        ring = tuple("".join("1" if inner <= math.hypot(x - radius, y - radius) <= radius + .5
+                             else "0" for x in range(size)) for y in range(size))
     glyphs["°"] = tuple(sum((row[x] == "1") << y for y, row in enumerate(ring))
                         for x in range(len(ring[0])))
     cols = [0] * width
@@ -243,15 +253,40 @@ GLYPHS = _build_glyphs()
 @lru_cache(maxsize=2048)
 def _shape(text: str, font: str) -> tuple[tuple[tuple[tuple[int, ...] | None, int], ...], int, int, int]:
     base, scale, height = FONTS.get(font, FONTS["5x7"])
-    table = GLYPHS[base]
+    return _shape_run(text, GLYPHS[base], scale, height, SPACE[base])
+
+
+def _shape_run(text, table, scale, height, space):
     glyphs = []
     for char in str(text).upper():
         if char == " ":
-            glyphs.append((None, SPACE[base] * scale))
+            glyphs.append((None, space * scale))
         elif char in table:
             glyphs.append((table[char], len(table[char]) * scale))
     width = sum(w for _, w in glyphs) + max(0, len(glyphs) - 1)
     return tuple(glyphs), width, height, scale
+
+
+@lru_cache(maxsize=512)
+def _max_shape(text: str, width: int, height: int):
+    """Fit native strokes to the slot, with a one-pixel full-panel inset.
+
+    Height takes priority; digit width adapts within readable proportions.
+    Blank clock separators have the same advance as a colon, so blinking
+    never shifts the time. Cached shapes keep this work off steady frames.
+    """
+    width, height = min(WIDTH, width), min(HEIGHT, height)
+    target_width = width - 2 if width >= 16 else width
+    target_height = height - 2 if height >= 28 else height
+    for h in range(target_height, 4, -1):
+        stroke = max(1, min(3, (h + 5) // 10))
+        minimum = max(3, stroke + 1, math.ceil(h * .35))
+        maximum = min(target_width, math.ceil(h * .65))
+        for w in range(maximum, minimum - 1, -1):
+            shape = _shape_run(text, _stroke_glyphs(w, h, stroke), 1, h, max(2, stroke))
+            if shape[1] <= target_width:
+                return shape
+    return None
 
 
 def measure(text: str, font: str) -> tuple[int, int]:
@@ -364,13 +399,23 @@ def _text(canvas: _Canvas, layer: dict, elapsed: float) -> None:
     rx, ry = layer.get("x") or 0, layer.get("y") or 0
     rw = layer["w"] if layer.get("w") is not None else WIDTH - rx
     scroll, clip = bool(layer.get("scroll")), bool(layer.get("clip"))
+    shape = None
+    if font == "max":
+        candidates = [text] if isinstance(text, str) else list(text) or [""]
+        for candidate in candidates:
+            shape = _max_shape(str(candidate), rw, layer.get("h") or HEIGHT)
+            if shape is not None:
+                break
+        if shape is None:
+            font, text, forced = fit_text(text, rw, layer.get("h") or HEIGHT)
+            scroll = scroll or forced
     if font in ("auto", "block"):
         order = BLOCK_ORDER if font == "block" else AUTO_ORDER
         font, text, forced = fit_text(text, rw, layer.get("h") or HEIGHT, fonts=order)
         scroll = scroll or forced
     elif not isinstance(text, str):
         text = text[0] if text else ""
-    glyphs, width, height, scale = _shape(text, font)
+    glyphs, width, height, scale = shape if shape is not None else _shape(text, font)
     align = layer.get("a") or "c"
     if scroll and width > rw:
         x0, clip = rx - scroll_offset(width - rw, elapsed), True

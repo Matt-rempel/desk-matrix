@@ -10,6 +10,33 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_max_clock_fills_panel_for_short_and_wide_times(self):
+        for text in ("4:37", "9:59", "10:00", "11:11", "12:59", "23:59"):
+            with self.subTest(text=text):
+                points = lit(rasterize([{"t": "text", "f": "max", "s": text,
+                                         "x": 0, "y": 0, "w": 64, "h": 32, "c": "#FFFFFF"}]))
+                self.assertGreaterEqual(max(y for _, y in points) - min(y for _, y in points) + 1, 28)
+                self.assertGreaterEqual(max(x for x, _ in points) - min(x for x, _ in points) + 1, 56)
+                self.assertTrue(all(1 <= x < 63 and 1 <= y < 31 for x, y in points))
+
+    def test_max_blinking_colon_does_not_move_digits(self):
+        layer = {"t": "text", "f": "max", "x": 0, "y": 0, "w": 64, "h": 32, "c": "#FFFFFF"}
+        on = lit(rasterize([{**layer, "s": "12:59"}]))
+        off = lit(rasterize([{**layer, "s": "12 59"}]))
+        self.assertTrue(off < on)
+        self.assertTrue(all(29 <= x <= 33 for x, _ in on - off))
+
+    def test_max_fits_short_slots_and_preserves_neighboring_pixels(self):
+        pixels = rasterize([
+            {"t": "rect", "x": 0, "y": 0, "w": 31, "h": 32, "c": "#FF0000"},
+            {"t": "text", "f": "max", "s": "12:59", "x": 33, "y": 17, "w": 31, "h": 15,
+             "c": "#FFFFFF", "_clip": (33, 17, 31, 15)},
+        ])
+        points = {(i % 64, i // 64) for i, pixel in enumerate(pixels) if pixel == (255, 255, 255)}
+        self.assertGreaterEqual(max(y for _, y in points) - min(y for _, y in points) + 1, 13)
+        self.assertTrue(all(33 <= x < 64 and 17 <= y < 32 for x, y in points))
+        self.assertEqual(sum(p == (255, 0, 0) for p in pixels), 31 * 32)
+
     def test_five_by_seven_matches_flightboard_font(self):
         self.assertEqual(render.FONT, flightboard.FONT)
         for name in ("maple", "westjet", "delta"):

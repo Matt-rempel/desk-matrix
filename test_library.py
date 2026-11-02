@@ -66,6 +66,14 @@ class ValidationTests(unittest.TestCase):
                 clean = validate_library(json.loads(json.dumps(lib)))
                 self.assertEqual(clean["screens"][0]["slots"][0]["options"]["font"], "block")
 
+    def test_max_font_persists_on_full_panel_clock(self):
+        item = screen(layout="full", slots=[{"block": "time", "color": None,
+                                             "options": {"font": "max", "h24": False}}])
+        lib = default_library()
+        lib["screens"] = [item]
+        clean = validate_library(json.loads(json.dumps(lib)))
+        self.assertEqual(clean["screens"][0]["slots"][0]["options"], {"font": "max", "h24": False})
+
     def test_good_screen_is_normalized(self):
         clean = validate_screen(screen(name="  Morning glance "))
         self.assertEqual(clean["name"], "Morning glance")

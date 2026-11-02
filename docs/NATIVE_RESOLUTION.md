@@ -19,7 +19,15 @@ the web frame contract is in `web/display.js`.
   rings. This applies to every block using these fonts, including saved screens;
   the explicit 5×7 and 3×5 styles remain unchanged. Clock colons retain the same
   width as their blinking blank so the digits do not shift.
-- **Block** is an opt-in chunky font family in the Font picker, alongside Auto,
+- **Max** fills the text's available slot with native strokes, adapting both
+  height and digit width. A full-panel clock uses 30 of the 32 rows with a
+  one-pixel inset; three- and four-digit times fit without scrolling. Choose
+  **Customize → Type → Max** on a Time-only screen to fill the panel (or choose
+  **Font → Max** on a text/value block). Multi-slot
+  layouts retain their other content and fit Max inside the selected slot.
+  Blinking colons keep a fixed advance. Existing saved fonts and Auto retain
+  their sizing; Max is opt-in. The same renderer supplies previews and the Pi.
+- **Block** is an opt-in chunky font family in the Font picker, alongside Auto, Max,
   Display, Large, Big, Classic and Tiny. It retains the enlarged pixel style at
   20, 14 or 10 pixels, fitting the available slot before falling back to the small
   fonts. The picker is available on text/value blocks in Customize and Build.
