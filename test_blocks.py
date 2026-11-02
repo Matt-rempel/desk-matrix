@@ -34,6 +34,31 @@ def texts(layers):
     return [layer["s"] for layer in layers if layer["t"] == "text"]
 
 
+class FlightLookupRegressionTests(unittest.TestCase):
+    def test_preview_selects_requested_flight_from_follow_map(self):
+        ctx = RenderContext(data={"aircraft": {
+            "tracked": {"callsign": "ACA150", "route": "YYC>YYZ"},
+            "follow": {"WS2231": {"callsign": "WS2231", "icao": "WJA2231",
+                                      "route": "MBJ>YEG"}}}})
+        layers = render_screen(one("flight", source="follow", callsign="WS2231"), ctx)
+        self.assertIn(["MBJ>YEG"], texts(layers))
+        self.assertNotIn(["NOT SEEN", "--"], texts(layers))
+
+    def test_unchecked_preview_does_not_claim_flight_was_not_seen(self):
+        layers = render_screen(one("flight", source="follow", callsign="WS2231"),
+                               RenderContext(data={"aircraft": {"follow": {}}}))
+        self.assertNotIn(["NOT SEEN", "--"], texts(layers))
+        self.assertIn("CHECK", str(texts(layers)))
+
+    def test_lookup_states_are_distinct_on_the_display(self):
+        for state, message in (("checking", "LOOKING"), ("not_seen", "NO SIGNAL"),
+                               ("error", "FEED ERROR")):
+            ctx = RenderContext(data={"aircraft": {"follow": {"WS2231": None},
+                                  "follow_status": {"WS2231": {"state": state}}}})
+            layers = render_screen(one("flight", source="follow", callsign="WS2231"), ctx)
+            self.assertIn([message, "--"], texts(layers))
+
+
 class CatalogTests(unittest.TestCase):
     def test_ascii_preview_shape(self):
         # CONTRIBUTING.md asks for this preview when a screen is added to catalog.py.
@@ -235,7 +260,7 @@ class BlockBehaviourTests(unittest.TestCase):
         second = texts(self.render(item, elapsed=10.5))[0][0]
         self.assertEqual((first, second), ("WJA123", "ACA150"))
         follow = one("flight", source="follow", callsign="XX1")
-        self.assertIn(["NOT SEEN", "--"], texts(self.render(follow)))
+        self.assertIn(["CHECK FLIGHT", "--"], texts(self.render(follow)))
 
     def test_fuzzy_words(self):
         def words(h, m):

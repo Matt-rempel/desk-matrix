@@ -458,13 +458,16 @@ def b_metar(s: Slot) -> list[dict]:
 # --- sky ------------------------------------------------------------------
 
 def _callsign(value) -> str:
-    return re.sub(r"\s+", "", str(value or "")).upper()
+    return re.sub(r"[\s-]+", "", str(value or "")).upper()
 
 
 def _plane(s: Slot) -> tuple[dict | None, str]:
     aircraft = s.source("aircraft") or {}
     if s.opt("source") == "follow":
         wanted = _callsign(s.opt("callsign"))
+        follows = aircraft.get("follow")
+        if isinstance(follows, dict) and wanted in follows:
+            return follows[wanted], "follow"
         tracked = aircraft.get("tracked")
         if isinstance(tracked, dict) and (not wanted or _callsign(tracked.get("callsign")) == wanted):
             return tracked, "follow"
@@ -498,11 +501,16 @@ def b_flight(s: Slot) -> list[dict]:
     if mode == "setup":
         return s.placeholder(["SET UP", "SET"])
     if plane is None:
+        status = ((s.source("aircraft") or {}).get("follow_status") or {}).get(
+            _callsign(s.opt("callsign")), {}).get("state")
+        missing = {"checking": "LOOKING", "not_seen": "NO SIGNAL",
+                   "error": "FEED ERROR"}.get(status, "CHECK FLIGHT")
         if not r.full:
-            return s.placeholder(["NO PLANES", "NONE", "--"])
+            return s.placeholder(["NO PLANES", "NONE", "--"] if mode == "nearby" else
+                                 [missing, "CHECK" if status is None else "--"])
         label = ["IN RANGE"] if mode == "nearby" else [_callsign(s.opt("callsign")) or "--"]
         return [icon("plane", r.x, r.y, dim(s.icon_color(AMBER)), 14, 21),
-                T(r.sub(16, 0, r.w - 16, 21), ["NONE", "--"] if mode == "nearby" else ["NOT SEEN", "--"], dim(s.color)),
+                T(r.sub(16, 0, r.w - 16, 21), ["NONE", "--"] if mode == "nearby" else [missing, "--"], dim(s.color)),
                 T(r.sub(0, 23, r.w, 9), label, dim(s.accent(MUTED)))]
     strings = _flight_strings(s, plane, mode)
     if not r.full:

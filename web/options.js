@@ -2,6 +2,7 @@
 
 import { state, blockOf, allArt } from './store.js';
 import { h, toggleRow, chips, stepper, nextId, paint } from './ui.js';
+import { api } from './api.js';
 
 const FALLBACK_COLORS = [
   { c: '#F4F2EE', name: 'White' }, { c: '#FFB23F', name: 'Amber' }, { c: '#FF5A36', name: 'Tomato' },
@@ -114,14 +115,64 @@ function optionField(blockId, name, spec, options, set) {
     id, type: 'text', class: upper ? 'input input-mono' : 'input', value: value ?? '', maxlength: spec.max_len || 64,
     autocomplete: 'off', spellcheck: 'false', autocapitalize: upper ? 'characters' : 'off',
   });
+  if (name === 'callsign') input.setAttribute('placeholder', 'WS2231 or WJA2231');
   input.addEventListener('input', () => {
     if (upper) {
       const pos = input.selectionStart;
       input.value = input.value.toUpperCase();
+      if (name === 'callsign') input.value = input.value.replace(/[\s-]+/g, '');
       try { input.setSelectionRange(pos, pos); } catch { /* ignore */ }
     }
     set(input.value);
   });
+  if (name === 'callsign') {
+    const helpId = nextId('flight-help');
+    const result = h('p', { class: 'foot-note', role: 'status', 'aria-live': 'polite' });
+    const button = h('button', { type: 'button', class: 'btn btn-small btn-secondary' }, 'Check flight');
+    input.setAttribute('aria-describedby', helpId);
+    input.addEventListener('input', () => { result.textContent = ''; });
+    button.addEventListener('click', async () => {
+      const callsign = input.value.replace(/[\s-]+/g, '').toUpperCase();
+      if (!/^[A-Z0-9]{2,10}$/.test(callsign) || !/[A-Z]/.test(callsign)) {
+        result.textContent = 'Enter a flight number with its airline code, such as WS2231.';
+        return;
+      }
+      button.disabled = true;
+      result.textContent = `Looking for ${callsign}…`;
+      try {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          if (!input.isConnected || input.value !== callsign) return;
+          const checked = await api.checkFlight(callsign);
+          if (!input.isConnected || input.value !== callsign) return;
+          const resolved = checked.resolved || callsign;
+          if (checked.state === 'found') {
+            result.textContent = `Live position found${resolved !== callsign ? ` as ${resolved}` : ''}. Save, then tap Show now to put it on the display.`;
+            set(input.value);
+            return;
+          }
+          if (checked.state === 'not_seen') {
+            result.textContent = `No live position in our feed for ${resolved}. For a regional or codeshare flight, try the operating callsign shown by your tracker. A scheduled flight may not be transmitting yet.`;
+            set(input.value);
+            return;
+          }
+          if (checked.state === 'error') {
+            result.textContent = 'The flight feed could not be reached. Try again shortly.';
+            set(input.value);
+            return;
+          }
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+        result.textContent = 'Still checking. Make sure the Pi display service is running, then try again.';
+      } catch (error) {
+        result.textContent = error.message;
+      } finally {
+        button.disabled = false;
+      }
+    });
+    return h('div', { class: 'field' }, h('label', { class: 'field-label', for: id }, label), input,
+      h('p', { class: 'foot-note', id: helpId }, 'Flight numbers (WS2231) and transmitted callsigns (WJA2231) are accepted. Regional flights can use a different operator code. Check the live feed before saving.'),
+      button, result);
+  }
   return h('div', { class: 'field' }, h('label', { class: 'field-label', for: id }, label), input);
 }
 

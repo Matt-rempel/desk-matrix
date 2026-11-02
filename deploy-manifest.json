@@ -1,6 +1,7 @@
 {
   "app_files": [
     "flightboard.py",
+    "flight_lookup.py",
     "settings.py",
     "screens.py",
     "render.py",

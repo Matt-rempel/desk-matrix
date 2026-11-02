@@ -116,3 +116,22 @@ test('animated preview requests a fresh frame at the selected elapsed time', asy
     globalThis.fetch = originalFetch;
   }
 });
+
+test('follow-flight previews refresh after a check instead of caching a missing flight', async () => {
+  globalThis.localStorage = memoryStorage();
+  globalThis.sessionStorage = memoryStorage();
+  const api = await loadApi();
+  const originalFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = async () => {
+    requests += 1;
+    return { ok: true, status: 200, json: async () => ({ frames: [String(requests).repeat(12288)] }) };
+  };
+  try {
+    const screen = { layout: 'full', slots: [{ block: 'flight', options: { source: 'follow', callsign: 'WS2231' } }] };
+    assert.equal(await api.preview(screen), '1'.repeat(12288));
+    assert.equal(api.cachedPreview(screen), null);
+    assert.equal(await api.preview(screen), '2'.repeat(12288));
+    assert.equal(requests, 2);
+  } finally { globalThis.fetch = originalFetch; }
+});

@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 import blocks
 import catalog
+from flight_lookup import normalize_flight, request_flight
 from player import apply_motion
 from library import LIBRARY_PATH, apply_action, load_library, save_library, validate_art, validate_screen
 from settings import (DEFAULT_PATH, LEGACY_FIELDS, STATE_DIR, load_settings, save_settings,
@@ -56,7 +57,7 @@ PWA_FILES = {
     "/icon-512.png": ("icon-512.png", "image/png"),
     "/offline.html": ("offline.html", "text/html; charset=utf-8"),
 }
-POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update")
+POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update", "/api/flight-check")
 
 _catalog_body: bytes | None = None
 _data_cache: dict = {"key": None, "data": None}
@@ -181,6 +182,26 @@ def frame_hex(pixels) -> str:
     return bytes(channel for pixel in pixels for channel in pixel).hex()
 
 
+def flight_results() -> dict:
+    """Use the two-second status snapshot, not the slower preview data file."""
+    try:
+        if time.time() - STATUS_PATH.stat().st_mtime > 10:
+            return {}
+        result = json.loads(STATUS_PATH.read_text()).get("flights", {})
+        return result if isinstance(result, dict) else {}
+    except (OSError, ValueError, AttributeError):
+        return {}
+
+
+def check_flight(body) -> dict:
+    if not isinstance(body, dict) or set(body) != {"callsign"}:
+        raise ValueError("Send only a flight number or callsign")
+    callsign = normalize_flight(body["callsign"])
+    request_flight(STATUS_PATH.parent, callsign)
+    result = flight_results().get(callsign) or {"state": "checking", "resolved": callsign}
+    return {"callsign": callsign, **result}
+
+
 def render_previews(body, settings, lib: dict) -> list[str]:
     """Validate a /api/preview body and render each screen to a frame string."""
     if not isinstance(body, dict) or set(body) - {"screens", "elapsed", "art", "animate"} or "screens" not in body:
@@ -215,8 +236,15 @@ def render_previews(body, settings, lib: dict) -> list[str]:
         clean_screens.append(clean)
     sample = blocks.sample_context()
     zone = ZoneInfo(settings.timezone)
+    data = preview_data()
+    flights = flight_results()
+    if flights:
+        aircraft = data.setdefault("aircraft", {})
+        aircraft["follow"] = {**(aircraft.get("follow") or {}),
+                              **{cs: entry.get("aircraft") for cs, entry in flights.items()}}
+        aircraft["follow_status"] = {**(aircraft.get("follow_status") or {}), **flights}
     ctx = blocks.RenderContext(
-        now=datetime.now(zone), elapsed=float(elapsed), data=preview_data(),
+        now=datetime.now(zone), elapsed=float(elapsed), data=data,
         units={"temp": settings.temp_unit, "distance": settings.distance_unit}, art=art,
         habits={**sample.habits, **lib["habits"]}, timers={**sample.timers, **lib["timers"]})
     frames = []
@@ -378,6 +406,9 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0:
                 raise ValueError("Request is empty")
             data = json.loads(self.rfile.read(length))
+            if path == "/api/flight-check":
+                self._json(200, check_flight(data))
+                return
             if path == "/api/update":
                 if not isinstance(data, dict) or set(data) != {"version"}:
                     raise ValueError("Send only the selected version")

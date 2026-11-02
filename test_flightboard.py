@@ -236,7 +236,7 @@ class AircraftProviderTests(unittest.TestCase):
             self.assertEqual(fetch.call_count, 2)
             self.assertEqual(lookup.call_count, 2)
         snap = provider.snapshot()
-        self.assertEqual(set(snap), {"nearby", "tracked", "follow", "updated_at", "error"})
+        self.assertEqual(set(snap), {"nearby", "tracked", "follow", "follow_status", "updated_at", "error"})
         self.assertIsNone(snap["tracked"])
         self.assertIsNone(snap["error"])
         first, second = snap["nearby"]
@@ -437,6 +437,21 @@ class RunLoopTests(unittest.TestCase):
         data = json.loads((self.dir / "data.json").read_text())
         self.assertEqual(data["health"]["feed_age_s"], 7)
         self.assertEqual(stat.S_IMODE((self.dir / "data.json").stat().st_mode), 0o640)
+
+    def test_editor_check_uses_provider_without_changing_the_display(self):
+        from flight_lookup import request_flight
+        self.libraries = [self.lineup("time-classic")]
+        request_flight(self.dir, "ws 2231")
+        plane = app.Aircraft("WJA2231", "c00001", 80, 38000, 430)
+        with patch("flightboard.fetch_tracked_aircraft", return_value=(plane, "WJA2231")) as lookup, \
+                patch("flightboard.lookup_metadata", return_value=None):
+            self.run_loop(2)
+        lookup.assert_called_once_with("WS2231", app.DEFAULT_LAT, app.DEFAULT_LON)
+        status = json.loads((self.dir / "status.json").read_text())
+        self.assertEqual(status["screen_id"], "time-classic")
+        self.assertIsNone(status["pinned"])
+        self.assertEqual(status["flights"]["WS2231"]["state"], "found")
+        self.assertEqual(status["flights"]["WS2231"]["resolved"], "WJA2231")
 
     def test_display_off_blanks_and_reports_off(self):
         save_settings(validate_settings({"display_enabled": False}), self.settings_path)

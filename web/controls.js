@@ -54,7 +54,7 @@ export async function removeFromLineup(screenId) {
 
 /** Follow a callsign: reuse or create a custom copy of sky-follow, then show it now. */
 export async function followFlight(callsign) {
-  const cs = String(callsign || '').trim().toUpperCase();
+  const cs = String(callsign || '').replace(/[\s-]+/g, '').toUpperCase();
   if (!cs) return;
   const base = findScreen('sky-follow');
   let screen = customs().find((s) => s.based_on === 'sky-follow' && /^Follow /.test(s.name));

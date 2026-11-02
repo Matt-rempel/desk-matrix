@@ -133,7 +133,7 @@ BLOCKS = {
     "sun_time": _block("Sunrise / sunset", "6:51", "sky", {
         "event": _enum("next", "next", "sunrise", "sunset"), "h24": _bool(False)}, 17, 5, ["sun"]),
     "flight": _block("Flight", "WJA", "sky", {
-        "source": _enum("nearby", "nearby", "follow"), "callsign": _str("", 8),
+        "source": _enum("nearby", "nearby", "follow"), "callsign": _str("", 10),
         "field": _enum("callsign", "callsign", "route", "detail"),
         "accent": _color(), "icon_color": _color()}, 11, 5, ["aircraft"]),
     "plane_count": _block("Plane count", "×7", "sky", {}, 7, 5, ["aircraft:nearby"]),

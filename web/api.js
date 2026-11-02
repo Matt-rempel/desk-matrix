@@ -86,6 +86,7 @@ export const api = {
   library: () => request('/api/library'),
   settings: () => request('/api/settings'),
   status: () => request('/api/status'),
+  checkFlight: (callsign) => request('/api/flight-check', { method: 'POST', body: { callsign } }),
   updateStatus: (fresh = false) => request(fresh ? '/api/update?fresh=1' : '/api/update'),
   installUpdate: (version) => request('/api/update', { method: 'POST', body: { version } }),
   saveSettings: (partial) => request('/api/settings', { method: 'POST', body: partial }),
@@ -109,18 +110,23 @@ function cacheKey(screen) {
   return JSON.stringify([screen.layout, screen.slots, screen.style || null]);
 }
 
+function followsFlight(screen) {
+  return (screen.slots || []).some((slot) => slot.options?.source === 'follow');
+}
+
 function remember(k, frame) {
   cache.set(k, frame);
   if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
 }
 
 export function cachedPreview(screen) {
+  if (followsFlight(screen)) return null;
   return cache.get(cacheKey(screen)) || null;
 }
 
 export function preview(screen) {
   const k = cacheKey(screen);
-  if (cache.has(k)) return Promise.resolve(cache.get(k));
+  if (!followsFlight(screen) && cache.has(k)) return Promise.resolve(cache.get(k));
   const pending = queue.find((item) => item.k === k);
   if (pending) return pending.promise;
   let resolve, reject;
@@ -172,7 +178,7 @@ async function flush() {
       chunk.forEach((item, n) => {
         const frame = frames[n];
         if (typeof frame === 'string' && frame.length === FRAME_HEX_LENGTH) {
-          remember(item.k, frame);
+          if (!followsFlight(item.screen)) remember(item.k, frame);
           item.resolve(frame);
         } else {
           item.reject(new ApiError('Preview unavailable', 500));

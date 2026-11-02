@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 import library
 import render
+from flight_lookup import normalize_flight, requested_flight
 from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings
 
 SOURCE = "https://opendata.adsb.fi"
@@ -142,6 +143,7 @@ def _fetch_callsign(callsign: str, lat: float, lon: float) -> Aircraft | None:
 
 def fetch_tracked_aircraft(callsign: str, lat: float, lon: float) -> tuple[Aircraft | None, str]:
     """Look globally; translate a two-letter flight number when ADSBdb knows it."""
+    callsign = normalize_flight(callsign)
     found = _fetch_callsign(callsign, lat, lon)
     if found:
         return found, callsign
@@ -434,7 +436,7 @@ class AircraftProvider:
                                                            "future": None, "next": 0.0,
                                                            "at": None, "error": None})
                 if entry["future"] is None and mono >= entry["next"]:
-                    entry["future"] = self._executor.submit(fetch_tracked_aircraft, entry["alias"],
+                    entry["future"] = self._executor.submit(fetch_tracked_aircraft, callsign,
                                                             settings.lat, settings.lon)
                     entry["next"] = mono + self.refresh
             self._poll(mono)  # an inline executor has already finished
@@ -494,8 +496,14 @@ class AircraftProvider:
                   for callsign, entry in self._follow.items()}
         stamps = [self._nearby_at] + [entry["at"] for entry in self._follow.values()]
         errors = [self._nearby_error] + [entry["error"] for entry in self._follow.values()]
+        follow_status = {callsign: {
+            "state": ("error" if entry["error"] else "found" if entry["found"] else
+                      "checking" if entry["at"] is None else "not_seen"),
+            "resolved": entry["alias"], "checked_at": _iso(entry["at"]),
+        } for callsign, entry in self._follow.items()}
         return {"nearby": nearby, "tracked": next(iter(follow.values()), None) if follow else None,
-                "follow": follow, "updated_at": _iso(max((s for s in stamps if s), default=None)),
+                "follow": follow, "follow_status": follow_status,
+                "updated_at": _iso(max((s for s in stamps if s), default=None)),
                 "error": next((e for e in errors if e), None)}
 
     def close(self) -> None:
@@ -584,6 +592,8 @@ def build_status(settings, info: dict, pixels, data: dict, now: float | None = N
         "updated_at": datetime.fromtimestamp(now, timezone.utc).isoformat(),
         "nearby": [{key: plane.get(key) for key in ("callsign", "distance_nm", "altitude_ft", "route")}
                    for plane in (aircraft.get("nearby") or [])[:10] if isinstance(plane, dict)],
+        "flights": {cs: {**value, "aircraft": (aircraft.get("follow") or {}).get(cs)}
+                    for cs, value in (aircraft.get("follow_status") or {}).items()},
         "frame": render.to_hex(pixels if on else [render.BLACK] * (render.WIDTH * render.HEIGHT)),
         "display": {"width": render.WIDTH, "height": render.HEIGHT},
         "screen_id": info.get("screen_id"),
@@ -701,6 +711,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
     data: dict = {}
     pixels, info = [render.BLACK] * (render.WIDTH * render.HEIGHT), {}
     next_reload = next_snapshot = next_status = 0.0
+    checking_flight = None
     next_data = monotonic() + DATA_S
     frames = 0
     matrix.Clear()
@@ -709,6 +720,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
             now = monotonic()
             if now >= next_reload:
                 next_reload = now + RELOAD_S
+                checking_flight = requested_flight(state_dir)
                 mtime = _mtime(args.settings)
                 if mtime != settings_mtime:
                     settings_mtime = mtime
@@ -733,6 +745,8 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
                     except (OSError, ValueError) as exc:
                         _log(f"library error: {exc}")
             needs = player.needs()
+            if checking_flight:
+                needs = set(needs) | {f"aircraft:follow:{checking_flight}"}
             providers.update(needs, lib.get("feeds") or [])
             aircraft.update(needs)
             if now >= next_snapshot:

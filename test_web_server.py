@@ -296,6 +296,36 @@ class ApiTests(ServerTestCase):
         self.assertEqual(self.get_json("/api/status"), status)
 
 
+class FlightCheckApiTests(ServerTestCase):
+    def test_check_is_authenticated_validated_and_does_not_save_screen_or_pin(self):
+        from flight_lookup import requested_flight
+        self.assertStatus(401, self.post, "/api/flight-check", {"callsign": "WS2231"}, key=None)
+        self.assertStatus(403, self.post, "/api/flight-check", {"callsign": "WS2231"},
+                          origin="https://elsewhere.example")
+        for bad in ({}, [], {"callsign": "2231"}, {"callsign": "WS1", "url": "https://example.com"}):
+            self.assertStatus(400, self.post, "/api/flight-check", bad)
+        self.assertEqual(self.post("/api/flight-check", {"callsign": "ws-2231"}),
+                         {"callsign": "WS2231", "state": "checking", "resolved": "WS2231"})
+        self.assertEqual(requested_flight(self.data_path.parent), "WS2231")
+        self.assertFalse(self.library_path.exists())
+        self.assertFalse(self.settings_path.exists())
+
+    def test_check_reports_resolution_and_preview_uses_the_same_flight(self):
+        import blocks
+        plane = {"callsign": "WS2231", "icao": "WJA2231", "route": "MBJ>YEG"}
+        result = {"state": "found", "resolved": "WJA2231", "aircraft": plane}
+        (self.data_path.parent / "status.json").write_text(json.dumps({"flights": {"WS2231": result}}))
+        self.assertEqual(self.post("/api/flight-check", {"callsign": "WS2231"}),
+                         {"callsign": "WS2231", **result})
+        screen = {**CUSTOM_SCREEN, "layout": "full", "slots": [
+            {"block": "flight", "color": "#FFFFFF", "options": {"source": "follow", "callsign": "WS2231"}}]}
+        expected = blocks.frame(screen, blocks.RenderContext(data={"aircraft": {"follow": {"WS2231": plane}}}))
+        self.assertEqual(self.post("/api/preview", {"screens": [screen]})["frames"][0],
+                         web_server.frame_hex(expected))
+        os.utime(self.data_path.parent / "status.json", (1, 1))
+        self.assertEqual(self.post("/api/flight-check", {"callsign": "WS2231"})["state"], "checking")
+
+
 class SettingsApiTests(ServerTestCase):
     def test_settings_api_validates_and_persists(self):
         self.assertEqual(self.get_json("/api/settings")["temp_unit"], "C")

@@ -22,6 +22,9 @@ Flight cards use larger, bundled Air Canada, WestJet, United, Delta and American
 Airlines artwork on the native 64×32 canvas. Nearby and followed flights share the same logo assets and
 previews. See [airline artwork sources and layout](docs/AIRLINE_LOGOS.md).
 
+Following a flight? Use **Check flight** in the editor to verify a live position
+before saving. See [flight numbers, operating callsigns and lookup states](docs/FLIGHT_TRACKING.md).
+
 ### Tested build
 
 - Raspberry Pi 3 Model B, tested with Raspberry Pi OS Lite 64-bit
