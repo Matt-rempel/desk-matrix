@@ -50,6 +50,29 @@ class TextFontSelectionTests(unittest.TestCase):
     def test_max_style_renders_in_every_supported_block_and_slot(self):
         self.check_adaptive_font("max")
 
+    def test_family_and_size_keep_secondary_labels_and_other_slots(self):
+        ctx = sample_context()
+        automatic = render_screen(one("temp"), ctx, strict=True)
+        for family in ("standard", "block", "outline", "digital"):
+            styled = render_screen(one("temp", font_family=family, font_size="max"), ctx, strict=True)
+            self.assertEqual(styled[0], automatic[0])
+            self.assertEqual(styled[-1], automatic[-1])
+            self.assertEqual(styled[1]["face"], family)
+            self.assertEqual(styled[1]["size"], "max")
+
+    def test_new_families_render_in_every_supported_block_and_slot(self):
+        for family in ("standard", "block", "outline", "digital"):
+            for block in catalog.TEXT_FONT_BLOCKS:
+                options = {"font_family": family, "font_size": "max"}
+                if block == "text":
+                    options["text"] = "HELLO"
+                for layout, spec in catalog.LAYOUTS.items():
+                    with self.subTest(family=family, block=block, layout=layout):
+                        item = screen(layout, *((block, None, options) for _ in spec["slots"]))
+                        pixels = rasterize(render_screen(item, sample_context(), strict=True))
+                        self.assertEqual(len(pixels), 2048)
+                        self.assertTrue(any(any(p) for p in pixels))
+
     def check_adaptive_font(self, font):
         for block in catalog.TEXT_FONT_BLOCKS:
             options = {"font": font}

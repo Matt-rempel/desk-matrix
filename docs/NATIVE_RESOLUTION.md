@@ -22,15 +22,15 @@ the web frame contract is in `web/display.js`.
 - **Max** fills the text's available slot with native strokes, adapting both
   height and digit width. A full-panel clock uses 30 of the 32 rows with a
   one-pixel inset; three- and four-digit times fit without scrolling. Choose
-  **Customize → Type → Max** on a Time-only screen to fill the panel (or choose
-  **Font → Max** on a text/value block). Multi-slot
+  **Customize → Size → Max** on a Time-only screen to fill the panel. The
+  separate Font control supports Standard, Block, Outline and Digital. Multi-slot
   layouts retain their other content and fit Max inside the selected slot.
   Blinking colons keep a fixed advance. Existing saved fonts and Auto retain
   their sizing; Max is opt-in. The same renderer supplies previews and the Pi.
-- **Block** is an opt-in chunky font family in the Font picker, alongside Auto, Max,
-  Display, Large, Big, Classic and Tiny. It retains the enlarged pixel style at
-  20, 14 or 10 pixels, fitting the available slot before falling back to the small
-  fonts. The picker is available on text/value blocks in Customize and Build.
+- **Block** is an opt-in chunky font family, now with its own Max size. Outline
+  and Digital provide two more styles. Independent Font and Size controls are
+  available on text/value blocks in Customize and Build. Original combined
+  font values still render identically until edited. See [Fonts and sizes](FONTS.md).
   It changes primary text while preserving smaller labels; saving retains the
   choice without changing the lineup or pin. Auto continues using the finer
   native glyphs. Existing screens default to Auto unless they saved another font.

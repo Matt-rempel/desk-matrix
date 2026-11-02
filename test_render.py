@@ -1,4 +1,5 @@
 import unittest
+import hashlib
 
 import flightboard
 import render
@@ -10,6 +11,61 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_legacy_font_frames_remain_identical(self):
+        expected = {
+            "auto": "d88586a0b1f6d089925599a8891ee074597e81e01221a3113f6e6887c51843d3",
+            "block": "96793016ce9d99952f903fcb6dde89249202e130692fbd0e6c3551e9299fc073",
+            "max": "c7a6cf8bb2214225e4f2c023060b1abcb746f45261a1c9b56577320e48d43e6a",
+            "display": "d88586a0b1f6d089925599a8891ee074597e81e01221a3113f6e6887c51843d3",
+            "large": "bf1fb73780ca4adeb0e9ef47a8a16842b81b1db34d57796a5bdf8144ed76d92c",
+            "big": "640909b65619cab2440ad4cd6561a339d1cfd75ed64522686b7ab75d8b83b17e",
+            "5x7": "411f6f43d133619294c113b772e50c10e698c08417a34d41596d5a51e05235ce",
+            "3x5": "d2b50072424f9673cfe2a14d9ce190edd8d0b780eb95000b12dd8947e0a8f177",
+        }
+        for font, digest in expected.items():
+            pixels = rasterize([{"t": "text", "f": font, "s": "12:59", "x": 0, "y": 0,
+                                 "w": 64, "h": 32, "c": "#FFFFFF"}])
+            self.assertEqual(hashlib.sha256(to_hex(pixels).encode()).hexdigest(), digest, font)
+
+    def test_new_families_clip_to_the_slot_and_keep_gradients_and_long_text(self):
+        for face in ("standard", "block", "outline", "digital"):
+            for content in ("4:37", "12:59", "-12°", "HELLO WORLD THIS IS LONGER THAN THE PANEL"):
+                with self.subTest(face=face, content=content):
+                    pixels = rasterize([{"t": "text", "face": face, "size": "max", "s": content,
+                                         "x": 33, "y": 17, "w": 31, "h": 15, "_clip": (33, 17, 31, 15),
+                                         "grad": ["#FF0000", "#0000FF"]}], elapsed=3)
+                    points = lit(pixels)
+                    self.assertTrue(points)
+                    self.assertTrue(all(33 <= x < 64 and 17 <= y < 32 for x, y in points))
+                    self.assertGreater(len(set(pixels) - {(0, 0, 0)}), 2)
+
+    def test_each_font_family_has_a_distinct_full_height_max_clock(self):
+        frames = []
+        for family in ("standard", "block", "outline", "digital"):
+            with self.subTest(family=family):
+                pixels = rasterize([{"t": "text", "s": "12:59", "face": family, "size": "max",
+                                     "x": 0, "y": 0, "w": 64, "h": 32, "c": "#FFFFFF"}])
+                points = lit(pixels)
+                self.assertEqual(max(y for _, y in points) - min(y for _, y in points) + 1, 30)
+                # Digital 1 only lights the right-hand segments of its cell.
+                self.assertGreaterEqual(max(x for x, _ in points) - min(x for x, _ in points) + 1,
+                                        48 if family == "digital" else 56)
+                self.assertTrue(all(1 <= x < 63 and 1 <= y < 31 for x, y in points))
+                frames.append(to_hex(pixels))
+        self.assertEqual(len(set(frames)), 4)
+
+    def test_font_family_size_limits_and_blinking(self):
+        for face in ("standard", "block", "outline", "digital"):
+            for size, height in (("tiny", 5), ("small", 7), ("medium", 10),
+                                 ("large", 14), ("xl", 20), ("max", 30), ("auto", 20)):
+                with self.subTest(face=face, size=size):
+                    layer = {"t": "text", "face": face, "size": size, "s": "12:59",
+                             "x": 0, "y": 0, "w": 64, "h": 32, "c": "#FFFFFF"}
+                    on = lit(rasterize([layer]))
+                    off = lit(rasterize([{**layer, "s": "12 59"}]))
+                    self.assertTrue(off < on)
+                    self.assertLessEqual(max(y for _, y in on) - min(y for _, y in on) + 1, height)
+
     def test_max_clock_fills_panel_for_short_and_wide_times(self):
         for text in ("4:37", "9:59", "10:00", "11:11", "12:59", "23:59"):
             with self.subTest(text=text):

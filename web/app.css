@@ -392,6 +392,11 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .pal-name { font-size: 11px; text-align: center; max-width: 100%; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.font-controls { display: grid; gap: 18px; }
+.font-choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.font-choice { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); font-size: 14px; }
+.font-choice[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.font-sample { display: block; width: 128px; max-width: 100%; height: auto; aspect-ratio: 2; border-radius: 6px; }
 .type-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 14px; background: var(--surface); border: 1px solid var(--line); color: var(--text); text-align: left; min-width: 0; }
 .type-btn[aria-pressed="true"], .tile-btn[aria-pressed="true"], .layout-btn[aria-pressed="true"], .block-btn[aria-pressed="true"], .slot-btn[aria-pressed="true"], .tool-btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
 .type-sample { font-family: var(--mono); font-weight: 600; line-height: 26px; }

@@ -5,6 +5,23 @@ const KEY = 'a'.repeat(64);
 const NAME = 'flightboard-key';
 let moduleNumber = 0;
 
+test('font and size changes preserve the other choice and legacy screen options', async () => {
+  const { fontSettings, chooseFont } = await import('./web/fonts.js');
+  const legacy = { display: ['standard', 'xl'], block: ['block', 'auto'], max: ['standard', 'max'],
+    '3x5': ['standard', 'tiny'] };
+  for (const [font, [family, size]] of Object.entries(legacy)) {
+    const options = { font, colon_blink: true };
+    assert.deepEqual(fontSettings(options, legacy), { family, size });
+    assert.deepEqual(options, { font, colon_blink: true });
+    chooseFont(options, { family: 'outline' }, legacy);
+    assert.deepEqual(fontSettings(options, legacy), { family: 'outline', size });
+    chooseFont(options, { size: 'max' }, legacy);
+    assert.deepEqual(fontSettings(options, legacy), { family: 'outline', size: 'max' });
+    assert.equal(options.font, font);
+    assert.equal(options.colon_blink, true);
+  }
+});
+
 test('retired palettes remain resolvable without appearing in either picker', async () => {
   const { normalizeCatalog } = await import('./web/store.js');
   const catalog = normalizeCatalog({

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 
-from render import ICONS, WIDTH, HEIGHT
+from render import ICONS, WIDTH, HEIGHT, FONT_FAMILIES, FONT_SIZES, LEGACY_FONT_SETTINGS, rasterize, to_hex
 from nhl import TEAMS, TEAM_NAMES
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
@@ -227,6 +227,14 @@ for _block_id in TEXT_FONT_BLOCKS:
         "choices": ["auto", "max", "block", "display", "large", "big", "5x7", "3x5"],
         "labels": {"auto": "Auto", "max": "Max", "block": "Block", "display": "Display", "large": "Large",
                    "big": "Big", "5x7": "Classic", "3x5": "Tiny"},
+    }
+    BLOCKS[_block_id]["options"]["font_family"] = {
+        "type": "enum", "default": "standard", "label": "Font", "choices": list(FONT_FAMILIES),
+        "labels": FONT_FAMILIES,
+    }
+    BLOCKS[_block_id]["options"]["font_size"] = {
+        "type": "enum", "default": "auto", "label": "Size", "choices": list(FONT_SIZES),
+        "labels": {key: label for key, (label, _) in FONT_SIZES.items()},
     }
 for _id, _meta in BLOCKS.items():
     _meta["id"] = _id
@@ -479,6 +487,10 @@ def catalog_json() -> dict:
         "display": {"width": WIDTH, "height": HEIGHT},
         "layouts": LAYOUTS, "palettes": PALETTES, "blocks": BLOCKS,
         "legacy_palettes": LEGACY_PALETTES,
+        "font_families": {key: {"name": name, "sample": to_hex(rasterize([
+            {"t": "text", "s": "12:34", "face": key, "size": "max", "x": 0, "y": 0,
+             "w": WIDTH, "h": HEIGHT, "c": "#FFFFFF"}]))} for key, name in FONT_FAMILIES.items()},
+        "legacy_fonts": LEGACY_FONT_SETTINGS,
         "icons": {name: list(rows) for name, rows in ICONS.items()},
         "motions": MOTIONS, "transitions": TRANSITIONS, "colors": COLORS,
         "builtins": BUILTIN_SCREENS, "shelves": SHELVES, "legacy_ids": LEGACY_IDS,

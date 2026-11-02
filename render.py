@@ -167,6 +167,13 @@ FONTS = {"display": ("native20", 1, 20), "large": ("native14", 1, 14),
          "block": ("3x5", 4, 20), "block-large": ("5x7", 2, 14), "block-big": ("3x5", 2, 10)}
 AUTO_ORDER = ("display", "large", "big", "5x7", "3x5")
 BLOCK_ORDER = ("block", "block-large", "block-big", "5x7", "3x5")
+FONT_FAMILIES = {"standard": "Standard", "block": "Block", "outline": "Outline", "digital": "Digital"}
+FONT_SIZES = {"auto": ("Auto", 20), "max": ("Max", 30), "xl": ("Extra large", 20),
+              "large": ("Large", 14), "medium": ("Medium", 10), "small": ("Small", 7), "tiny": ("Tiny", 5)}
+LEGACY_FONT_SETTINGS = {"auto": ("standard", "auto"), "max": ("standard", "max"),
+                        "display": ("standard", "xl"), "large": ("standard", "large"),
+                        "big": ("standard", "medium"), "5x7": ("standard", "small"),
+                        "3x5": ("standard", "tiny"), "block": ("block", "auto")}
 SCROLL_HOLD = 2.0
 SCROLL_SPEED = 8.0
 
@@ -289,6 +296,91 @@ def _max_shape(text: str, width: int, height: int):
     return None
 
 
+def font_settings(options: dict) -> tuple[str, str]:
+    """Resolve partial new choices against the screen's original font."""
+    family, size = LEGACY_FONT_SETTINGS.get(options.get("font"), ("standard", "auto"))
+    return (options.get("font_family", family), options.get("font_size", size))
+
+
+@lru_cache(maxsize=128)
+def _family_glyphs(family: str, width: int, height: int, stroke: int):
+    if family == "standard":
+        if height == 5 and width == 3:
+            return GLYPHS["3x5"]
+        if height == 7 and width == 5:
+            return GLYPHS["5x7"]
+        return _stroke_glyphs(width, height, stroke)
+    if family in ("block", "outline"):
+        # Scale the original pixel cells independently in each axis. A four-
+        # digit Max clock can therefore use the full height without cropping.
+        base = GLYPHS["3x5"] if height >= 10 or height <= 5 else GLYPHS["5x7"]
+        rows = 5 if base is GLYPHS["3x5"] else 7
+        cell_width = 3 if rows == 5 else 5
+        table = {}
+        for char, source in base.items():
+            gw = max(1, jround(width * len(source) / cell_width))
+            cols = tuple(sum(1 << y for y in range(height)
+                             if source[min(len(source) - 1, x * len(source) // gw)]
+                             & (1 << min(rows - 1, y * rows // height))) for x in range(gw))
+            if family == "outline" and height >= 10:
+                edge = max(1, height // 15)
+                solid = {(x, y) for x, mask in enumerate(cols) for y in range(height) if mask & (1 << y)}
+                cols = tuple(sum(1 << y for y in range(height) if (x, y) in solid and
+                                 any((x + dx, y + dy) not in solid
+                                     for dx, dy in ((edge, 0), (-edge, 0), (0, edge), (0, -edge))))
+                             for x in range(gw))
+            table[char] = cols
+    else:  # Seven-segment digits, with stroke letters for words and units.
+        table = dict(_stroke_glyphs(width, height, stroke))
+        if height >= 10:
+            segments = {"0": "abcedf", "1": "bc", "2": "abged", "3": "abgcd", "4": "fgbc",
+                        "5": "afgcd", "6": "afgecd", "7": "abc", "8": "abcdefg", "9": "abfgcd"}
+            middle = (height - stroke) // 2
+            for char, active in segments.items():
+                cols = [0] * width
+                rects = {"a": (stroke, 0, width - 2 * stroke, stroke),
+                         "g": (stroke, middle, width - 2 * stroke, stroke),
+                         "d": (stroke, height - stroke, width - 2 * stroke, stroke),
+                         "f": (0, stroke + 1, stroke, max(1, middle - stroke - 2)),
+                         "b": (width - stroke, stroke + 1, stroke, max(1, middle - stroke - 2)),
+                         "e": (0, middle + stroke + 1, stroke, max(1, height - middle - 2 * stroke - 2)),
+                         "c": (width - stroke, middle + stroke + 1, stroke, max(1, height - middle - 2 * stroke - 2))}
+                for segment in active:
+                    x0, y0, w, h = rects[segment]
+                    for x in range(x0, x0 + w):
+                        for y in range(y0, min(height, y0 + h)):
+                            cols[x] |= 1 << y
+                table[char] = tuple(cols)
+    # Match the blank advance used for a blinking colon in every family.
+    dot = (1 << stroke) - 1
+    table[":"] = tuple((dot << (height // 3)) | (dot << (2 * height // 3))
+                       for _ in range(max(2, stroke)))
+    return table
+
+
+@lru_cache(maxsize=1024)
+def _styled_shape(text: str, width: int, height: int, family: str, size: str):
+    family = family if family in FONT_FAMILIES else "standard"
+    size = size if size in FONT_SIZES else "auto"
+    width, height = min(WIDTH, width), min(HEIGHT, height)
+    if size == "max" and family == "standard":
+        return _max_shape(text, width, height)
+    inset = 2 if size == "max" and width >= 16 else 0
+    target = min(height - (2 if size == "max" and height >= 28 else 0), FONT_SIZES[size][1])
+    heights = range(target, 4, -1) if size == "max" else [h for h in (20, 14, 10, 7, 5) if h <= target]
+    for h in heights:
+        stroke = max(1, min(3, (h + 5) // 10))
+        widths = (range(min(width - inset, math.ceil(h * .65)),
+                        max(3, stroke + 1, math.ceil(h * .35)) - 1, -1)
+                  if size == "max" else [{20: 11, 14: 8, 10: 6, 7: 5, 5: 3}[h]])
+        for w in widths:
+            space = 1 if family == "standard" and h == 5 else max(2, stroke)
+            shape = _shape_run(text, _family_glyphs(family, w, h, stroke), 1, h, space)
+            if shape[1] <= width - inset:
+                return shape
+    return None
+
+
 def measure(text: str, font: str) -> tuple[int, int]:
     """Return the (width, height) in pixels of text drawn in a font."""
     _, width, height, _ = _shape(text, font)
@@ -400,7 +492,20 @@ def _text(canvas: _Canvas, layer: dict, elapsed: float) -> None:
     rw = layer["w"] if layer.get("w") is not None else WIDTH - rx
     scroll, clip = bool(layer.get("scroll")), bool(layer.get("clip"))
     shape = None
-    if font == "max":
+    if layer.get("face") in FONT_FAMILIES:
+        candidates = [text] if isinstance(text, str) else list(text) or [""]
+        for candidate in candidates:
+            shape = _styled_shape(str(candidate), rw, layer.get("h") or HEIGHT,
+                                  layer["face"], layer.get("size", "auto"))
+            if shape is not None:
+                break
+        if shape is None:
+            # Keep long text readable and scrolling in the selected family.
+            text = str(candidates[-1])
+            shape = _shape_run(text, _family_glyphs(layer["face"], 3, 5, 1), 1, 5,
+                               1 if layer["face"] == "standard" else 2)
+            scroll = True
+    elif font == "max":
         candidates = [text] if isinstance(text, str) else list(text) or [""]
         for candidate in candidates:
             shape = _max_shape(str(candidate), rw, layer.get("h") or HEIGHT)

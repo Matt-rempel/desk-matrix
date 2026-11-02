@@ -199,6 +199,22 @@ class ApiTests(ServerTestCase):
     def test_max_font_preview_and_save_use_the_same_choice(self):
         self.check_font_preview_and_save("max")
 
+    def test_font_family_samples_preview_and_save(self):
+        faces = self.get_json("/api/catalog")["font_families"]
+        self.assertEqual(set(faces), {"standard", "block", "outline", "digital"})
+        samples = {face["sample"] for face in faces.values()}
+        self.assertEqual(len(samples), 4)
+        self.assertTrue(all(len(frame) == 12288 for frame in samples))
+        before = self.get_json("/api/library")
+        for face in faces:
+            item = {**CUSTOM_SCREEN, "layout": "full", "slots": [{"block": "time", "color": "#FFFFFF",
+                    "options": {"font_family": face, "font_size": "max"}}]}
+            preview = self.post("/api/preview", {"screens": [item]})["frames"][0]
+            self.assertEqual(len(preview), 12288)
+            saved = self.post("/api/library", {"action": "save_screen", "screen": item})
+            self.assertEqual(saved["screens"][-1]["slots"][0]["options"], item["slots"][0]["options"])
+            self.assertEqual(saved["pinned"], before["pinned"])
+
     def check_font_preview_and_save(self, font):
         self.data_path.write_text(json.dumps({"weather": {"temp_c": 7, "high_c": 11, "low_c": -5,
                                                            "code": "sun"}}))

@@ -12,7 +12,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import catalog
 from airline_logos import LOGOS, airline_for
-from render import ICONS, WIDTH, HEIGHT, FONTS, fit_text, hex_color, jround, measure, mix, rasterize
+from render import ICONS, WIDTH, HEIGHT, FONTS, fit_text, font_settings, hex_color, jround, measure, mix, rasterize
 
 WHITE = "#FFFFFF"
 INK, MUTED, FAINT, AMBER = catalog.INK, catalog.MUTED, catalog.FAINT, catalog.AMBER
@@ -1014,6 +1014,8 @@ def b_text(s: Slot) -> list[dict]:
     text = " ".join(str(s.opt("text") or "").upper().split())
     if not text:
         return []
+    if "font_family" in s.options or "font_size" in s.options:
+        return [T(r, [text], s.color, scroll=True)]
     font = s.opt("font")
     if font != "auto" and (font in ("block", "max") or measure(text, font)[1] <= r.h):
         return [T(r, [text], s.color, f=font, scroll=True)]
@@ -1178,7 +1180,15 @@ def render_screen(screen: dict, ctx: RenderContext, palette: str | None = None,
         # Block and Max resolve their own size; fixed sizes retain the clock's
         # established fallback behavior when a slot is too short.
         font = s.opt("font")
-        if font and font != "auto" and block not in ("time", "text"):
+        styled = "font_family" in options or "font_size" in options
+        if styled:
+            family, size = font_settings(options)
+            text_layers = [layer for layer in slot_layers if layer.get("t") == "text"]
+            main_height = max((layer.get("h", s.rect.h) for layer in text_layers), default=0)
+            slot_layers = [{**layer, "face": family, "size": size, "scroll": True}
+                           if layer.get("t") == "text" and layer.get("h", s.rect.h) == main_height
+                           else layer for layer in slot_layers]
+        elif font and font != "auto" and block not in ("time", "text"):
             text_layers = [layer for layer in slot_layers if layer.get("t") == "text"]
             main_height = max((layer.get("h", s.rect.h) for layer in text_layers), default=0)
             if font in ("block", "max") or FONTS[font][2] <= main_height:

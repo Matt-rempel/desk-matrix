@@ -5,14 +5,9 @@ import { state, findScreen, isBuiltin, familyOf, describeScreen, clone, screenFo
 import { createMatrix, livePreview } from './matrix.js';
 import { h, header, toggleRow, stepper, messageLine, toast, confirmSheet, paint, busy, eyebrow, splitLayout } from './ui.js';
 import { optionsForm, colorPicker } from './options.js';
+import { fontControls, fontSettings } from './fonts.js';
 import { saveScreen, showNow, focusControls, lineupPlaces, removeFromLineup, replaceInLineup } from './controls.js';
 
-const TYPES = [
-  { id: 'big', layout: 'bigsmall', font: 'big', name: 'Big', note: 'Two-row digits', size: 'lg' },
-  { id: 'classic', layout: 'two', font: '5x7', name: 'Classic', note: '5 × 7 pixels', size: 'md' },
-  { id: 'tiny', layout: 'three', font: '3x5', name: 'Tiny', note: 'Three lines', size: 'sm' },
-  { id: 'max', layout: 'bigsmall', font: 'max', name: 'Max', note: 'Fills the space', size: 'lg' },
-];
 const COLOR_OPTIONS = ['accent', 'icon_color'];
 const SECOND = [
   { id: 'date', block: 'date', name: 'Date' },
@@ -40,7 +35,9 @@ export function render(root, { id, go }) {
   let savedJSON = JSON.stringify(screenForSave(work));
   let savedId = builtin ? source.id : source.id;
   const family = familyOf(source);
-  let lastType = typeFromFont(work.slots[0]?.options?.font) || typeFromLayout(work.layout) || 'big';
+  const clockLayout = work.layout === 'full'
+    ? ({ tiny: 'three', small: 'two' }[fontSettings(work.slots[0]?.options || {}).size] || 'bigsmall')
+    : work.layout;
   let thirdSlot = work.layout === 'three' ? clone(work.slots[2]) : null;
 
   let nightToggle = null;
@@ -301,22 +298,11 @@ export function render(root, { id, go }) {
 
   function clockSections() {
     const frag = h('div');
-    const typeGroup = h('div', { class: 'grid-4', role: 'group', 'aria-label': 'Type' });
     const secondGroup = h('div', { class: 'chips', role: 'group', 'aria-label': 'Second line' });
     const redraw = () => {
-      const type = typeFromFont(work.slots[0]?.options?.font) || (work.layout === 'full' ? lastType : typeFromLayout(work.layout));
-      for (const b of typeGroup.children) b.setAttribute('aria-pressed', String(b.dataset.id === type));
       const sec = secondFromSlots();
       for (const b of secondGroup.children) b.setAttribute('aria-pressed', String(b.dataset.id === sec));
     };
-    for (const t of TYPES) {
-      if (!layoutOf(t.layout)) continue;
-      const btn = h('button', { type: 'button', class: 'type-btn', dataset: { id: t.id } },
-        h('span', { class: `type-sample type-${t.size}`, 'aria-hidden': 'true' }, '10:24'),
-        h('span', { class: 'type-name' }, t.name), h('span', { class: 'type-note' }, t.note));
-      btn.addEventListener('click', () => { setType(t.id); redraw(); refresh(); });
-      typeGroup.append(btn);
-    }
     for (const s of SECOND) {
       if (s.block && !blockOf(s.block)) continue;
       const btn = h('button', { type: 'button', class: 'chip', dataset: { id: s.id } }, s.name);
@@ -353,7 +339,8 @@ export function render(root, { id, go }) {
     rows.append(nightRow);
 
     frag.append(
-      h('section', { class: 'block', 'aria-labelledby': 'type-h' }, eyebrow('Type', 'type-h'), typeGroup),
+      h('section', { class: 'block', 'aria-label': 'Typography' }, fontControls(time.options, refresh),
+        h('p', { class: 'foot-note' }, 'Max fills the available space. Choose Nothing below for a full-panel clock.')),
       h('section', { class: 'block', 'aria-labelledby': 'l2-h' }, eyebrow('Second line', 'l2-h'), secondGroup),
       h('section', { class: 'block', 'aria-labelledby': 'clock-h' }, rows));
     return frag;
@@ -368,15 +355,6 @@ export function render(root, { id, go }) {
     return hit ? hit.id : null;
   }
 
-  function setType(typeId) {
-    lastType = typeId;
-    const t = TYPES.find((x) => x.id === typeId);
-    const timeMeta = blockOf('time');
-    if (!timeMeta || 'font' in (timeMeta.options || {})) work.slots[0].options.font = t.font;
-    if (secondFromSlots() === 'none' && work.layout === 'full') return; // stays one big line
-    applyLayout(TYPES.find((t) => t.id === typeId).layout);
-  }
-
   function setSecond(choice) {
     if (!choice.block) {
       if (work.layout === 'three') thirdSlot = clone(work.slots[2]);
@@ -386,7 +364,7 @@ export function render(root, { id, go }) {
     }
     const prev = work.slots[1];
     const slot = { block: choice.block, color: prev ? prev.color : null, options: { ...defaultOptions(choice.block), ...(choice.options || {}) } };
-    if (work.layout === 'full') applyLayout(TYPES.find((t) => t.id === lastType).layout);
+    if (work.layout === 'full') applyLayout(clockLayout);
     work.slots[1] = slot;
   }
 
@@ -420,7 +398,8 @@ export function render(root, { id, go }) {
     work.slots.forEach((slot, i) => {
       const meta = blockOf(slot.block);
       if (!meta || slot.block === 'none') return;
-      const skip = family === 'clock' && i === 0 && slot.block === 'time' ? ['h24', 'colon_blink', 'font'] : [];
+      const skip = family === 'clock' && i === 0 && slot.block === 'time'
+        ? ['h24', 'colon_blink', 'font', 'font_family', 'font_size'] : [];
       if (family === 'clock' && i === 1 && slot.block === 'progress') skip.push('source');
       const names = Object.keys(meta.options || {}).filter((n) => !skip.includes(n));
       const where = layout?.slots[i]?.where || `Slot ${i + 1}`;
@@ -445,16 +424,6 @@ export function render(root, { id, go }) {
   }
 
   return () => { unsubscribe(); live.cancel(); stuck.disconnect(); };
-}
-
-function typeFromFont(font) {
-  const t = TYPES.find((x) => x.font === font);
-  return t ? t.id : null;
-}
-
-function typeFromLayout(layout) {
-  const t = TYPES.find((x) => x.layout === layout);
-  return t ? t.id : null;
 }
 
 function firstColor(screen) {

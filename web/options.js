@@ -4,6 +4,7 @@ import { state, blockOf, allArt } from './store.js';
 import { h, toggleRow, chips, stepper, nextId, paint } from './ui.js';
 import { api } from './api.js';
 import { nearbyPicker } from './nearby.js';
+import { fontControls } from './fonts.js';
 
 const FALLBACK_COLORS = [
   { c: '#F4F2EE', name: 'White' }, { c: '#FFB23F', name: 'Amber' }, { c: '#FF5A36', name: 'Tomato' },
@@ -51,7 +52,12 @@ export function optionsForm(blockId, options, onChange, cfg = {}) {
   const draw = () => {
     wrap.replaceChildren();
     for (const [name, spec] of Object.entries(meta.options || {})) {
+      if (name === 'font_family' || name === 'font_size') continue;
       if (skip.has(name) || !visible(name, options)) continue;
+      if (name === 'font' && meta.options.font_family) {
+        wrap.append(fontControls(options, onChange));
+        continue;
+      }
       const field = optionField(blockId, name, spec || {}, options, (value, rerender) => {
         options[name] = value;
         onChange(options);

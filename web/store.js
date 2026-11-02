@@ -131,6 +131,8 @@ export function normalizeCatalog(raw) {
 
   return {
     layouts, palettes, blocks, motions, transitions, icons, builtins, shelves, colors, art,
+    fontFamilies: asEntries(c.font_families).map(([id, face]) => ({ id, ...face })),
+    legacyFonts: c.legacy_fonts || {},
     layoutById: new Map(layouts.map((l) => [l.id, l])),
     paletteById: new Map([...legacyPalettes, ...palettes].map((p) => [p.id, p])),
     blockById: new Map(blocks.map((b) => [b.id, b])),
