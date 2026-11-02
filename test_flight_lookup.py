@@ -6,12 +6,23 @@ from unittest.mock import patch
 from concurrent.futures import Future
 
 import flightboard as app
-from flight_lookup import normalize_flight, request_flight, requested_flight, REQUEST_NAME
+from flight_lookup import (normalize_flight, request_flight, requested_flight, REQUEST_NAME,
+                           request_nearby, nearby_requested)
 from settings import Settings
 from test_flightboard import InlineExecutor, Ticker
 
 
 class FlightLookupTests(unittest.TestCase):
+    def test_nearby_request_expires_and_does_not_replace_a_flight_check(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch("flight_lookup.time.time", return_value=1000):
+                request_flight(root, "WS2231")
+                request_nearby(root)
+            self.assertTrue(nearby_requested(root, 1001))
+            self.assertFalse(nearby_requested(root, 1120))
+            self.assertEqual(requested_flight(root, 1001), "WS2231")
+
     def test_formats_and_expiry(self):
         for value in ("ws2231", "WS 2231", "WS-2231", " WS2231 "):
             self.assertEqual(normalize_flight(value), "WS2231")

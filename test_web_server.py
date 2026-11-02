@@ -297,6 +297,37 @@ class ApiTests(ServerTestCase):
 
 
 class FlightCheckApiTests(ServerTestCase):
+    def test_nearby_picker_requests_a_fresh_list_without_saving_or_pinning(self):
+        from flight_lookup import nearby_requested
+        self.get_json("/api/library")
+        saved_library = self.library_path.read_bytes()
+        self.assertStatus(401, self.post, "/api/nearby", {}, key=None)
+        self.assertStatus(403, self.post, "/api/nearby", {}, origin="https://elsewhere.example")
+        for body in ([], {"lat": 0}, {"callsign": "WS1"}):
+            self.assertStatus(400, self.post, "/api/nearby", body)
+        self.assertEqual(self.post("/api/nearby", {})["state"], "checking")
+        self.assertTrue(nearby_requested(self.data_path.parent))
+        plane = {"callsign": "WEN3739", "route": "MSP>YQR", "distance_nm": 5, "altitude_ft": 14075}
+        status = {"nearby_state": "ready", "nearby_updated_at": datetime.now().astimezone().isoformat(),
+                  "nearby": [plane]}
+        path = self.data_path.parent / "status.json"
+        path.write_text(json.dumps(status))
+        result = self.post("/api/nearby", {})
+        self.assertEqual((result["state"], result["planes"]), ("ready", [plane]))
+        screen = {**CUSTOM_SCREEN, "layout": "full", "slots": [
+            {"block": "flight", "color": "#FFFFFF", "options": {"source": "follow", "callsign": "WEN3739"}}]}
+        import blocks
+        expected = blocks.frame(screen, blocks.RenderContext(data={"aircraft": {"nearby": [plane]}}))
+        self.assertEqual(self.post("/api/preview", {"screens": [screen]})["frames"][0], web_server.frame_hex(expected))
+        status["nearby_updated_at"] = "2020-01-01T00:00:00+00:00"
+        path.write_text(json.dumps(status))
+        self.assertEqual(self.post("/api/nearby", {})["planes"], [])
+        status["nearby_state"] = "error"
+        path.write_text(json.dumps(status))
+        self.assertEqual(self.post("/api/nearby", {})["state"], "error")
+        self.assertEqual(self.library_path.read_bytes(), saved_library)
+        self.assertFalse(self.settings_path.exists())
+
     def test_show_selection_produces_three_different_full_flight_previews(self):
         plane = {"callsign": "WS2231", "icao": "WJA2231", "route": "MBJ>YEG",
                  "remaining_min": 127, "progress": .75, "distance_nm": 80, "altitude_ft": 38000}

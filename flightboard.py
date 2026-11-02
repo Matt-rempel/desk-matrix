@@ -27,7 +27,7 @@ from dataclasses import dataclass
 
 import library
 import render
-from flight_lookup import normalize_flight, requested_flight
+from flight_lookup import normalize_flight, requested_flight, nearby_requested
 from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings
 
 SOURCE = "https://opendata.adsb.fi"
@@ -503,6 +503,9 @@ class AircraftProvider:
         } for callsign, entry in self._follow.items()}
         return {"nearby": nearby, "tracked": next(iter(follow.values()), None) if follow else None,
                 "follow": follow, "follow_status": follow_status,
+                "nearby_status": {"state": ("error" if self._nearby_error else
+                                            "ready" if self._nearby_at is not None else "checking"),
+                                  "updated_at": _iso(self._nearby_at)},
                 "updated_at": _iso(max((s for s in stamps if s), default=None)),
                 "error": next((e for e in errors if e), None)}
 
@@ -592,6 +595,8 @@ def build_status(settings, info: dict, pixels, data: dict, now: float | None = N
         "updated_at": datetime.fromtimestamp(now, timezone.utc).isoformat(),
         "nearby": [{key: plane.get(key) for key in ("callsign", "distance_nm", "altitude_ft", "route")}
                    for plane in (aircraft.get("nearby") or [])[:10] if isinstance(plane, dict)],
+        "nearby_state": (aircraft.get("nearby_status") or {}).get("state", "checking"),
+        "nearby_updated_at": (aircraft.get("nearby_status") or {}).get("updated_at"),
         "flights": {cs: {**value, "aircraft": (aircraft.get("follow") or {}).get(cs)}
                     for cs, value in (aircraft.get("follow_status") or {}).items()},
         "frame": render.to_hex(pixels if on else [render.BLACK] * (render.WIDTH * render.HEIGHT)),
@@ -712,6 +717,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
     pixels, info = [render.BLACK] * (render.WIDTH * render.HEIGHT), {}
     next_reload = next_snapshot = next_status = 0.0
     checking_flight = None
+    checking_nearby = False
     next_data = monotonic() + DATA_S
     frames = 0
     matrix.Clear()
@@ -721,6 +727,7 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
             if now >= next_reload:
                 next_reload = now + RELOAD_S
                 checking_flight = requested_flight(state_dir)
+                checking_nearby = nearby_requested(state_dir)
                 mtime = _mtime(args.settings)
                 if mtime != settings_mtime:
                     settings_mtime = mtime
@@ -747,6 +754,8 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
             needs = player.needs()
             if checking_flight:
                 needs = set(needs) | {f"aircraft:follow:{checking_flight}"}
+            if checking_nearby:
+                needs = set(needs) | {"aircraft:nearby"}
             providers.update(needs, lib.get("feeds") or [])
             aircraft.update(needs)
             if now >= next_snapshot:

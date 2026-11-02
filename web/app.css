@@ -268,6 +268,11 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .plane { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line-soft); }
 .plane strong { display: block; font-family: var(--mono); font-size: 15px; }
 .plane small { display: block; font-size: 12px; color: var(--muted); }
+.flight-picker { margin-bottom: 18px; }
+.flight-picker .plane > div { min-width: 0; overflow-wrap: anywhere; }
+.flight-picker .plane button { flex-shrink: 0; }
+.flight-picker > button { margin-top: 10px; }
+.flight-picker button[aria-pressed="true"] { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---- Chips ------------------------------------------------------------------------ */
 .chip-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 28px var(--gutter) 2px; scrollbar-width: none; }

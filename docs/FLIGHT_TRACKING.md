@@ -4,6 +4,15 @@ In a flight screen, select **Source → Follow one**, then enter the flight numb
 including its airline code: `WS2231`, `AC150`, or the aircraft's transmitted
 callsign such as `WJA2231`. Case, spaces and hyphens are normalized.
 
+Under **Follow one**, the **Planes nearby** list shows callsigns, routes when
+known, distance and altitude. Tap **Use** to fill in the draft's callsign and
+preview that aircraft. This does not save the screen or change what is playing.
+You can still type another flight manually. The list uses your configured nearby
+radius and distance unit, refreshes every 20 seconds while expanded, and includes
+**Refresh planes**. Loading, no aircraft in range and feed errors have distinct
+messages. It works even when the current matrix screen is a clock or followed
+flight: the editor requests a temporary nearby lookup through the same provider.
+
 Tap **Check flight** before saving. It reports the callsign searched and whether
 the live feed has a position. The check does not change the matrix, pin a screen,
 or save edits. After saving, tap **Show now** to display the flight.

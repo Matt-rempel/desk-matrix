@@ -236,7 +236,7 @@ class AircraftProviderTests(unittest.TestCase):
             self.assertEqual(fetch.call_count, 2)
             self.assertEqual(lookup.call_count, 2)
         snap = provider.snapshot()
-        self.assertEqual(set(snap), {"nearby", "tracked", "follow", "follow_status", "updated_at", "error"})
+        self.assertEqual(set(snap), {"nearby", "tracked", "follow", "follow_status", "nearby_status", "updated_at", "error"})
         self.assertIsNone(snap["tracked"])
         self.assertIsNone(snap["error"])
         first, second = snap["nearby"]
@@ -452,6 +452,21 @@ class RunLoopTests(unittest.TestCase):
         self.assertIsNone(status["pinned"])
         self.assertEqual(status["flights"]["WS2231"]["state"], "found")
         self.assertEqual(status["flights"]["WS2231"]["resolved"], "WJA2231")
+
+    def test_editor_nearby_picker_fetches_while_a_clock_is_displayed(self):
+        from flight_lookup import request_nearby
+        self.libraries = [self.lineup("time-classic")]
+        request_nearby(self.dir)
+        plane = app.Aircraft("WEN3739", "c00001", 5, 14075, 300)
+        with patch("flightboard.fetch_aircraft", return_value=[plane]) as lookup, \
+                patch("flightboard.lookup_metadata", return_value=None):
+            self.run_loop(2)
+        lookup.assert_called_once_with(app.DEFAULT_LAT, app.DEFAULT_LON, Settings().radius)
+        status = json.loads((self.dir / "status.json").read_text())
+        self.assertEqual(status["screen_id"], "time-classic")
+        self.assertIsNone(status["pinned"])
+        self.assertEqual(status["nearby"][0]["callsign"], "WEN3739")
+        self.assertEqual(status["nearby_state"], "ready")
 
     def test_display_off_blanks_and_reports_off(self):
         save_settings(validate_settings({"display_enabled": False}), self.settings_path)

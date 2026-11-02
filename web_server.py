@@ -21,7 +21,7 @@ from zoneinfo import ZoneInfo
 
 import blocks
 import catalog
-from flight_lookup import normalize_flight, request_flight
+from flight_lookup import normalize_flight, request_flight, request_nearby
 from player import apply_motion
 from library import LIBRARY_PATH, apply_action, load_library, save_library, validate_art, validate_screen
 from settings import (DEFAULT_PATH, LEGACY_FIELDS, STATE_DIR, load_settings, save_settings,
@@ -57,7 +57,7 @@ PWA_FILES = {
     "/icon-512.png": ("icon-512.png", "image/png"),
     "/offline.html": ("offline.html", "text/html; charset=utf-8"),
 }
-POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update", "/api/flight-check")
+POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update", "/api/flight-check", "/api/nearby")
 
 _catalog_body: bytes | None = None
 _data_cache: dict = {"key": None, "data": None}
@@ -182,15 +182,38 @@ def frame_hex(pixels) -> str:
     return bytes(channel for pixel in pixels for channel in pixel).hex()
 
 
-def flight_results() -> dict:
+def recent_status() -> dict:
     """Use the two-second status snapshot, not the slower preview data file."""
     try:
         if time.time() - STATUS_PATH.stat().st_mtime > 10:
             return {}
-        result = json.loads(STATUS_PATH.read_text()).get("flights", {})
+        result = json.loads(STATUS_PATH.read_text())
         return result if isinstance(result, dict) else {}
     except (OSError, ValueError, AttributeError):
         return {}
+
+
+def flight_results() -> dict:
+    return recent_status().get("flights") or {}
+
+
+def nearby_results(status: dict | None = None) -> dict:
+    status = recent_status() if status is None else status
+    state = status.get("nearby_state", "checking")
+    updated = status.get("nearby_updated_at")
+    try:
+        fresh = 0 <= time.time() - datetime.fromisoformat(updated).timestamp() <= 60
+    except (ValueError, TypeError):
+        fresh = False
+    return {"state": state if fresh or state == "error" else "checking",
+            "planes": (status.get("nearby") or []) if fresh else [], "updated_at": updated}
+
+
+def check_nearby(body) -> dict:
+    if body != {}:
+        raise ValueError("Send an empty object to refresh nearby planes")
+    request_nearby(STATUS_PATH.parent)
+    return nearby_results()
 
 
 def check_flight(body) -> dict:
@@ -237,6 +260,10 @@ def render_previews(body, settings, lib: dict) -> list[str]:
     sample = blocks.sample_context()
     zone = ZoneInfo(settings.timezone)
     data = preview_data()
+    status = recent_status()
+    nearby = nearby_results(status)
+    if nearby["state"] == "ready":
+        data.setdefault("aircraft", {})["nearby"] = nearby["planes"]
     flights = flight_results()
     if flights:
         aircraft = data.setdefault("aircraft", {})
@@ -406,6 +433,9 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0:
                 raise ValueError("Request is empty")
             data = json.loads(self.rfile.read(length))
+            if path == "/api/nearby":
+                self._json(200, check_nearby(data))
+                return
             if path == "/api/flight-check":
                 self._json(200, check_flight(data))
                 return

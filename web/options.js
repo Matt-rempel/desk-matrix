@@ -3,6 +3,7 @@
 import { state, blockOf, allArt } from './store.js';
 import { h, toggleRow, chips, stepper, nextId, paint } from './ui.js';
 import { api } from './api.js';
+import { nearbyPicker } from './nearby.js';
 
 const FALLBACK_COLORS = [
   { c: '#F4F2EE', name: 'White' }, { c: '#FFB23F', name: 'Amber' }, { c: '#FF5A36', name: 'Tomato' },
@@ -130,7 +131,15 @@ function optionField(blockId, name, spec, options, set) {
     const result = h('p', { class: 'foot-note', role: 'status', 'aria-live': 'polite' });
     const button = h('button', { type: 'button', class: 'btn btn-small btn-secondary' }, 'Check flight');
     input.setAttribute('aria-describedby', helpId);
+    const picker = nearbyPicker({ distanceUnit: state.settings?.distance_unit,
+      selected: () => input.value,
+      onChoose: (callsign) => {
+        input.value = callsign;
+        result.textContent = `Selected ${callsign}. Save, then tap Show now to put it on the display.`;
+        set(callsign);
+      } });
     input.addEventListener('input', () => { result.textContent = ''; });
+    input.addEventListener('input', picker.syncSelection);
     button.addEventListener('click', async () => {
       const callsign = input.value.replace(/[\s-]+/g, '').toUpperCase();
       if (!/^[A-Z0-9]{2,10}$/.test(callsign) || !/[A-Z]/.test(callsign)) {
@@ -169,7 +178,7 @@ function optionField(blockId, name, spec, options, set) {
         button.disabled = false;
       }
     });
-    return h('div', { class: 'field' }, h('label', { class: 'field-label', for: id }, label), input,
+    return h('div', { class: 'field' }, picker.el, h('label', { class: 'field-label', for: id }, label), input,
       h('p', { class: 'foot-note', id: helpId }, 'Flight numbers (WS2231) and transmitted callsigns (WJA2231) are accepted. Regional flights can use a different operator code. Check the live feed before saving.'),
       button, result);
   }

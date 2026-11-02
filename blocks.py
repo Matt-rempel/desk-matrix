@@ -466,8 +466,15 @@ def _plane(s: Slot) -> tuple[dict | None, str]:
     if s.opt("source") == "follow":
         wanted = _callsign(s.opt("callsign"))
         follows = aircraft.get("follow")
-        if isinstance(follows, dict) and wanted in follows:
+        if isinstance(follows, dict) and isinstance(follows.get(wanted), dict):
             return follows[wanted], "follow"
+        lookup_state = ((aircraft.get("follow_status") or {}).get(wanted) or {}).get("state")
+        nearby_match = next((plane for plane in aircraft.get("nearby") or ()
+                             if isinstance(plane, dict) and _callsign(plane.get("callsign")) == wanted), None)
+        if nearby_match and lookup_state not in ("not_seen", "error"):
+            return nearby_match, "follow"
+        if isinstance(follows, dict) and wanted in follows:
+            return None, "follow"
         tracked = aircraft.get("tracked")
         if isinstance(tracked, dict) and (not wanted or _callsign(tracked.get("callsign")) == wanted):
             return tracked, "follow"

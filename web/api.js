@@ -87,6 +87,7 @@ export const api = {
   settings: () => request('/api/settings'),
   status: () => request('/api/status'),
   checkFlight: (callsign) => request('/api/flight-check', { method: 'POST', body: { callsign } }),
+  nearby: () => request('/api/nearby', { method: 'POST', body: {} }),
   updateStatus: (fresh = false) => request(fresh ? '/api/update?fresh=1' : '/api/update'),
   installUpdate: (version) => request('/api/update', { method: 'POST', body: { version } }),
   saveSettings: (partial) => request('/api/settings', { method: 'POST', body: partial }),

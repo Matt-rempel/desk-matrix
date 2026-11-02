@@ -35,6 +35,17 @@ def texts(layers):
 
 
 class FlightLookupRegressionTests(unittest.TestCase):
+    def test_nearby_picker_draft_uses_only_the_selected_aircraft(self):
+        plane = {"callsign": "WEN3739", "route": "MSP>YQR"}
+        ctx = RenderContext(data={"aircraft": {"nearby": [plane], "follow": {"WEN3739": None},
+                                              "follow_status": {"WEN3739": {"state": "checking"}}}})
+        item = one("flight", source="follow", callsign="WEN3739")
+        self.assertIn(["MSP>YQR"], texts(render_screen(item, ctx)))
+        ctx.data["aircraft"]["follow_status"]["WEN3739"]["state"] = "not_seen"
+        self.assertIn(["NO SIGNAL", "--"], texts(render_screen(item, ctx)))
+        other = one("flight", source="follow", callsign="WJA189")
+        self.assertIn(["CHECK FLIGHT", "--"], texts(render_screen(other, ctx)))
+
     def test_full_flight_show_selection_changes_the_headline_and_pixels(self):
         plane = {"callsign": "WS2231", "icao": "WJA2231", "route": "MBJ>YEG",
                  "origin": "MBJ", "destination": "YEG", "remaining_min": 127,

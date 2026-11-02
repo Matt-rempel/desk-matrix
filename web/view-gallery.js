@@ -5,6 +5,7 @@ import { createMatrix, screenMatrix } from './matrix.js';
 import { preview, cachedPreview } from './api.js';
 import { h, toast } from './ui.js';
 import { focusControls, followFlight, unpin, showNow, removeFromLineup } from './controls.js';
+import { planeList, planeCredits } from './nearby.js';
 
 let filter = 'all';
 
@@ -164,27 +165,16 @@ export function render(root) {
     const planes = state.status?.nearby || [];
     nearby.replaceChildren();
     if (!planes.length) return;
-    const unit = state.settings?.distance_unit === 'km' ? 'km' : 'NM';
-    const list = h('ul', { class: 'plane-list' }, planes.map((plane) => {
-      const dist = Number(plane.distance_nm);
-      const shownDist = Number.isFinite(dist) ? Math.round(unit === 'km' ? dist * 1.852 : dist) : '?';
-      const follow = h('button', { type: 'button', class: 'btn btn-small btn-secondary', 'aria-label': `Follow ${plane.callsign}` }, 'Follow');
-      follow.addEventListener('click', async () => {
-        follow.disabled = true;
-        try { await followFlight(plane.callsign); } catch (error) { toast(error.message, 'error'); } finally { follow.disabled = false; }
-      });
-      return h('li', { class: 'plane' },
-        h('div', null, h('strong', null, plane.callsign || 'Unknown'),
-          h('small', null, `${plane.route ? plane.route + ' · ' : ''}${shownDist} ${unit} · ${plane.altitude_ft != null ? Number(plane.altitude_ft).toLocaleString() + ' ft' : '? ft'}`)),
-        follow);
-    }));
+    const list = planeList(planes, { distanceUnit: state.settings?.distance_unit,
+      onChoose: async (plane) => {
+        try { await followFlight(plane.callsign); } catch (error) { toast(error.message, 'error'); }
+      } });
     const wasOpen = nearby.dataset.open === '1';
     const details = h('details', { class: 'card nearby', open: wasOpen || null },
       h('summary', null, h('span', null, 'Planes nearby'), h('span', { class: 'mono-note' }, String(planes.length))),
       h('p', { class: 'card-note' }, 'Tap Follow to keep a plane on the matrix.'),
       list,
-      h('p', { class: 'credit' }, 'Positions: ', h('a', { href: 'https://adsb.fi/', target: '_blank', rel: 'noopener noreferrer' }, 'adsb.fi'),
-        ' · Routes: ', h('a', { href: 'https://www.adsbdb.com/', target: '_blank', rel: 'noopener noreferrer' }, 'ADSBdb'), '. Route progress is approximate.'));
+      planeCredits());
     details.addEventListener('toggle', () => { nearby.dataset.open = details.open ? '1' : ''; });
     nearby.append(details);
   }
