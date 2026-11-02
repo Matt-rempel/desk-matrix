@@ -95,8 +95,6 @@
 }
 /* Pale swatches (Paper, White) need an edge on light surfaces. */
 :root[data-theme="light"] .pal-dot, :root[data-theme="light"] .swatch:not(.swatch-auto) { outline: 1px solid var(--line-strong); outline-offset: -1px; }
-.theme-btn { color: var(--muted); }
-.theme-btn:hover { color: var(--text); }
 
 * { box-sizing: border-box; }
 /* Repeated taps on steppers should not trigger iOS double-tap zoom; pinch zoom remains available. */
