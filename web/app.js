@@ -117,7 +117,8 @@ function renderUpdateBanner() {
       state === 'error' ? 'Try again' : 'Install update')
     : null;
   updateEl.append(h('div', { class: 'update-copy' },
-    h('strong', {}, title), h('span', {}, detail)), button);
+    h('strong', {}, title), h('span', {}, detail)));
+  if (button) updateEl.append(button);
 }
 
 async function installUpdate(version) {
