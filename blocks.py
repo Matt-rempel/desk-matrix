@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable, NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -61,6 +61,7 @@ class RenderContext:
     art: dict = field(default_factory=dict)
     habits: dict = field(default_factory=dict)
     timers: dict = field(default_factory=dict)
+    nhl_elapsed: float | None = None
 
 
 def _valid_color(value) -> bool:
@@ -973,8 +974,13 @@ def _nhl_scoreboard(s: Slot, game: dict) -> list[dict]:
 
 def b_nhl(s: Slot) -> list[dict]:
     """Keep both scores and game status visible together."""
-    r, team = s.rect, s.opt("team")
-    game = (s.source("nhl") or {}).get(team) or {}
+    teams = nhl.followed_teams(s.options)
+    hockey = s.source("nhl") or {}
+    games = nhl.games_for_teams(hockey, teams)
+    elapsed = s.ctx.elapsed if s.ctx.nhl_elapsed is None else s.ctx.nhl_elapsed
+    team, game = games[int(max(0, elapsed) // nhl.ROTATE_S) % len(games)] if games else (teams[0], hockey.get(teams[0]) or {})
+    s = replace(s, options={**s.options, "team": team})
+    r = s.rect
     if not r.full:
         return s.placeholder([team])
     if s.opt("display") == "logos" and game.get("state") in ("live", "final", "upcoming"):
@@ -1286,9 +1292,7 @@ def data_needs(screen: dict) -> set[str]:
             if station:
                 needs.add(f"metar:{station}")
         elif block == "nhl":
-            team = options.get("team", "CGY")
-            if team in catalog.BLOCKS["nhl"]["options"]["team"]["choices"]:
-                needs.add(f"nhl:{team}")
+            needs.update(f"nhl:{team}" for team in nhl.followed_teams(options))
         elif block in ("feed", "spark"):
             if block == "spark" and options.get("source", "temp_hourly") != "feed":
                 needs.add("weather")

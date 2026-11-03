@@ -64,7 +64,7 @@ INTERRUPT_DEFAULTS = {
     "timer_done": {"enabled": True},
     "rain_soon": {"enabled": False, "minutes": 15},
     "iss_overhead": {"enabled": False},
-    "nhl_live": {"enabled": False, "screen_id": "data-score", "mode": "brief", "seconds": 20},
+    "nhl_live": {"enabled": False, "screen_id": "nhl-scoreboard", "teams": [], "mode": "brief", "seconds": 20},
     # Pi alerts
     "pi_hot": {"enabled": True, "threshold_c": 75},
     "pi_power": {"enabled": True},
@@ -164,6 +164,14 @@ def _blank_id(value) -> bool:
     return value is None or value == ""
 
 
+def _nhl_teams(value) -> list[str]:
+    from nhl import TEAMS
+    _check(isinstance(value, list) and len(value) <= len(TEAMS), "Choose up to 32 NHL teams")
+    _check(all(isinstance(team, str) and team in TEAMS for team in value), "Unknown NHL team")
+    _check(len(set(value)) == len(value), "NHL teams must not repeat")
+    return list(value)
+
+
 # ---------------------------------------------------------------- screens
 
 def validate_options(block_id: str, options) -> dict:
@@ -187,6 +195,8 @@ def validate_options(block_id: str, options) -> dict:
             _check(isinstance(value, str) and value in spec["choices"],
                    f"{label} must be one of {', '.join(c or '(none)' for c in spec['choices'])}")
             clean[name] = value
+        elif kind == "teams":
+            clean[name] = _nhl_teams(value)
         elif kind == "date":
             clean[name] = "" if value == "" else _date(value, label)
         elif kind == "color":
@@ -401,7 +411,7 @@ def validate_lineup(lineup, known: set) -> dict:
                    "NHL live interruption needs an existing screen")
             _check(value["mode"] in ("brief", "game"),
                    "NHL live interruption mode must be brief or game")
-            clean.update(screen_id=screen_id, mode=value["mode"],
+            clean.update(screen_id=screen_id, teams=_nhl_teams(value["teams"]), mode=value["mode"],
                          seconds=_int(value["seconds"], *INTERRUPT_BOUNDS["seconds"], "NHL alert seconds"))
             clean_interrupts[kind] = clean
             continue

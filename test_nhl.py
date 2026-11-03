@@ -24,6 +24,33 @@ def game(state, start, *, home="CGY", away="EDM", home_score=None, away_score=No
 
 
 class NHLTests(unittest.TestCase):
+    def test_multiple_teams_rotate_live_games_and_deduplicate_a_shared_matchup(self):
+        import copy
+        item = copy.deepcopy(catalog.BUILTINS["nhl-scoreboard"])
+        item["slots"][0]["options"]["teams"] = ["CGY", "EDM", "SJS"]
+        hockey = {"CGY": {"state": "live", "game_id": 1, "home": "CGY", "away": "SJS", "home_score": 1, "away_score": 0},
+                  "EDM": {"state": "live", "game_id": 2, "home": "VAN", "away": "EDM", "home_score": 2, "away_score": 3}}
+        hockey["SJS"] = dict(hockey["CGY"])
+        self.assertEqual(blocks.data_needs(item), {"nhl:CGY", "nhl:EDM", "nhl:SJS"})
+        self.assertEqual([t for t, _ in nhl.games_for_teams(hockey, ["CGY", "EDM", "SJS"])], ["CGY", "EDM"])
+        ctx = blocks.RenderContext(now=NOW, data={"nhl": hockey})
+        first = blocks.frame(item, ctx)
+        ctx.elapsed = 10
+        second = blocks.frame(item, ctx)
+        self.assertNotEqual(first, second)
+        self.assertIn(["3-2"], [l["s"] for l in blocks.render_screen(item, ctx) if l["t"] == "text"])
+        ctx.elapsed = 20
+        self.assertEqual(first, blocks.frame(item, ctx))
+        hockey["EDM"]["state"] = "upcoming"
+        self.assertEqual([t for t, _ in nhl.games_for_teams(hockey, ["EDM", "CGY"])], ["CGY"])
+        self.assertEqual(nhl.followed_teams({"team": "EDM", "teams": []}), ["EDM"])
+
+    def test_live_alert_games_exclude_failed_or_stale_sources(self):
+        hockey = {"CGY": {"state": "live", "game_id": 1, "age_s": 91},
+                  "EDM": {"state": "live", "game_id": 2, "error": "offline"},
+                  "VAN": {"state": "live", "game_id": 3, "age_s": 3, "intermission": True}}
+        self.assertEqual([t for t, _ in nhl.games_for_teams(hockey, ["CGY", "EDM", "VAN"], live_only=True)], ["VAN"])
+
     def test_detail_preserves_intermission_shots_and_clock_flags(self):
         raw = game("LIVE", "2026-10-12T18:00:00Z", away="SJS", home_score=1, away_score=0,
                    period=1, clock="00:00")

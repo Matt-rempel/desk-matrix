@@ -277,6 +277,8 @@ class InterruptTests(unittest.TestCase):
         live = self.nhl_data()
         self.assertEqual((p.tick(0, live)[1]["screen_id"], p._interrupt["name"]),
                          ("data-score", "nhl_live"))
+        self.assertEqual(p._interrupt["screen"]["slots"][0]["options"]["display"], "logos")
+        self.assertNotEqual(catalog.BUILTINS["data-score"]["slots"][0]["options"].get("display"), "logos")
         live["nhl"]["CGY"]["clock"] = "09:01"
         self.assertEqual(p.tick(20, live)[1]["screen_id"], "time-big")
         self.assertIsNone(p.tick(30, live)[1]["interrupt"])
@@ -313,6 +315,57 @@ class InterruptTests(unittest.TestCase):
         self.assertEqual(p.tick(0, live)[1]["screen_id"], "time-classic")
         lib["pinned"] = None
         self.assertEqual((p.tick(1, live)[1]["screen_id"], p._interrupt["name"]), (sid, "nhl_live"))
+
+    def test_nhl_multiple_brief_alerts_take_turns_and_only_show_the_changed_game(self):
+        cfg = {"nhl_live": {"enabled": True, "teams": ["CGY", "EDM", "SJS"], "mode": "brief", "seconds": 5}}
+        p, _ = self.make(cfg)
+        live = self.nhl_data()
+        live["nhl"]["CGY"]["away"] = "SJS"
+        live["nhl"]["SJS"] = dict(live["nhl"]["CGY"])
+        live["nhl"]["EDM"] = {"state": "live", "game_id": 2026020002, "home": "VAN", "away": "EDM", "home_score": 0, "away_score": 1}
+        self.assertTrue({"nhl:CGY", "nhl:EDM", "nhl:SJS"} <= p.needs())
+        p.tick(0, live)
+        self.assertEqual(p._interrupt["screen"]["slots"][0]["options"]["teams"], ["CGY"])
+        p.tick(5, live)
+        self.assertEqual(p._interrupt["screen"]["slots"][0]["options"]["teams"], ["EDM"])
+        self.assertIsNone(p.tick(10, live)[1]["interrupt"])
+        live["nhl"]["EDM"]["away_score"] = 2
+        self.assertEqual(p.tick(11, live)[1]["interrupt"], "nhl_live")
+        self.assertEqual(p._interrupt["screen"]["slots"][0]["options"]["teams"], ["EDM"])
+        self.assertIsNone(p.tick(16, live)[1]["interrupt"])
+
+    def test_nhl_rotation_carries_across_short_lineup_visits(self):
+        sid = "custom-" + "c" * 32
+        screen = {**catalog.BUILTINS["nhl-scoreboard"], "id": sid,
+                  "slots": [{"block": "nhl", "color": "#FFFFFF", "options": {
+                      "teams": ["CGY", "EDM"], "display": "logos"}}]}
+        p = Player(library(always=[(sid, 5), ("time-classic", 5)], screens=[screen]), settings(), now_fn=Clock())
+        data = self.nhl_data()
+        data["nhl"]["EDM"] = {"state": "live", "game_id": 2, "home": "EDM", "away": "VAN", "home_score": 4, "away_score": 0}
+        first = p.tick(0, data)[0]
+        self.assertEqual(p.tick(5, data)[1]["screen_id"], "time-classic")
+        self.assertEqual(first, p.tick(10, data)[0])  # five seconds of screen time so far
+        p.tick(15, data)
+        self.assertNotEqual(first, p.tick(20, data)[0])  # resumes at the second game
+
+    def test_nhl_live_game_rotation_keeps_remaining_games_and_resumes_the_lineup(self):
+        cfg = {"nhl_live": {"enabled": True, "teams": ["CGY", "EDM"], "mode": "game", "seconds": 20}}
+        p, lib = self.make(cfg)
+        live = self.nhl_data()
+        live["nhl"]["CGY"].update(away="SJS", intermission=True)
+        live["nhl"]["EDM"] = {"state": "live", "game_id": 2026020002, "home": "VAN", "away": "EDM", "home_score": 0, "away_score": 1}
+        first = p.tick(0, live)[0]
+        self.assertNotEqual(first, p.tick(10, live)[0])
+        self.assertEqual(first, p.tick(20, live)[0])
+        live["nhl"]["CGY"]["state"] = "final"
+        self.assertEqual(p.tick(21, live)[1]["interrupt"], "nhl_live")
+        self.assertEqual(p._interrupt["screen"]["slots"][0]["options"]["teams"], ["EDM"])
+        live["nhl"]["EDM"]["error"] = "offline"
+        self.assertEqual(p.tick(22, live)[1]["screen_id"], "time-big")
+        live["nhl"]["EDM"].pop("error")
+        self.assertEqual(p.tick(23, live)[1]["interrupt"], "nhl_live")
+        lib["lineup"]["interrupts"]["nhl_live"]["enabled"] = False
+        self.assertEqual(p.tick(24, live)[1]["screen_id"], "time-big")
 
     def test_plane_overhead_once_per_callsign_per_hour(self):
         p, _ = self.make({"plane_overhead": {"enabled": True, "radius_nm": 3,

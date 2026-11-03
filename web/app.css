@@ -562,6 +562,29 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .sheet-title { font-size: 17px; font-weight: 600; }
 .sheet-body { overflow-y: auto; padding: 14px 20px calc(24px + env(safe-area-inset-bottom)); }
 .sheet-text { color: var(--muted); font-size: 14px; line-height: 1.45; }
+
+/* NHL team selection is a separate, searchable sheet, shared by screens and alerts. */
+.nhl-teams-control { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--text); text-align: left; cursor: pointer; }
+.nhl-teams-control .row-text { flex: 1; min-width: 0; }
+.nhl-teams-control .row-title, .nhl-teams-control .row-detail, .nhl-team-choice .row-title, .nhl-team-choice .row-detail { display: block; }
+.nhl-team-count { padding: 3px 10px; border-radius: 20px; background: var(--accent-soft); color: var(--accent-text); font-size: 14px; }
+.nhl-team-sheet { height: 86dvh; }
+.nhl-team-sheet .sheet-body { padding-top: 0; padding-bottom: 0; }
+.nhl-picker-help { margin: 14px 0; }
+.nhl-picker-search { position: sticky; top: 0; z-index: 1; padding: 8px 0 0; background: var(--surface); }
+.nhl-picker-count { margin: 8px 0 0; padding-bottom: 10px; color: var(--muted); font-size: 13px; }
+.nhl-team-choice { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 10px 2px; border: 0; border-bottom: 1px solid var(--line-soft); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.nhl-team-choice .row-text { flex: 1; min-width: 0; }
+.nhl-team-choice .row-title { font-size: 15px; }
+.nhl-team-icon { display: grid; place-items: center; flex: 0 0 44px; height: 44px; border-radius: 10px; background: #050506; }
+.nhl-team-mark { width: 32px; height: 32px; image-rendering: pixelated; }
+.nhl-team-check { display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 24px; border: 1px solid var(--line-strong); border-radius: 50%; font-size: 15px; }
+.nhl-team-choice[aria-pressed="true"] .nhl-team-check { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.nhl-picker-footer { position: sticky; bottom: 0; z-index: 1; padding: 12px 0 calc(12px + env(safe-area-inset-bottom)); background: var(--surface); }
+.nhl-picker-footer .btn { width: 100%; }
+.nhl-appearance { font-size: 14px; color: var(--muted); }
+.nhl-appearance > summary { cursor: pointer; }
+.nhl-appearance .field { margin-top: 16px; }
 .pick-group + .pick-group { margin-top: 18px; }
 .pick-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .pick { width: 100%; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--black); color: var(--text); text-align: left; min-height: 44px; }

@@ -25,6 +25,50 @@ TEAM_NAMES = {
     "WPG": "Winnipeg Jets", "WSH": "Washington Capitals",
 }
 
+ROTATE_S = 10
+
+
+def followed_teams(options: dict) -> list[str]:
+    """An explicit list wins; old single-team screens keep their original team."""
+    values = options.get("teams")
+    if isinstance(values, list) and values:
+        teams = list(dict.fromkeys(t for t in values if isinstance(t, str) and t in TEAMS))
+        if teams:
+            return teams
+    team = options.get("team", "CGY")
+    return [team if isinstance(team, str) and team in TEAMS else "CGY"]
+
+
+def game_key(game: dict, team: str = "") -> tuple:
+    game_id = game.get("game_id")
+    if isinstance(game_id, (str, int)) and not isinstance(game_id, bool) and game_id:
+        return ("id", game_id)
+    return ("match", str(game.get("home") or team), str(game.get("away") or ""),
+            str(game.get("start") or ""))
+
+
+def games_for_teams(hockey: dict, teams: list[str], *, live_only=False) -> list[tuple[str, dict]]:
+    """Keep each matchup once, favouring live games for regular screen rotation."""
+    games, seen = [], set()
+    for team in teams:
+        game = hockey.get(team)
+        if not isinstance(game, dict) or game.get("state") not in ("live", "final", "upcoming"):
+            continue
+        if live_only:
+            age = game.get("age_s")
+            if (game.get("state") != "live" or game.get("error")
+                    or isinstance(age, (int, float)) and age > 90):
+                continue
+        key = game_key(game, team)
+        if key not in seen:
+            seen.add(key)
+            games.append((team, game))
+    if games and not live_only:
+        rank = {"live": 0, "final": 1, "upcoming": 2}
+        priority = min(rank[g["state"]] for _, g in games)
+        games = [(team, g) for team, g in games if rank[g["state"]] == priority]
+    return games
+
 
 def _start(game: dict) -> datetime | None:
     try:

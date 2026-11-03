@@ -5,6 +5,7 @@ import { h, toggleRow, chips, stepper, nextId, paint } from './ui.js';
 import { api } from './api.js';
 import { nearbyPicker } from './nearby.js';
 import { fontControls } from './fonts.js';
+import { teamPicker, followedTeams } from './nhl-teams.js';
 
 const FALLBACK_COLORS = [
   { c: '#F4F2EE', name: 'White' }, { c: '#FFB23F', name: 'Amber' }, { c: '#FF5A36', name: 'Tomato' },
@@ -53,6 +54,7 @@ export function optionsForm(blockId, options, onChange, cfg = {}) {
   const draw = () => {
     wrap.replaceChildren();
     for (const [name, spec] of Object.entries(meta.options || {})) {
+      if (blockId === 'nhl' && name === 'team') continue; // superseded by the multi-team picker
       if (name === 'font_family' || name === 'font_size') continue;
       if (skip.has(name) || !visible(name, options)) continue;
       if (name === 'font' && meta.options.font_family) {
@@ -75,6 +77,13 @@ function optionField(blockId, name, spec, options, set) {
   const value = options[name] ?? spec.default;
   const label = optionLabel(name, spec);
   const type = spec.type;
+
+  if (type === 'teams') {
+    return h('div', { class: 'field' }, teamPicker({ value: followedTeams(options),
+      detail: 'Live games play first. Multiple games rotate every 10 seconds; a shared matchup appears once.',
+      onChange: (teams) => set(teams) }),
+    h('p', { class: 'card-note' }, 'Live games first. Multiple games rotate every 10 seconds.'));
+  }
 
   if (type === 'bool') {
     return h('div', { class: 'card card-rows' }, toggleRow({ title: label, pressed: !!value, onChange: (v) => set(v) }));

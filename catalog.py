@@ -6,6 +6,7 @@ import copy
 
 from render import ICONS, WIDTH, HEIGHT, FONT_FAMILIES, FONT_SIZES, LEGACY_FONT_SETTINGS, rasterize, to_hex
 from nhl import TEAMS, TEAM_NAMES
+from nhl_logos import LOGOS as NHL_LOGOS
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
 
@@ -182,6 +183,7 @@ BLOCKS = {
         "team": {"type": "enum", "default": "CGY", "choices": list(TEAMS),
                  "labels": {code: f"{name} ({code})" for code, name in TEAM_NAMES.items()},
                  "label": "Team shown"},
+        "teams": {"type": "teams", "default": [], "label": "Teams to follow"},
         "h24": _bool(False),
         "display": {"type": "enum", "default": "classic", "label": "Scoreboard",
                     "choices": ["classic", "logos"], "labels": {"classic": "Classic", "logos": "Team logos"}},
@@ -493,6 +495,7 @@ def catalog_json() -> dict:
     return copy.deepcopy({
         "display": {"width": WIDTH, "height": HEIGHT},
         "layouts": LAYOUTS, "palettes": PALETTES, "blocks": BLOCKS,
+        "nhl_teams": [{"code": team, "name": TEAM_NAMES[team], "logo": NHL_LOGOS[team]} for team in TEAMS],
         "legacy_palettes": LEGACY_PALETTES,
         "font_families": {key: {"name": name, "sample": to_hex(rasterize([
             {"t": "text", "s": "12:34", "face": key, "size": "max", "x": 0, "y": 0,

@@ -7,7 +7,9 @@ visible together; it does not scroll or rotate between statistics.
 ## Choose the screen
 
 1. Open **New screen → Sports → NHL scoreboard**.
-2. Choose **Team shown**, then save and add it to your lineup or use **Show now**.
+2. Open **Teams to follow**, search or browse the team list, select one or more
+   teams, then tap **Done**. Save the screen and add it to your lineup or use
+   **Show now**.
 3. To change an existing NHL screen, open **Customize → Scoreboard → Team logos**.
 
 The selected team always appears on the left, whether it plays at home or away.
@@ -16,10 +18,46 @@ the selected team and 9 for the opponent. Turn **Show shots** off to hide this
 row. Missing scores or shots use a dash, not an invented zero. Very large shot
 counts use the shorter prefix `S` so both numbers still fit.
 
+With multiple teams, live games take priority. If none are live, recently
+finished games take priority over upcoming games. Games at the same priority
+rotate every 10 seconds of screen time. Rotation resumes across short lineup
+visits rather than repeatedly starting with the first team. When two selected
+teams play each other, that matchup appears once, with the earlier selected
+team on the left. Close the picker to cancel; **Done** requires at least one
+team. Teams can be found by full name or abbreviation.
+
 Logos retain their team colours with the Original palette. Applying a screen
 palette tints them to match the selected palette. The older **Classic** layout
 remains available. Updating the app does not change saved screens, the lineup,
 or the pinned screen automatically.
+
+## Live alerts
+
+Open **Lineup → Live alerts → NHL games live**. Enable the alert and open
+**Teams to follow** to select multiple teams using the same picker as Customize.
+Tap **Done**, then **Save lineup** to apply the alert settings.
+
+- **Brief alerts** shows the appropriate game at puck drop and whenever its
+  score changes. If several games change while another alert is showing, the
+  pending game observations are checked in selection order after it finishes.
+  A shared matchup is not alerted twice. Changes to the same game during its
+  alert remain visible and can trigger another brief alert afterward.
+- **Follow live games** keeps scoreboards on the display while any selected
+  game is live, rotating between unique games, including intermissions. Games
+  leave the rotation when finished, stale or unavailable. The normal lineup
+  resumes when no selected game is live. Existing timer/device alert priorities
+  and Show now pins are respected.
+- Alerts always use the full **Team logos** layout, including alert settings
+  saved before it was introduced. The saved screen itself is not rewritten.
+  **Scoreboard appearance** optionally selects an NHL screen whose colours and
+  shots setting the alert should use.
+
+Screen and alert team lists can be configured independently. Until an alert
+has an explicit team list, it inherits the teams from its selected appearance
+screen; old single-team screens retain their original team. An empty stored
+list is the backwards-compatible inheritance value, not an empty selection
+offered by the picker. Explicit lists accept up to all 32 teams, without
+duplicates or unknown team codes.
 
 ## Period, clock and game states
 
@@ -94,6 +132,8 @@ without it the recorded hashes describe the input PNGs instead.
 ## Implementation and checks
 
 - `nhl.py`: defensive schedule/detail parsing, polling intervals and status text.
+- `nhl.py`, `player.py`: followed-team selection, unique-game rotation and
+  multi-game alert bookkeeping.
 - `providers.py`: background requests, game-detail enrichment and last-good data.
 - `flightboard.py`: promptly persists new NHL observations for web previews.
 - `blocks.py`: Classic and Team logos renderers shared by panel and previews.
@@ -101,6 +141,8 @@ without it the recorded hashes describe the input PNGs instead.
 - `nhl_logos.py`: generated runtime pixels, included in `deploy-manifest.json`.
 - `web/options.js`, `web/api.js`, `web/matrix.js`: conditional shots control and
   fresh live previews.
+- `web/nhl-teams.js`: shared searchable picker with bundled team marks; used by
+  Customize and Lineup live alerts.
 
 Regression coverage includes intermissions, stopped/running clocks, stale
 observations, overtime/shootouts/finals, missing shots, away-team orientation,

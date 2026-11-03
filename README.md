@@ -18,7 +18,9 @@ Block, Outline or Digital, then use **Max** for a clock that fills the panel.
 See [fonts, sizes and existing-screen compatibility](docs/FONTS.md).
 
 The **NHL scoreboard** screen keeps team logos, scores, shots and the current
-period or intermission visible together. See [NHL scoreboard options and live
+period or intermission visible together. Follow multiple teams with a searchable
+picker in Customize and Live alerts; unique games rotate automatically.
+See [NHL scoreboard options and live
 clock behaviour](docs/NHL_SCOREBOARD.md).
 
 The first installation uses WinSport in Calgary as a sample location. **Change

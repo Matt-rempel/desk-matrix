@@ -5,6 +5,14 @@ const KEY = 'a'.repeat(64);
 const NAME = 'flightboard-key';
 let moduleNumber = 0;
 
+test('NHL team picker keeps legacy single-team choices and describes multiple teams', async () => {
+  const { followedTeams, teamsLabel } = await import('./web/nhl-teams.js');
+  assert.deepEqual(followedTeams({ team: 'EDM', teams: [] }), ['EDM']);
+  assert.deepEqual(followedTeams({ team: 'CGY', teams: ['EDM', 'VAN', 'EDM'] }), ['EDM', 'VAN']);
+  assert.equal(teamsLabel(['CGY', 'EDM']), 'CGY, EDM');
+  assert.equal(teamsLabel(['CGY', 'EDM', 'VAN', 'SJS', 'TOR']), 'CGY, EDM, VAN +2');
+});
+
 test('NHL clocks opt into live previews and scores never reuse a cached frame', async () => {
   const { hasLiveClock } = await import('./web/matrix.js');
   const screen = { layout: 'full', slots: [{ block: 'nhl', options: { team: 'CGY', display: 'logos' } }] };

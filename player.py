@@ -9,6 +9,7 @@ at render time. Standard library only.
 from __future__ import annotations
 
 import math
+import copy
 import random
 import time
 from datetime import datetime, timezone
@@ -17,6 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import blocks
 import catalog
 import library
+import nhl
 from settings import is_night
 from render import BLACK, HEIGHT, WIDTH, jround, mix, parse_color
 
@@ -223,7 +225,9 @@ class Player:
         self._iss_overhead = False
         self._timer_seen: set[tuple[str, float]] = set()
         self._alert_fired: dict[str, float] = {}
-        self._nhl_seen: tuple | None = None
+        self._nhl_seen: dict[tuple, tuple] = {}
+        self._nhl_elapsed: dict[str, float] = {}
+        self._nhl_rotation_last: tuple[str, float] | None = None
         self.set_library(library)
 
     # -- inputs ----------------------------------------------------------------
@@ -310,11 +314,11 @@ class Player:
                 result |= needs
         target = self._nhl_target()
         if target:
-            result.add(f"nhl:{target[1]}")
+            result.update(f"nhl:{team}" for team in target[1])
         return result
 
     # -- interruptions ---------------------------------------------------------------
-    def _nhl_target(self) -> tuple[dict, str, dict] | None:
+    def _nhl_target(self) -> tuple[dict, list[str], dict] | None:
         config = self._interrupt_config("nhl_live")
         if not config:
             return None
@@ -323,48 +327,55 @@ class Player:
             return None
         for slot in screen.get("slots") or ():
             if isinstance(slot, dict) and slot.get("block") == "nhl":
-                options = slot.get("options")
-                team = options.get("team", "CGY") if isinstance(options, dict) else "CGY"
-                if f"nhl:{team}" in blocks.data_needs(screen):
-                    return config, team, screen
+                options = slot.get("options") or {}
+                teams = nhl.followed_teams({"teams": config.get("teams") or nhl.followed_teams(options)})
+                return config, teams, screen
         return None
 
-    def _nhl_game(self, data: dict) -> tuple[dict, str, dict] | None:
+    def _nhl_games(self, data: dict) -> tuple[dict, dict, list[tuple[str, dict]]] | None:
         target = self._nhl_target()
         if not target:
             return None
-        config, team, screen = target
+        config, teams, screen = target
         hockey = data.get("nhl") if isinstance(data.get("nhl"), dict) else {}
-        game = hockey.get(team) if isinstance(hockey.get(team), dict) else {}
-        age = game.get("age_s")
-        if (game.get("state") != "live" or
-                (isinstance(age, (int, float)) and age > 180)):
-            return None
-        return config, screen["id"], game
+        games = nhl.games_for_teams(hockey, teams, live_only=True)
+        return (config, screen, games) if games else None
+
+    @staticmethod
+    def _nhl_alert_screen(template: dict, teams: list[str]) -> dict:
+        """Old alert selections also get the full logo scoreboard, without editing the library."""
+        screen = copy.deepcopy(template)
+        slot = next(slot for slot in screen["slots"] if slot["block"] == "nhl")
+        slot["options"] = {**(slot.get("options") or {}), "display": "logos", "teams": teams, "team": teams[0]}
+        screen.update(layout="full", slots=[slot])
+        return screen
+
+    def _start_nhl(self, mono, config, template, teams):
+        self._start_interrupt(mono, "nhl_live", template["id"], config["seconds"])
+        self._interrupt["screen"] = self._nhl_alert_screen(template, teams)
+        self._interrupt["mode"] = config["mode"]
+        if config["mode"] == "game":
+            self._interrupt["until"] = float("inf")
 
     def _check_nhl(self, mono: float, data: dict) -> bool:
-        live = self._nhl_game(data)
+        live = self._nhl_games(data)
         if not live:
-            hockey = data.get("nhl") if isinstance(data.get("nhl"), dict) else {}
-            target = self._nhl_target()
-            game = hockey.get(target[1]) if target else None
-            if isinstance(game, dict) and game.get("state") in ("final", "upcoming", "none"):
-                self._nhl_seen = None
             return False
-        config, screen_id, game = live
+        config, screen, games = live
         if config["mode"] == "game":
-            self._start_interrupt(mono, "nhl_live", screen_id, 2)
-            self._interrupt["mode"] = "game"
-            self._interrupt["until"] = float("inf")
+            self._start_nhl(mono, config, screen, [team for team, _ in games])
             return True
-        token = (screen_id, game.get("game_id") or game.get("start"),
-                 game.get("home_score"), game.get("away_score"))
-        if token == self._nhl_seen:
-            return False
-        self._nhl_seen = token
-        self._start_interrupt(mono, "nhl_live", screen_id, config["seconds"])
-        self._interrupt["mode"] = "brief"
-        return True
+        for team, game in games:
+            key = nhl.game_key(game, team)
+            token = (game.get("home_score"), game.get("away_score"))
+            if self._nhl_seen.get(key) == token:
+                continue
+            self._nhl_seen[key] = token
+            if len(self._nhl_seen) > 128:
+                del self._nhl_seen[next(iter(self._nhl_seen))]
+            self._start_nhl(mono, config, screen, [team])
+            return True
+        return False
 
     def _start_interrupt(self, mono: float, name: str, screen_id: str, seconds: float,
                          flash: float = 0.0, focus: dict | None = None) -> None:
@@ -377,9 +388,11 @@ class Player:
         if self._interrupt and mono >= self._interrupt["until"]:
             self._interrupt = None
         if self._interrupt and self._interrupt["name"] == "nhl_live" and self._interrupt.get("mode") == "game":
-            live = self._nhl_game(data)
-            if not live or live[0]["mode"] != "game" or live[1] != self._interrupt["screen_id"]:
+            live = self._nhl_games(data)
+            if not live or live[0]["mode"] != "game" or live[1]["id"] != self._interrupt["screen_id"]:
                 self._interrupt = None
+            else:
+                self._interrupt["screen"] = self._nhl_alert_screen(live[1], [team for team, _ in live[2]])
         # timer_done preempts any other interruption; its bookkeeping runs even when off
         done = None
         for timer_id, timer in self._timers_raw().items():
@@ -511,6 +524,10 @@ class Player:
     # -- main entry point -------------------------------------------------------------
     def tick(self, now_monotonic: float, data: dict | None) -> tuple[list, dict]:
         mono = float(now_monotonic)
+        if self._nhl_rotation_last:
+            sid, previous = self._nhl_rotation_last
+            self._nhl_elapsed[sid] = self._nhl_elapsed.get(sid, 0.0) + max(0, mono - previous)
+        self._nhl_rotation_last = None
         data = data if isinstance(data, dict) else {}
         now = self._now()
         local = self._local(now)
@@ -576,6 +593,9 @@ class Player:
             pixels = self._flash(screen, mono - interrupt["started"], night)
         else:
             ctx = self._context(local, now, elapsed, self._screen_data(screen, data))
+            if any(slot.get("block") == "nhl" for slot in screen.get("slots") or ()):
+                ctx.nhl_elapsed = self._nhl_elapsed.get(screen_id, 0.0)
+                self._nhl_rotation_last = (screen_id, mono)
             pixels = blocks.frame(screen, ctx, "night" if night else None)
             style = screen.get("style") if isinstance(screen.get("style"), dict) else {}
             pixels = apply_motion(pixels, style.get("motion") or "still", elapsed)

@@ -218,6 +218,25 @@ class ApiTests(ServerTestCase):
         self.assertTrue(saved["screens"][-1]["slots"][0]["options"]["show_shots"])
         self.assertEqual(saved["pinned"], before["pinned"])
 
+    def test_multiple_nhl_teams_preview_rotate_and_round_trip_in_screens_and_live_alerts(self):
+        self.data_path.write_text(json.dumps({"nhl": {
+            "CGY": {"state": "live", "game_id": 1, "home": "CGY", "away": "SJS", "home_score": 1, "away_score": 0},
+            "EDM": {"state": "live", "game_id": 2, "home": "VAN", "away": "EDM", "home_score": 0, "away_score": 3}}}))
+        item = {**CUSTOM_SCREEN, "layout": "full", "style": {"palette": None, "motion": "still"},
+                "slots": [{"block": "nhl", "color": None, "options": {"teams": ["CGY", "EDM"], "display": "logos"}}]}
+        first = self.post("/api/preview", {"screens": [item], "elapsed": 0})["frames"][0]
+        second = self.post("/api/preview", {"screens": [item], "elapsed": 10})["frames"][0]
+        self.assertNotEqual(first, second)
+        saved = self.post("/api/library", {"action": "save_screen", "screen": item})
+        self.assertEqual(saved["screens"][-1]["slots"][0]["options"]["teams"], ["CGY", "EDM"])
+        saved["lineup"]["interrupts"]["nhl_live"].update(enabled=True, teams=["CGY", "EDM"], mode="game")
+        after = self.post("/api/library", {"action": "save_lineup", "lineup": saved["lineup"]})
+        self.assertEqual(after["lineup"]["interrupts"]["nhl_live"]["teams"], ["CGY", "EDM"])
+        self.assertEqual(after["pinned"], saved["pinned"])
+        teams = self.get_json("/api/catalog")["nhl_teams"]
+        self.assertEqual(len(teams), 32)
+        self.assertTrue(all(t["code"] and t["name"] and t["logo"]["rows"] for t in teams))
+
     def test_font_family_samples_preview_and_save(self):
         faces = self.get_json("/api/catalog")["font_families"]
         self.assertEqual(set(faces), {"standard", "block", "outline", "digital"})

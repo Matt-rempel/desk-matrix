@@ -172,7 +172,7 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(clean["interrupts"]["plane_overhead"]["radius_nm"], 3)
         self.assertTrue(clean["interrupts"]["timer_done"]["enabled"])
         self.assertEqual(clean["interrupts"]["nhl_live"],
-                         {"enabled": False, "screen_id": "data-score", "mode": "brief", "seconds": 20})
+                         {"enabled": False, "screen_id": "nhl-scoreboard", "teams": [], "mode": "brief", "seconds": 20})
         hockey = {**lineup, "interrupts": {"nhl_live": {"enabled": True, "screen_id": CUSTOM,
                                                         "mode": "game", "seconds": 30}}}
         self.assertEqual(validate_lineup(hockey, known)["interrupts"]["nhl_live"]["mode"], "game")
@@ -243,6 +243,24 @@ class ValidationTests(unittest.TestCase):
                                                        "mode": "brief", "seconds": 20}
         with self.assertRaisesRegex(ValueError, "needs an NHL screen"):
             validate_library(base)
+
+    def test_nhl_team_lists_validate_for_screens_and_alerts_and_keep_legacy_selection(self):
+        item = screen(layout="full", slots=[{"block": "nhl", "color": None,
+                      "options": {"team": "EDM", "teams": ["CGY", "EDM", "VAN"]}}])
+        self.assertEqual(validate_screen(item)["slots"][0]["options"]["teams"], ["CGY", "EDM", "VAN"])
+        base = default_library()
+        base["lineup"]["interrupts"]["nhl_live"].update(enabled=True, teams=["CGY", "SJS"])
+        self.assertEqual(validate_library(base)["lineup"]["interrupts"]["nhl_live"]["teams"], ["CGY", "SJS"])
+        for bad in (["CGY", "CGY"], ["XYZ"], "CGY", None, [True], ["CGY"] * 33):
+            with self.subTest(bad=bad):
+                item["slots"][0]["options"]["teams"] = bad
+                with self.assertRaises(ValueError):validate_screen(item)
+                base["lineup"]["interrupts"]["nhl_live"]["teams"] = bad
+                with self.assertRaises(ValueError):validate_library(base)
+        legacy = default_library()
+        legacy["lineup"]["interrupts"]["nhl_live"] = {"enabled": True, "screen_id": "data-score", "mode": "brief", "seconds": 20}
+        saved = validate_library(legacy)["lineup"]["interrupts"]["nhl_live"]
+        self.assertEqual((saved["screen_id"], saved["teams"]), ("data-score", []))
 
     def test_resolve_screen(self):
         lib = validate_library({"version": 1, "screens": [screen()]})

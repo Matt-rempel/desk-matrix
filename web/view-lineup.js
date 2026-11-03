@@ -3,6 +3,7 @@
 import { state, subscribe, clone, findScreen, customs, liveMomentId, act } from './store.js';
 import { screenMatrix } from './matrix.js';
 import { h, toggle, stepper, chips, sheet, toast, messageLine, confirmSheet, busy, nextId } from './ui.js';
+import { teamPicker, followedTeams, teamsLabel } from './nhl-teams.js';
 
 const DAY_LETTERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -11,7 +12,7 @@ const INTERRUPTS = [
   { id: 'timer_done', name: 'Timer finished', defaults: { enabled: true } },
   { id: 'rain_soon', name: 'Rain starting', defaults: { enabled: false, minutes: 15 } },
   { id: 'iss_overhead', name: 'ISS passing over', defaults: { enabled: false } },
-  { id: 'nhl_live', name: 'NHL game live', defaults: { enabled: false, screen_id: 'data-score', mode: 'brief', seconds: 20 } },
+  { id: 'nhl_live', name: 'NHL games live', defaults: { enabled: false, screen_id: 'nhl-scoreboard', teams: [], mode: 'brief', seconds: 20 } },
   // Pi alerts
   { id: 'pi_hot', name: 'Pi running hot', group: 'pi', defaults: { enabled: true, threshold_c: 75 } },
   { id: 'pi_power', name: 'Low power', group: 'pi', defaults: { enabled: true } },
@@ -291,9 +292,12 @@ export function render(root, { params }) {
       case 'timer_done': return 'Flash the panel three times';
       case 'rain_soon': return `${cfg.minutes} minutes ahead · once per hour`;
       case 'iss_overhead': return 'When the ISS is within about 1,500 km · once per pass';
-      case 'nhl_live': return cfg.mode === 'game'
-        ? 'Show the selected NHL screen throughout the game'
-        : `At puck drop and score changes · show for ${cfg.seconds} s`;
+      case 'nhl_live': {
+        const screen = findScreen(cfg.screen_id);
+        const teams = followedTeams({ ...screen?.slots?.find(s => s.block === 'nhl')?.options,
+          ...(cfg.teams?.length ? { teams: cfg.teams } : {}) });
+        return `${teamsLabel(teams)} · ${cfg.mode === 'game' ? 'Rotate live games' : `Starts and scores · ${cfg.seconds} s`}`;
+      }
       case 'pi_hot': return `CPU at ${cfg.threshold_c}°C or more · every 10 min while hot`;
       case 'pi_power': return 'Under-voltage or throttling · every 30 min while it lasts';
       case 'offline': return `No internet for ${cfg.minutes} min · then hourly`;
@@ -309,19 +313,27 @@ export function render(root, { params }) {
         .filter((screen) => (screen.slots || []).some((slot) => slot.block === 'nhl'));
       const inputId = nextId('nhl-screen');
       const select = h('select', { id: inputId, class: 'input' }, screens.map((screen) => {
-        const team = screen.slots.find((slot) => slot.block === 'nhl')?.options?.team || 'CGY';
-        return h('option', { value: screen.id, selected: screen.id === cfg.screen_id }, `${screen.name} · ${team}`);
+        return h('option', { value: screen.id, selected: screen.id === cfg.screen_id }, screen.name);
       }));
       select.addEventListener('change', () => { cfg.screen_id = select.value; refresh(); });
       const mode = chips({ label: 'NHL alert behavior', value: cfg.mode,
-        choices: [{ id: 'brief', label: 'Brief alerts' }, { id: 'game', label: 'Entire game' }],
+        choices: [{ id: 'brief', label: 'Brief alerts' }, { id: 'game', label: 'Follow live games' }],
         onChange: (value) => { cfg.mode = value; refresh(); } });
+      const screenOptions = findScreen(cfg.screen_id)?.slots?.find(slot => slot.block === 'nhl')?.options || {};
+      const teams = followedTeams(cfg.teams?.length ? { teams: cfg.teams } : screenOptions);
       return h('div', { class: 'sub-rows' },
-        h('div', { class: 'field pad-row' }, h('label', { class: 'field-label', for: inputId }, 'Screen to follow'), select,
-          h('p', { class: 'card-note' }, 'Clone NHL game in Sports to choose another team or look.')),
+        h('div', { class: 'pad-row' }, teamPicker({ value: teams,
+          detail: 'Get logo scoreboards for these teams. Shared matchups appear once. Save the lineup to apply your choices.',
+          onChange: value => { cfg.teams = value; refresh(); } })),
         h('div', { class: 'field pad-row nhl-mode-field' }, h('div', { class: 'field-label' }, 'When it appears'), mode),
+        h('p', { class: 'card-note' }, cfg.mode === 'game'
+          ? 'Rotate live games every 10 seconds, including intermissions. Return to your lineup when they finish.'
+          : 'Show each game at puck drop and when its score changes. Other alerts wait their turn.'),
         cfg.mode === 'brief' ? paramRow('Show for', stepper({ label: 'seconds', value: cfg.seconds,
-          min: 5, max: 120, step: 5, format: (v) => `${v} s`, onChange: (v) => { cfg.seconds = v; refresh(); } })) : null);
+          min: 5, max: 120, step: 5, format: (v) => `${v} s`, onChange: (v) => { cfg.seconds = v; refresh(); } })) : null,
+        h('details', { class: 'nhl-appearance pad-row' }, h('summary', {}, 'Scoreboard appearance'),
+          h('div', { class: 'field' }, h('label', { class: 'field-label', for: inputId }, 'Use colors and shots setting from'), select,
+            h('p', { class: 'card-note' }, 'Alerts always use team logos. Teams above override the screen’s team selection.'))));
     }
     if (id === 'plane_overhead') {
       return h('div', { class: 'sub-rows' },
