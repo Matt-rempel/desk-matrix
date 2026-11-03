@@ -29,7 +29,7 @@ These designs use the entire native **64 × 32** display. Their typography and g
 - **Palette / colors:** Palette gradients tint the time and supporting geometry. Accent color changes the secondary marks; in Word Glow it controls the illuminated words. Original retains each design's characteristic colors. Forced night colors override custom colors throughout.
 - The existing screen-wide Still/Breathe/Slide/Sparkle motion controls remain separate from the design's own Animate setting.
 
-Phone Customize previews and the Pi use the same renderer and the device's configured timezone. Gallery thumbnails are settled snapshots; Customize requests fresh frames. The displayed time is based on the supplied wall clock, so entering a screen does not start a fictional clock or replay an old date. Clockwork's choreography lasts 1.5 seconds after a minute boundary; Platform's flip lasts 0.4 seconds and Minute Track's slide 0.5 seconds.
+Phone Customize previews and the Pi use the same renderer and the device's configured timezone. Gallery thumbnails are settled snapshots; Customize requests fresh frames. The displayed time is based on the supplied wall clock, so entering a screen does not start a fictional clock or replay an old date. Previous-minute animations follow the actual timeline through daylight-saving changes. Clockwork's choreography lasts 1.5 seconds after a minute boundary; Platform's flip lasts 0.4 seconds and Minute Track's slide 0.5 seconds.
 
 ## Implementation
 

@@ -74,6 +74,20 @@ class ClockFacesTest(unittest.TestCase):
             after = (before + timedelta(seconds=4))
             self.assertNotEqual(draw_face(design, before), draw_face(design, after), design)
 
+    def test_dst_flip_uses_the_actual_preceding_minute(self):
+        zone = ZoneInfo('America/Edmonton')
+        for moment, previous in (
+            (datetime(2026, 3, 8, 3, 0, tzinfo=zone), datetime(2026, 3, 8, 1, 59, tzinfo=zone)),
+            (datetime(2025, 11, 2, 1, 0, fold=1, tzinfo=zone), datetime(2025, 11, 2, 1, 59, tzinfo=zone)),
+        ):
+            self.assertTrue(draw_face('platform', moment, show_date=False) ==
+                            draw_face('platform', previous, show_date=False, animate=False), moment.isoformat())
+        repeated = datetime(2025, 11, 2, 1, 0, 0, 50000, fold=1, tzinfo=zone)
+        moving = draw_face('clockwork', repeated)
+        still = draw_face('clockwork', repeated, animate=False)
+        self.assertTrue(all(moving[y*64:y*64+32] == still[y*64:y*64+32] for y in range(24)),
+                        'Fallback must not rotate the unchanged hour dials')
+
     def test_accent_control_changes_each_design(self):
         for design in DESIGN_NAMES:
             self.assertTrue(draw_face(design, self.now, accent='#FF0000') !=

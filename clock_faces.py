@@ -1,7 +1,7 @@
 """Twelve native clock/date designs. Time is supplied by the shared player/preview context."""
 import calendar
 import math
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from clock_canvas import Canvas, shade
 
@@ -30,6 +30,14 @@ def week_dates(now):
 
 def month_cells(now):
     return calendar.Calendar(firstweekday=0).monthdayscalendar(now.year, now.month)
+
+
+def previous_minute(now):
+    # Local subtraction invents/skips an hour at DST boundaries. Move on the
+    # actual timeline, then convert back to the supplied display timezone.
+    if now.utcoffset() is not None:
+        return (now.astimezone(timezone.utc) - timedelta(minutes=1)).astimezone(now.tzinfo)
+    return now - timedelta(minutes=1)
 
 
 def time_words(now):
@@ -90,7 +98,7 @@ class Face:
             self.text(self.date, 0, 27, 64, 5, self.dim)
 
     def platform(self):
-        old = self.now - timedelta(minutes=1)
+        old = previous_minute(self.now)
         old_values = (f'{old.hour if self.h24 else old.hour % 12 or 12:02}', f'{old.minute:02}')
         for x, value, previous in zip((0, 35), (self.hour, self.minute), old_values):
             self.c.rect(x, 0, x + 28, 25, shade(self.primary, .07))
@@ -164,7 +172,7 @@ class Face:
         self.footer()
 
     def clockwork(self):
-        previous = self.now - timedelta(minutes=1)
+        previous = previous_minute(self.now)
         old_hour = previous.hour if self.h24 else previous.hour % 12 or 12
         old_digits = f'{old_hour:02}{previous.minute:02}'
         for di, digit in enumerate(self.hour + self.minute):
