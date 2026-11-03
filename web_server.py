@@ -21,6 +21,7 @@ from zoneinfo import ZoneInfo
 
 import blocks
 import catalog
+import flicker
 from flight_lookup import normalize_flight, request_flight, request_nearby
 from player import apply_motion
 from library import LIBRARY_PATH, apply_action, load_library, save_library, validate_art, validate_screen
@@ -30,6 +31,7 @@ from settings import (DEFAULT_PATH, LEGACY_FIELDS, STATE_DIR, load_settings, sav
 HERE = Path(__file__).parent
 WEB_DIR = HERE / "web"
 STATUS_PATH = STATE_DIR / "status.json"
+FLICKER_ROOT = STATE_DIR
 DATA_PATH = STATE_DIR / "data.json"
 TOKEN_PATH = STATE_DIR / "web-token"
 PUBLIC_HOST_PATH = STATE_DIR / "public-host"
@@ -57,7 +59,7 @@ PWA_FILES = {
     "/icon-512.png": ("icon-512.png", "image/png"),
     "/offline.html": ("offline.html", "text/html; charset=utf-8"),
 }
-POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update", "/api/flight-check", "/api/nearby")
+POST_ROUTES = ("/api/settings", "/api/display", "/api/library", "/api/preview", "/api/update", "/api/flight-check", "/api/nearby", "/api/flicker")
 
 _catalog_body: bytes | None = None
 _data_cache: dict = {"key": None, "data": None}
@@ -385,6 +387,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"state": "starting", "nearby": []})
         elif path == "/api/update":
             self._json(200, update_status(fresh=parse_qs(urlsplit(self.path).query).get("fresh") == ["1"]))
+        elif path == "/api/flicker":
+            self._json(200, flicker.Store(FLICKER_ROOT).status())
         else:
             self._json(404, {"error": "Not found"})
 
@@ -433,6 +437,9 @@ class Handler(BaseHTTPRequestHandler):
             if length <= 0:
                 raise ValueError("Request is empty")
             data = json.loads(self.rfile.read(length))
+            if path == "/api/flicker":
+                self._json(200, flicker.Store(FLICKER_ROOT).action(data, self._library()))
+                return
             if path == "/api/nearby":
                 self._json(200, check_nearby(data))
                 return

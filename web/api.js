@@ -86,6 +86,8 @@ export const api = {
   library: () => request('/api/library'),
   settings: () => request('/api/settings'),
   status: () => request('/api/status'),
+  flicker: () => request('/api/flicker'),
+  flickerAction: (body) => request('/api/flicker', { method: 'POST', body }),
   checkFlight: (callsign) => request('/api/flight-check', { method: 'POST', body: { callsign } }),
   nearby: () => request('/api/nearby', { method: 'POST', body: {} }),
   updateStatus: (fresh = false) => request(fresh ? '/api/update?fresh=1' : '/api/update'),

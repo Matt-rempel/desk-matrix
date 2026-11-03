@@ -23,6 +23,12 @@ Tracker offers a choice of minutes or seconds on its moving ruler; other clocks 
 numeric seconds, progress bars or seconds hands. See
 [clock designs and controls](docs/CLOCK_DESIGNS.md).
 
+Seeing random flashing pixels or rows? **Device → Display diagnostics → Open
+flicker tests** compares software timing and rendering profiles on your chosen
+screens for up to 24 hours. Runs continue without the browser and restore normal
+settings at the end. See [Debug flicker](docs/FLICKER_DEBUG.md) for instructions
+and [software research](docs/FLICKER_RESEARCH.md) for causes and limitations.
+
 The **NHL scoreboard** screen keeps team logos, scores, shots and the current
 period or intermission visible together. Follow multiple teams with a searchable
 picker in Customize and Live alerts; unique games rotate automatically.

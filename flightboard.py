@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 import library
 import render
+import flicker
 from flight_lookup import normalize_flight, requested_flight, nearby_requested
 from settings import DEFAULT_PATH, STATE_DIR, Settings, effective_brightness, load_settings
 
@@ -726,10 +727,35 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
     checking_nearby = False
     next_data = monotonic() + DATA_S
     frames = 0
+    debug_store = flicker.Store(state_dir)
+    debug_renderer = flicker.TrialRenderer()
+    measurements = flicker.Measurements()
+    cached_data = flicker.read_json(state_dir / "data.json", {})
+    debug_key = None
+    debug_player = None
     matrix.Clear()
     try:
         while not (stop_event and stop_event.is_set()):
             now = monotonic()
+            trial = debug_store.active()
+            target = trial["target"] if trial else "normal"
+            if target != getattr(args, "_flicker_target", "normal"):
+                # systemd relaunches this fixed service as root, then RGBMatrix
+                # drops privileges again. No privileged web endpoint is needed.
+                _log("Flicker trial profile changed; restarting the display driver")
+                return flicker.RESTART_EXIT
+            selected = trial["screen_id"] if trial else "lineup"
+            key = (target, selected)
+            if key != debug_key:
+                debug_key = key
+                debug_player = None
+                if trial and selected != "lineup" and selected not in flicker.PATTERNS:
+                    chosen = library.resolve_screen(lib, selected)
+                    if chosen:
+                        debug_lib = {**lib, "pinned": {"screen_id": selected, "until": None},
+                                     "lineup": {"always": [{"screen_id": selected, "seconds": 30}],
+                                                "moments": [], "interrupts": {}, "transition": "cut"}}
+                        debug_player = Player(debug_lib, settings)
             if now >= next_reload:
                 next_reload = now + RELOAD_S
                 checking_flight = requested_flight(state_dir)
@@ -745,6 +771,8 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
                         if updated != settings:
                             settings = updated
                             player.set_settings(settings)
+                            if debug_player:
+                                debug_player.set_settings(settings)
                             providers.set_settings(settings)
                             aircraft.set_settings(settings)
                             next_snapshot = next_status = now
@@ -754,46 +782,82 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
                     try:
                         lib = load_library(lib_path, settings)
                         player.set_library(lib)
+                        debug_key = None
                         next_status = now
                     except (OSError, ValueError) as exc:
                         _log(f"library error: {exc}")
-            needs = player.needs()
+            needs = debug_player.needs() if debug_player else (set() if selected in flicker.PATTERNS else player.needs())
             if checking_flight:
                 needs = set(needs) | {f"aircraft:follow:{checking_flight}"}
             if checking_nearby:
                 needs = set(needs) | {"aircraft:nearby"}
-            providers.update(needs, lib.get("feeds") or [])
-            aircraft.update(needs)
+            paused = bool(trial and trial["profile"]["pause"])
+            if not paused:
+                providers.update(needs, lib.get("feeds") or [])
+                aircraft.update(needs)
             if now >= next_snapshot:
                 next_snapshot = now + SNAPSHOT_S
                 updated_snapshot = providers.snapshot()
                 if _nhl_revision(updated_snapshot) != _nhl_revision(snapshot):
                     next_data = now
                 snapshot = updated_snapshot
-            data = dict(snapshot)
+            data = {**cached_data, "health": snapshot.get("health", {})} if paused else dict(snapshot)
             planes = aircraft.snapshot()
-            if planes is not None:
+            if planes is not None and not paused:
                 data["aircraft"] = planes
+            render_start = time.perf_counter()
+            swap_ms, paint_ms, swapped, render_error = 0.0, 0.0, False, None
+            def draw_current():
+                if trial and selected in flicker.PATTERNS:
+                    return flicker.pattern(selected), {"screen_id": selected, "screen_name": flicker.PATTERNS[selected]}
+                return (debug_player or player).tick(now, data)
             try:
-                pixels, info = player.tick(now, data)
+                pixels, info = debug_renderer.draw(trial, draw_current)
+                if trial:
+                    info = {**info, "moment": "Debug flicker", "pinned": False, "pin": None, "interrupt": None}
             except Exception as exc:  # noqa: BLE001 - one bad screen must not stop the panel
                 _log(f"render error: {exc}")
+                render_error = str(exc)[:160]
+            render_ms = (time.perf_counter() - render_start) * 1000
             if settings.display_enabled:
                 wanted = effective_brightness(settings, moment_brightness=info.get("moment_brightness"))
+                if trial:
+                    wanted = min(trial["brightness"], settings.brightness_max)
                 if wanted != brightness:
                     brightness = matrix.brightness = wanted
                     shown = None  # brightness applies when pixels are set
                 if pixels != shown:
+                    paint_start = time.perf_counter()
                     paint_frame(canvas, pixels, args.panel_scale)
+                    paint_ms = (time.perf_counter() - paint_start) * 1000
+                    swap_start = time.perf_counter()
                     canvas = matrix.SwapOnVSync(canvas)
+                    swap_ms, swapped = (time.perf_counter() - swap_start) * 1000, True
                     shown = pixels
             elif shown is not None or brightness is not None:
                 matrix.Clear()
                 shown = brightness = None
+            observed = ({**trial, "selection_id": selected,
+                         "screen_id": info.get("screen_id") or selected} if trial else None)
+            measurements.add(observed, render_ms, swap_ms, swapped, paint_ms, render_error)
             if now >= next_status:
                 next_status = now + STATUS_S
                 try:
-                    _write_status(build_status(settings, info, pixels, data), state_dir / "status.json")
+                    status = build_status(settings, info, pixels, data)
+                    if trial:
+                        status.update(mode="flicker", flicker={"run_id": trial["run_id"], "profile_id": trial["profile_id"]})
+                    _write_status(status, state_dir / "status.json")
+                    rows = measurements.report()
+                    flicker.write_json(debug_store.live_path, {
+                        "updated_at": time.time(), "trial": observed,
+                        "driver": getattr(args, "_flicker_driver", {}),
+                        "restart_supported": getattr(args, "_flicker_restart_supported", False),
+                        "metrics": measurements.current(observed), "measurements": rows,
+                        "measurement_id": measurements.instance_id,
+                        "health": data.get("health", {}),
+                        "render_error": render_error,
+                        "brightness": brightness, "screen_name": info.get("screen_name"),
+                        "app_fps_limit": trial["profile"]["fps"] if trial else 20})
                 except OSError as exc:
                     _log(f"status error: {exc}")
             if now >= next_data:
@@ -805,11 +869,13 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
             frames += 1
             if stop_after is not None and frames >= stop_after:
                 break
-            sleep(max(0.0, now + (FRAME_S if settings.display_enabled else 4 * FRAME_S) - monotonic()))
+            frame_s = 1 / trial["profile"]["fps"] if trial else FRAME_S
+            sleep(max(0.0, now + (frame_s if settings.display_enabled else 4 * frame_s) - monotonic()))
     finally:
         aircraft.close()
         providers.close()
         matrix.Clear()
+        measurements.archive(state_dir)
     return 0
 
 
@@ -841,6 +907,19 @@ def main(argv=None) -> int:
     options.disable_hardware_pulsing = args.software_pulse or sound_module_loaded
     if sound_module_loaded and not args.software_pulse:
         print("Onboard audio is loaded; using software pulse timing", file=sys.stderr, flush=True)
+    debug_store = flicker.Store(STATE_DIR)
+    trial = debug_store.startup()
+    baseline = {key: getattr(options, key) for key in flicker.DRIVER_KEYS if hasattr(options, key)}
+    effective = flicker.driver_settings(baseline, trial)
+    if trial and any(key not in baseline for key in trial["profile"]["driver"]):
+        raise RuntimeError("Flicker trial requested an unsupported driver option")
+    for key, value in effective.items():
+        setattr(options, key, value)
+    args._flicker_target = trial["target"] if trial else "normal"
+    args._flicker_restart_supported = bool(os.environ.get("INVOCATION_ID"))
+    args._flicker_driver = {"baseline": baseline, "effective": effective, "mapping": args.mapping,
+                            "software_pulse": bool(options.disable_hardware_pulsing),
+                            "audio_loaded": sound_module_loaded}
     matrix = RGBMatrix(options=options)
     stop_event = threading.Event()
 

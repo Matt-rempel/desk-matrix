@@ -10,6 +10,7 @@ import * as build from './view-build.js';
 import * as draw from './view-draw.js';
 import * as lineup from './view-lineup.js';
 import * as device from './view-device.js';
+import * as flicker from './view-flicker.js';
 
 installInputMode();
 const main = document.getElementById('main');
@@ -29,6 +30,7 @@ export function parseRoute(hash = location.hash) {
     '': ['gallery', gallery, true], customize: ['customize', customize, false],
     build: ['build', build, false], draw: ['draw', draw, false],
     lineup: ['lineup', lineup, true], device: ['device', device, true],
+    flicker: ['flicker', flicker, false],
   };
   const hit = table[name] || table[''];
   return { name: hit[0], view: hit[1], top: hit[2], id: parts[1] || null, params };
@@ -53,11 +55,12 @@ function route() {
   const page = h('div', { class: 'page' });
   if (r.top) page.append(shellHeader(), updateBanner(), navBar(r.name));
   else page.append(updateBanner());
+  page.append(flickerBanner());
   const body = h('div', { class: 'page-body' });
   page.append(body);
   main.append(page);
   cleanup = r.view.render(body, { id: r.id, params: r.params, go }) || null;
-  const titles = { gallery: 'Screens', customize: 'Customize', build: 'Build a screen', draw: 'Pixel studio', lineup: 'Lineup', device: 'Device' };
+  const titles = { gallery: 'Screens', customize: 'Customize', build: 'Build a screen', draw: 'Pixel studio', lineup: 'Lineup', device: 'Device', flicker: 'Debug flicker' };
   document.title = `${titles[r.name] || 'Screens'} · Desk Matrix`;
   window.scrollTo(0, 0);
   // Move focus for screen-reader users when navigating between views.
@@ -76,6 +79,12 @@ function logo() {
 }
 
 let pillEl = null;
+let flickerEl = null;
+function flickerBanner() {
+  flickerEl = h('a', { class:'flicker-banner', href:'#/flicker', hidden:state.status?.mode !== 'flicker' },
+    'Flicker test running · Manage test');
+  return flickerEl;
+}
 let powerEl = null;
 let updateEl = null;
 let updateData = null;
@@ -212,6 +221,7 @@ export function connection() {
 }
 
 function updateShell() {
+  if (flickerEl?.isConnected) flickerEl.hidden = state.status?.mode !== 'flicker';
   if (pillEl && pillEl.isConnected) {
     const c = connection();
     pillEl.className = `pill pill-${c.cls}`;

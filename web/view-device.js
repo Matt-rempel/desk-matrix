@@ -263,6 +263,11 @@ export function render(root) {
   root.append(group('Data sources', 'src-h', sourcesHost));
 
   // ---- this browser ---------------------------------------------------------------
+  root.append(group('Display diagnostics', 'debug-h', h('div', { class:'card card-pad' },
+    h('div', { class:'row-title' }, 'Debug flicker'),
+    h('p', { class:'card-note' }, 'Run software timing and rendering comparisons across your screens, record observations and restore normal settings automatically.'),
+    h('a', { class:'btn btn-secondary', href:'#/flicker' }, 'Open flicker tests'))));
+
   const forget = h('button', { type: 'button', class: 'btn btn-danger-outline' }, 'Forget this browser');
   forget.addEventListener('click', async () => {
     if (!(await confirmSheet({ title: 'Forget this browser?', text: 'You will need the pairing key to connect again.', confirmLabel: 'Forget' }))) return;
