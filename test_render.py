@@ -11,6 +11,32 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_max_outline_seven_is_one_connected_square_corner(self):
+        for height in (15, 20, 32):
+            with self.subTest(height=height):
+                shape = render._styled_shape("7", 64, height, "outline", "max")
+                cols, actual_height = shape[0][0][0], shape[2]
+                self.assertTrue(all(column & 1 for column in cols))
+                self.assertEqual(cols[-1], (1 << actual_height) - 1)
+                points = {(x, y) for x, col in enumerate(cols) for y in range(actual_height) if col >> y & 1}
+                remaining = set(points)
+                pending = [remaining.pop()]
+                while pending:
+                    x, y = pending.pop()
+                    for neighbour in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                        if neighbour in remaining:
+                            remaining.remove(neighbour)
+                            pending.append(neighbour)
+                self.assertFalse(remaining, "The outlined top bar and stem must form one shape")
+
+    def test_max_seven_keeps_its_advance_and_other_glyphs(self):
+        normal = render._family_glyphs("outline", 13, 30, 3)
+        maximum = render._family_glyphs("outline", 13, 30, 3, outline_max=True)
+        self.assertEqual(len(normal["7"]), len(maximum["7"]))
+        self.assertNotEqual(normal["7"], maximum["7"])
+        for char in normal.keys() - {"7", ":"}:
+            self.assertEqual(normal[char], maximum[char], char)
+
     def test_max_outline_colon_has_hollow_dots_and_stable_blinking(self):
         shape = render._styled_shape(":", 64, 32, "outline", "max")
         cols = shape[0][0][0]

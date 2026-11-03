@@ -32,6 +32,8 @@ digits to stay legible. Long values that cannot fit at Tiny scroll within
 their slot. Gradients and blinking colons work with every family; replacing
 the colon with a blank keeps the digits stationary.
 Outline / Max also uses hollow, one-pixel borders on the colon dots.
+Its 7 has a continuous top bar and straight right stem, forming a square
+corner instead of a stepped diagonal.
 
 Digital's vertical segments reach the same cap height and baseline as its
 horizontal segments. The 1 is a centered continuous stem, and the 4 has a
