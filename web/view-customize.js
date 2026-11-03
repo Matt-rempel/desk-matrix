@@ -70,8 +70,10 @@ export function render(root, { id, go }) {
   bar.querySelector('.subbar-back').addEventListener('click', async (event) => {
     if (!dirty()) return;
     event.preventDefault();
-    const keep = await confirmSheet({ title: 'Save your changes?', text: `Keep “${work.name}” in Your screens, or discard the changes.`,
-      confirmLabel: 'Save', danger: false });
+    const keep = await confirmSheet({ title: 'Leave this screen?',
+      text: `Save your changes to “${work.name}” before going back, or discard them.`,
+      confirmLabel: 'Save changes', cancelLabel: 'Discard changes', dismissValue: null, danger: false });
+    if (keep === null) return;
     if (keep) {
       try { await persist(); toast(savedToast()); } catch (error) { msg.error(error); return; }
     }

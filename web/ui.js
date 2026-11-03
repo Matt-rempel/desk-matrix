@@ -150,19 +150,20 @@ export function sheet({ title, body, onClose }) {
   return { dialog, close: shut };
 }
 
-/** Confirm via a sheet; resolves true/false. */
-export function confirmSheet({ title, text, confirmLabel = 'Delete', danger = true }) {
+/** Confirm via a sheet; dismissal may be distinguished from the secondary action. */
+export function confirmSheet({ title, text, confirmLabel = 'Delete', cancelLabel = 'Cancel',
+  dismissValue = false, danger = true }) {
   return new Promise((resolve) => {
-    let answer = false;
+    let answer = dismissValue;
     const yes = h('button', { type: 'button', class: danger ? 'btn btn-danger' : 'btn btn-primary' }, confirmLabel);
-    const no = h('button', { type: 'button', class: 'btn btn-secondary' }, 'Cancel');
+    const no = h('button', { type: 'button', class: 'btn btn-secondary' }, cancelLabel);
     const s = sheet({
       title,
       body: [h('p', { class: 'sheet-text' }, text), h('div', { class: 'btn-row' }, no, yes)],
       onClose: () => resolve(answer),
     });
     yes.addEventListener('click', () => { answer = true; s.close(); });
-    no.addEventListener('click', () => s.close());
+    no.addEventListener('click', () => { answer = false; s.close(); });
     no.focus();
   });
 }
