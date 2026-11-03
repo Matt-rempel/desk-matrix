@@ -303,7 +303,7 @@ def font_settings(options: dict) -> tuple[str, str]:
 
 
 @lru_cache(maxsize=128)
-def _family_glyphs(family: str, width: int, height: int, stroke: int):
+def _family_glyphs(family: str, width: int, height: int, stroke: int, hollow_colon: bool = False):
     if family == "standard":
         if height == 5 and width == 3:
             return GLYPHS["3x5"]
@@ -363,9 +363,13 @@ def _family_glyphs(family: str, width: int, height: int, stroke: int):
                         cols[x] = (1 << height) - 1
                 table[char] = tuple(cols)
     # Match the blank advance used for a blinking colon in every family.
-    dot = (1 << stroke) - 1
-    table[":"] = tuple((dot << (height // 3)) | (dot << (2 * height // 3))
-                       for _ in range(max(2, stroke)))
+    dot_width = max(2, stroke)
+    dots = []
+    for x in range(dot_width):
+        dot = sum(1 << y for y in range(stroke)
+                  if not hollow_colon or x in (0, dot_width - 1) or y in (0, stroke - 1))
+        dots.append((dot << (height // 3)) | (dot << (2 * height // 3)))
+    table[":"] = tuple(dots)
     return table
 
 
@@ -386,7 +390,9 @@ def _styled_shape(text: str, width: int, height: int, family: str, size: str):
                   if size == "max" else [{20: 11, 14: 8, 10: 6, 7: 5, 5: 3}[h]])
         for w in widths:
             space = 1 if family == "standard" and h == 5 else max(2, stroke)
-            shape = _shape_run(text, _family_glyphs(family, w, h, stroke), 1, h, space)
+            shape = _shape_run(text, _family_glyphs(family, w, h, stroke,
+                                                  hollow_colon=family == "outline" and size == "max"),
+                               1, h, space)
             if shape[1] <= width - inset:
                 return shape
     return None

@@ -31,6 +31,7 @@ At Small and Tiny, Outline uses solid pixel cells and Digital uses compact
 digits to stay legible. Long values that cannot fit at Tiny scroll within
 their slot. Gradients and blinking colons work with every family; replacing
 the colon with a blank keeps the digits stationary.
+Outline / Max also uses hollow, one-pixel borders on the colon dots.
 
 Digital's vertical segments reach the same cap height and baseline as its
 horizontal segments. The 1 is a centered continuous stem, and the 4 has a

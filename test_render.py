@@ -11,6 +11,26 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_max_outline_colon_has_hollow_dots_and_stable_blinking(self):
+        shape = render._styled_shape(":", 64, 32, "outline", "max")
+        cols = shape[0][0][0]
+        for top in (10, 20):
+            self.assertEqual(tuple((col >> top) & 7 for col in cols), (7, 5, 7))
+        layer = {"t": "text", "face": "outline", "size": "max", "s": "12:59",
+                 "x": 0, "y": 0, "w": 64, "h": 32, "c": "#FFFFFF"}
+        on = lit(rasterize([layer]))
+        off = lit(rasterize([{**layer, "s": "12 59"}]))
+        self.assertTrue(off < on)
+        self.assertEqual(len(on - off), 16)  # Two 3x3 rings, eight pixels each.
+        self.assertEqual(len({x for x, _ in on - off}), 3)
+
+    def test_other_font_colons_keep_their_solid_dots(self):
+        for face, size in (("outline", "xl"), ("block", "max"), ("digital", "max")):
+            with self.subTest(face=face, size=size):
+                shape = render._styled_shape(":", 64, 32, face, size)
+                cols = shape[0][0][0]
+                self.assertEqual(len(set(cols)), 1)
+
     def test_max_outline_border_is_one_pixel_thick(self):
         glyph = render._family_glyphs("outline", 13, 30, 3)["0"]
         self.assertTrue(all(column & 1 for column in glyph))
