@@ -3,6 +3,7 @@
 import { api, hasKey, setKey, forgetKey, takeKeyFromHash, setUnauthorizedHandler } from './api.js';
 import { state, loadAll, setStatus, setSettings, subscribe } from './store.js';
 import { h, toast } from './ui.js';
+import { installInputMode, focusForKeyboard } from './focus.js';
 import * as gallery from './view-gallery.js';
 import * as customize from './view-customize.js';
 import * as build from './view-build.js';
@@ -10,6 +11,7 @@ import * as draw from './view-draw.js';
 import * as lineup from './view-lineup.js';
 import * as device from './view-device.js';
 
+installInputMode();
 const main = document.getElementById('main');
 let cleanup = null;
 let loaded = false;
@@ -306,7 +308,7 @@ function showPairing(message = pairingMessage) {
     h('p', { id: 'pairing-help', class: 'pair-text' },
       'Enter the pairing key shown in the Pi installation terminal, or open the pairing link from it. This browser remembers the key until you forget it or clear its site data.'),
     form));
-  if (!message) input.focus();
+  if (!message) focusForKeyboard(input);
 }
 
 setUnauthorizedHandler((message) => {

@@ -1,5 +1,6 @@
 // Small DOM toolkit. Everything is built with createElement; dynamic styles go
 // through the CSSOM (el.style / custom properties), never style="" attributes.
+import { usingKeyboard, focusForKeyboard } from './focus.js';
 
 export function h(tag, props = null, ...children) {
   const el = document.createElement(tag);
@@ -138,7 +139,7 @@ export function toast(text, kind = 'ok') {
 export function sheet({ title, body, onClose }) {
   const titleId = nextId('sheet-title');
   const close = h('button', { type: 'button', class: 'link-btn' }, 'Close');
-  const dialog = h('dialog', { class: 'sheet', 'aria-labelledby': titleId },
+  const dialog = h('dialog', { class: 'sheet', 'aria-labelledby': titleId, tabIndex: -1 },
     h('div', { class: 'sheet-head' }, h('h2', { id: titleId, class: 'sheet-title' }, title), close),
     h('div', { class: 'sheet-body' }, body));
   const shut = () => { if (dialog.open) dialog.close(); };
@@ -147,6 +148,7 @@ export function sheet({ title, body, onClose }) {
   dialog.addEventListener('close', () => { dialog.remove(); if (onClose) onClose(); });
   document.body.append(dialog);
   dialog.showModal();
+  if (!usingKeyboard()) dialog.focus({ preventScroll: true });
   return { dialog, close: shut };
 }
 
@@ -164,7 +166,7 @@ export function confirmSheet({ title, text, confirmLabel = 'Delete', cancelLabel
     });
     yes.addEventListener('click', () => { answer = true; s.close(); });
     no.addEventListener('click', () => { answer = false; s.close(); });
-    no.focus();
+    focusForKeyboard(no);
   });
 }
 

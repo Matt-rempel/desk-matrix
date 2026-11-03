@@ -5,6 +5,7 @@ import { screenMatrix } from './matrix.js';
 import { h, toggle, stepper, chips, sheet, toast, messageLine, confirmSheet, busy, nextId } from './ui.js';
 import { teamPicker, followedTeams, teamsLabel } from './nhl-teams.js';
 import { nhlAppearanceChoices } from './nhl-appearance.js';
+import { focusForKeyboard } from './focus.js';
 
 const DAY_LETTERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -66,7 +67,7 @@ export function render(root, { params }) {
     lu.moments.push(m);
     open.add(m.id);
     changed();
-    requestAnimationFrame(() => document.getElementById(`name-${m.id}`)?.focus());
+    requestAnimationFrame(() => focusForKeyboard(document.getElementById(`name-${m.id}`)));
   });
 
   root.append(
@@ -485,5 +486,5 @@ export function render(root, { params }) {
 
 function cssq(s) { return String(s).replace(/["\\]/g, '\\$&'); }
 function focusLater(selector) {
-  requestAnimationFrame(() => { const el = document.querySelector(selector); if (el && !el.disabled) el.focus(); });
+  requestAnimationFrame(() => focusForKeyboard(document.querySelector(selector)));
 }
