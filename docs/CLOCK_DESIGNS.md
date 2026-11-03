@@ -2,7 +2,7 @@
 
 In **Screens → New screen → Time**, choose a design, customize it, save it to Your screens, then use Show now or add it to a lineup. Existing clock templates remain available. Installing this collection does not change a saved screen or add anything to a lineup automatically.
 
-These designs use the entire native **64 × 32** display. Their typography and geometry are composed for each design rather than controlled by the older clock's font/size and second-line settings.
+These designs use the entire native **64 × 32** display. Their geometry is composed for each design. Minute Track and Seconds Track have independent Font and Size controls for the time; the other faces retain their composed typography.
 
 | Concept | Screen | What it shows |
 | --- | --- | --- |
@@ -23,7 +23,8 @@ These designs use the entire native **64 × 32** display. Their typography and g
 ## Controls
 
 - **Design:** Switch between all thirteen layouts without leaving Customize.
-- **24-hour time:** Available for numeric clocks, including Perpetual Card and Week Strip. Hidden on date-only designs and Word Glow. Numeric hour fields use two digits for consistent spacing.
+- **24-hour time:** Available for numeric clocks, including Perpetual Card and Week Strip. Hidden on date-only designs and Word Glow. Tracker clocks omit the leading hour zero in 12-hour mode (9:37) and retain it in 24-hour mode (09:37). The other composed numeric fields retain two digits for spacing.
+- **Font / Size:** Minute Track and Seconds Track offer Standard, Block, Outline and Digital, with Auto, Max, Extra large, Large, Medium, Small and Tiny sizes. Auto keeps the original 14-pixel time area. Extra large uses 20 pixels; Max fills up to 20 pixels with a footer, or 25 when both date and optional seconds readout are hidden. The ruler moves down to stay fully visible; its labels and the date keep their own small font. Font settings are retained but ignored when switching to another design.
 - **Show date:** Available when the date is an optional footer or side label. Calendar-first designs keep their date content.
 - **Seconds:** Platform, Time Stack, Minute Track, Clockwork, Perpetual Card and Week Strip offer Off, Number or Progress bar. Off is the default, preserving saved appearances. The number is placed beside the date or AM/PM marker, except Week Strip, which shows HH:MM:SS. The bar occupies a spare row and fills over the minute. Narrow bars necessarily advance in coarser pixel steps.
 - **Seconds indicator:** Available on Station, Orbit and Minute Runner. Turning it off removes the seconds hand/arc or parks the runner; the main time still updates.

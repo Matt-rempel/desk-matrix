@@ -4,6 +4,7 @@ import math
 from datetime import timedelta, timezone
 
 from clock_canvas import Canvas, shade
+from render import FONT_FAMILIES, FONT_SIZES
 
 DESIGN_NAMES = {
     'platform': 'Platform', 'station': 'Station', 'time_stack': 'Time Stack',
@@ -71,11 +72,14 @@ DIAL_DIGITS = {
 
 
 class Face:
-    def __init__(self, now, h24, show_date, show_seconds, animate, primary, accent, tinted, custom_accent, seconds_display):
+    def __init__(self, now, h24, show_date, show_seconds, animate, primary, accent, tinted, custom_accent, seconds_display,
+                 font_family, font_size):
         self.c = Canvas()
         self.now, self.h24, self.show_date = now, h24, show_date
         self.show_seconds, self.animate = show_seconds, animate
         self.seconds_display = seconds_display
+        self.font_family = font_family if font_family in FONT_FAMILIES else 'standard'
+        self.font_size = font_size if font_size in FONT_SIZES else 'auto'
         self.primary = primary
         self.accent = accent
         self.dim, self.faint = shade(primary, .45), shade(primary, .20)
@@ -185,14 +189,28 @@ class Face:
         self.track(self.now.second, shift)
 
     def track(self, value, shift):
-        self.text(self.time, 0, 0, 64, 14, face='standard', size='large')
-        for y in range(3): self.c.line(30 + y, 15 + y, 34 - y, 15 + y, self.teal)
+        # Larger clocks use a compact pointer/baseline so the ruler stays fully
+        # visible. With no footer, Max can use five more rows for the time.
+        height = 14
+        if self.font_size == 'xl':
+            height = 20
+        elif self.font_size == 'max':
+            height = 20 if self.show_date or self.seconds_display != 'off' else 25
+        clock = f'{self.hour if self.h24 else self.now.hour % 12 or 12}:{self.minute}'
+        self.text(clock, 0, 0, 64, height, face=self.font_family,
+                  size='large' if self.font_size == 'auto' else self.font_size)
+        if height == 14:
+            for y in range(3): self.c.line(30 + y, 15 + y, 34 - y, 15 + y, self.teal)
+            digits_y, tick_y, baseline_y = 18, 24, 25
+        else:
+            self.c.point(32, height, self.teal)
+            digits_y, tick_y, baseline_y = height + 1, height + 6, height + 6
+        self.c.line(3, baseline_y, 60, baseline_y, self.faint)
         for delta in range(-4, 5):
             x = round(32 + delta * 8 + shift)
-            self.text(f'{(value + delta) % 60:02}', x - 3, 18, 7, 5,
+            self.text(f'{(value + delta) % 60:02}', x - 3, digits_y, 7, 5,
                       self.teal if delta == 0 else self.dim)
-            self.c.point(x, 24, self.teal if delta == 0 else self.dim)
-        self.c.line(3, 25, 60, 25, self.faint)
+            self.c.point(x, tick_y, self.teal if delta == 0 else self.dim)
         self.footer()
 
     def clockwork(self):
@@ -279,10 +297,12 @@ class Face:
 
 
 def draw_face(design, now, *, h24=False, show_date=True, show_seconds=True, animate=True,
-              primary='#F4F2EE', accent=None, tinted=False, seconds_display='off'):
+              primary='#F4F2EE', accent=None, tinted=False, seconds_display='off',
+              font_family='standard', font_size='auto'):
     """Return one opaque native frame. Never reads clocks, providers, files, or hardware."""
     face = Face(now, h24, show_date, show_seconds, animate, primary,
                 accent or DESIGN_ACCENTS.get(design, '#FFB34D'), tinted, accent is not None,
-                seconds_display if design in SECONDS_READOUT_DESIGNS and seconds_display in ('number', 'bar') else 'off')
+                seconds_display if design in SECONDS_READOUT_DESIGNS and seconds_display in ('number', 'bar') else 'off',
+                font_family, font_size)
     getattr(face, design if design in DESIGN_NAMES else 'platform')()
     return face.c.pixels

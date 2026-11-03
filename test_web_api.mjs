@@ -256,3 +256,15 @@ test('seconds controls appear where they fit and seconds clocks use live preview
     assert.equal(hasLiveClock({ slots: [{ block, options: { show_seconds: false } }] }), false);
   }
 });
+
+test('tracker typography is offered for both rulers and hidden for fixed clock designs', async () => {
+  const { optionVisible } = await import('./web/options.js');
+  for (const name of ['font', 'font_family', 'font_size']) {
+    for (const design of ['minute_track', 'seconds_track']) {
+      assert.equal(optionVisible('clock_design', name, { design }), true);
+    }
+    for (const design of ['platform', 'station', 'orbit', 'time_stack', 'clockwork', 'perpetual_card', 'week_strip', 'month_map', 'date_poster', 'word_glow', 'minute_runner']) {
+      assert.equal(optionVisible('clock_design', name, { design }), false);
+    }
+  }
+});

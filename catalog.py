@@ -253,6 +253,10 @@ for _block_id in TEXT_FONT_BLOCKS:
         "type": "enum", "default": "auto", "label": "Size", "choices": list(FONT_SIZES),
         "labels": {key: label for key, (label, _) in FONT_SIZES.items()},
     }
+# Tracker faces use the shared font picker, but their own renderer keeps the
+# ruler and footer independent from the time's typography.
+for _name in ("font", "font_family", "font_size"):
+    BLOCKS["clock_design"]["options"][_name] = copy.deepcopy(BLOCKS["time"]["options"][_name])
 for _id, _meta in BLOCKS.items():
     _meta["id"] = _id
 

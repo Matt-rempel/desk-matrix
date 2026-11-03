@@ -36,6 +36,7 @@ const choiceLabel = (v) => CHOICES[v] || human(v);
 export function optionVisible(blockId, name, options) {
   if (blockId === 'clock_design') {
     const design = options.design || 'platform';
+    if (['font', 'font_family', 'font_size'].includes(name)) return ['minute_track', 'seconds_track'].includes(design);
     if (name === 'h24') return !['month_map', 'date_poster', 'word_glow'].includes(design);
     if (name === 'show_date') return ['platform', 'station', 'time_stack', 'orbit', 'minute_track', 'seconds_track', 'clockwork', 'minute_runner'].includes(design);
     if (name === 'show_seconds') return ['station', 'orbit', 'minute_runner'].includes(design);
@@ -67,6 +68,8 @@ export function optionsForm(blockId, options, onChange, cfg = {}) {
       if (skip.has(name) || !optionVisible(blockId, name, options)) continue;
       if (name === 'font' && meta.options.font_family) {
         wrap.append(fontControls(options, onChange));
+        if (blockId === 'clock_design') wrap.append(h('p', { class: 'foot-note' },
+          'Font and size change the time only; the ruler stays readable.'));
         continue;
       }
       const field = optionField(blockId, name, spec || {}, options, (value, rerender) => {
