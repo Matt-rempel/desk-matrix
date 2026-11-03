@@ -5,6 +5,8 @@
     "settings.py",
     "screens.py",
     "render.py",
+    "clock_canvas.py",
+    "clock_faces.py",
     "catalog.py",
     "blocks.py",
     "airline_logos.py",

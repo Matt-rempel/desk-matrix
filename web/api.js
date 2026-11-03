@@ -112,7 +112,7 @@ function cacheKey(screen) {
 }
 
 function usesLiveData(screen) {
-  return (screen.slots || []).some((slot) => slot.block === 'nhl' || slot.options?.source === 'follow');
+  return (screen.slots || []).some((slot) => slot.block === 'nhl' || slot.block === 'clock_design' || slot.options?.source === 'follow');
 }
 
 function remember(k, frame) {

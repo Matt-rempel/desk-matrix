@@ -211,3 +211,31 @@ test('follow-flight previews refresh after a check instead of caching a missing 
     assert.equal(requests, 2);
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test('new clock designs use fresh frames and their controls match their purpose', async () => {
+  const { hasLiveClock } = await import('./web/matrix.js');
+  const { optionVisible } = await import('./web/options.js');
+  assert.equal(hasLiveClock({ slots: [{ block: 'clock_design' }] }), true);
+  for (const design of ['month_map', 'date_poster', 'word_glow']) {
+    assert.equal(optionVisible('clock_design', 'h24', { design }), false);
+    assert.equal(optionVisible('clock_design', 'show_date', { design }), false);
+    assert.equal(optionVisible('clock_design', 'animate', { design }), false);
+  }
+  assert.equal(optionVisible('clock_design', 'show_seconds', { design: 'station' }), true);
+  assert.equal(optionVisible('clock_design', 'show_seconds', { design: 'platform' }), false);
+  assert.equal(optionVisible('clock_design', 'show_date', { design: 'perpetual_card' }), false);
+  assert.equal(optionVisible('clock_design', 'show_date', {}), true);
+  assert.equal(optionVisible('flight', 'callsign', { source: 'follow' }), true);
+  globalThis.localStorage = memoryStorage();globalThis.sessionStorage = memoryStorage();
+  const api = await loadApi();api.setKey(KEY);
+  const previous = globalThis.fetch;let calls = 0;
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ frames: [(++calls === 1 ? 'a' : 'b').repeat(12288)] }) });
+  try {
+    const screen = { layout: 'full', slots: [{ block: 'clock_design', options: { design: 'month_map' } }] };
+    const first = await api.preview(screen);
+    assert.equal(api.cachedPreview(screen), null);
+    assert.notEqual(await api.preview(screen), first);
+  } finally { globalThis.fetch = previous; }
+});

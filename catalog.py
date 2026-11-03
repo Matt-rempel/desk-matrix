@@ -7,6 +7,7 @@ import copy
 from render import ICONS, WIDTH, HEIGHT, FONT_FAMILIES, FONT_SIZES, LEGACY_FONT_SETTINGS, rasterize, to_hex
 from nhl import TEAMS, TEAM_NAMES
 from nhl_logos import LOGOS as NHL_LOGOS
+from clock_faces import DESIGN_NAMES
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
 
@@ -139,6 +140,14 @@ CITIES = {
 }
 
 BLOCKS = {
+    "clock_design": _block("Clock design", "10:24", "time", {
+        "design": {"type": "enum", "default": "platform", "choices": list(DESIGN_NAMES),
+                   "labels": DESIGN_NAMES, "label": "Design", "control": "select"},
+        "h24": _bool(False),
+        "show_date": {"type": "bool", "default": True, "label": "Show date"},
+        "show_seconds": {"type": "bool", "default": True, "label": "Seconds indicator"},
+        "animate": {"type": "bool", "default": True, "label": "Animate"},
+        "accent": {**_color(), "label": "Accent color"}}, 64, 32),
     "time": _block("Time", "10:24", "time", {
         "h24": _bool(True), "colon_blink": _bool(False),
         "font": _enum("auto", "auto", "display", "large", "big", "5x7", "3x5")}, 17, 5),
@@ -359,6 +368,25 @@ BUILTIN_SCREENS = [
     _screen("time-weekday", "Time & weekday", "two", [
         _slot("time", "#FFFFFF"), _slot("weekday", "#FFB86C")], "clock", "Time · weekday", "Offline"),
 ]
+CLOCK_TEMPLATES = [
+    ("time-platform", "platform", "Split-flap time · date"),
+    ("time-station", "station", "Railway dial · time · date"),
+    ("time-stack", "time_stack", "Oversized hours · minutes"),
+    ("time-orbit", "orbit", "Hours · minutes · seconds rings"),
+    ("time-minute-track", "minute_track", "Time · sliding minute ruler"),
+    ("time-clockwork", "clockwork", "24 dials make the time"),
+    ("time-perpetual-card", "perpetual_card", "Calendar card · time"),
+    ("time-week-strip", "week_strip", "Time · this week"),
+    ("time-month-map", "month_map", "A dot for every day"),
+    ("time-date-poster", "date_poster", "Day · weekday · month · year"),
+    ("time-word-glow", "word_glow", "Exact time in glowing words"),
+    ("time-minute-runner", "minute_runner", "A one-minute pixel lap"),
+]
+BUILTIN_SCREENS += [
+    _screen(sid, DESIGN_NAMES[design], "full", [_slot("clock_design", None, design=design)],
+            "clock_design", tag, "Offline")
+    for sid, design, tag in CLOCK_TEMPLATES
+]
 BUILTINS = {screen["id"]: screen for screen in BUILTIN_SCREENS}
 # Compatibility ID for old lineup/pin references; never offered as another template.
 BUILTINS["data-score"]["hidden"] = True
@@ -366,7 +394,7 @@ BUILTINS["data-score"]["hidden"] = True
 SHELVES = [
     {"id": "time", "title": "Time", "source": "Offline",
      "blurb": "Clocks that read from across the room.",
-     "items": ["time-big", "time-classic", "time-analog", "time-words", "time-world",
+     "items": [sid for sid, _, _ in CLOCK_TEMPLATES] + ["time-big", "time-classic", "time-analog", "time-words", "time-world",
                "time-world-one", "time-daybar", "night-clock"]},
     {"id": "sky", "title": "Sky", "source": "adsb.fi · ADSBdb",
      "blurb": "Planes, the ISS, and the sun from your spot on the map.",

@@ -33,7 +33,14 @@ export const optionLabel = (name, spec) => spec?.label || LABELS[name] || human(
 const choiceLabel = (v) => CHOICES[v] || human(v);
 
 /** Options that only make sense for some values of a sibling option. */
-function visible(name, options) {
+export function optionVisible(blockId, name, options) {
+  if (blockId === 'clock_design') {
+    const design = options.design || 'platform';
+    if (name === 'h24') return !['month_map', 'date_poster', 'word_glow'].includes(design);
+    if (name === 'show_date') return ['platform', 'station', 'time_stack', 'orbit', 'minute_track', 'clockwork', 'minute_runner'].includes(design);
+    if (name === 'show_seconds') return ['station', 'orbit', 'minute_runner'].includes(design);
+    if (name === 'animate') return ['platform', 'station', 'orbit', 'minute_track', 'clockwork', 'minute_runner'].includes(design);
+  }
   if (name === 'callsign') return options.source === 'follow';
   if (name === 'feed_id' && 'source' in options) return options.source === 'feed';
   return true;
@@ -56,7 +63,7 @@ export function optionsForm(blockId, options, onChange, cfg = {}) {
       if (spec.hidden) continue;
       if (blockId === 'nhl' && name === 'team') continue; // superseded by the multi-team picker
       if (name === 'font_family' || name === 'font_size') continue;
-      if (skip.has(name) || !visible(name, options)) continue;
+      if (skip.has(name) || !optionVisible(blockId, name, options)) continue;
       if (name === 'font' && meta.options.font_family) {
         wrap.append(fontControls(options, onChange));
         continue;
@@ -98,9 +105,9 @@ function optionField(blockId, name, spec, options, set) {
   if (type === 'enum' || (blockId === 'icon' && name === 'name')) {
     let choices = spec.choices || [];
     if (!choices.length && name === 'name') choices = state.catalog?.icons || [];
-    const reflow = name === 'source' || name === 'display';
+    const reflow = name === 'source' || name === 'display' || name === 'design';
     // Long lists (world clock cities) read better as a dropdown with full names.
-    if (choices.length > 12) {
+    if (choices.length > 12 || spec.control === 'select') {
       const id = nextId('opt');
       const select = h('select', { id, class: 'input' },
         choices.map((c) => h('option', { value: c, selected: c === value || null }, spec.labels?.[c] || choiceLabel(c))));

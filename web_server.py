@@ -271,7 +271,7 @@ def render_previews(body, settings, lib: dict) -> list[str]:
                               **{cs: entry.get("aircraft") for cs, entry in flights.items()}}
         aircraft["follow_status"] = {**(aircraft.get("follow_status") or {}), **flights}
     ctx = blocks.RenderContext(
-        now=datetime.now(zone), elapsed=float(elapsed), data=data,
+        now=datetime.now(zone), elapsed=float(elapsed), data=data, animate_clock=animate,
         units={"temp": settings.temp_unit, "distance": settings.distance_unit}, art=art,
         habits={**sample.habits, **lib["habits"]}, timers={**sample.timers, **lib["timers"]})
     frames = []

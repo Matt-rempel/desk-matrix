@@ -13,6 +13,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import catalog
 import nhl
 from nhl_logos import LOGOS as NHL_LOGOS
+from clock_faces import draw_face
 from airline_logos import LOGOS, airline_for
 from render import ICONS, WIDTH, HEIGHT, FONTS, fit_text, font_settings, hex_color, jround, measure, mix, rasterize
 
@@ -62,6 +63,7 @@ class RenderContext:
     habits: dict = field(default_factory=dict)
     timers: dict = field(default_factory=dict)
     nhl_elapsed: float | None = None
+    animate_clock: bool = True
 
 
 def _valid_color(value) -> bool:
@@ -1166,7 +1168,19 @@ def b_none(s: Slot) -> list[dict]:
     return []
 
 
+def b_clock_design(s: Slot) -> list[dict]:
+    if not s.rect.full:
+        return s.placeholder(["FULL PANEL", "CLOCK"])
+    pixels = draw_face(s.opt("design"), s.ctx.now, h24=s.opt("h24"),
+                       show_date=s.opt("show_date"), show_seconds=s.opt("show_seconds"),
+                       animate=s.opt("animate") and s.ctx.animate_clock, primary=s.color,
+                       accent=s.accent(None), tinted=bool(s.palette))
+    return [{"t": "pts", "p": [[i % WIDTH, i // WIDTH, pixel]
+                                for i, pixel in enumerate(pixels) if any(pixel)]}]
+
+
 RENDERERS: dict[str, Callable[[Slot], list[dict]]] = {
+    "clock_design": b_clock_design,
     "time": b_time, "date": b_date, "weekday": b_weekday, "temp": b_temp,
     "weather_icon": b_weather_icon, "rain": b_rain, "sun_time": b_sun_time, "flight": b_flight,
     "plane_count": b_plane_count, "countdown": b_countdown, "timer": b_timer, "text": b_text,

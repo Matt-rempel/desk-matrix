@@ -175,7 +175,7 @@ export function screenMatrix(screen, opts = {}) {
  * editor opts into fresh frames for time and motion effects.
  */
 export function hasLiveClock(screen) {
-  return (screen.slots || []).some(slot => slot.block === 'nhl'
+  return (screen.slots || []).some(slot => slot.block === 'nhl' || slot.block === 'clock_design'
     || (slot.block === 'time' && slot.options?.colon_blink === true));
 }
 
@@ -211,9 +211,12 @@ export function livePreview(matrix, { onError, ms = 150, animated = false } = {}
     }).finally(() => {
       if (mine !== seq) return;
       const nhlClock = (screen.slots || []).some(slot => slot.block === 'nhl');
+      const clock = (screen.slots || []).find(slot => slot.block === 'clock_design');
+      const movingClock = clock && clock.options?.animate !== false &&
+        ['platform', 'station', 'orbit', 'minute_track', 'clockwork', 'minute_runner'].includes(clock.options?.design || 'platform');
       const delay = errorReported ? 1000 : motion === 'slide'
         ? phase < 0.5 ? 75 : Math.min(hasBlink(screen) ? 400 : 3000, Math.max(75, (3 - phase) * 1000))
-        : motion === 'still' ? (nhlClock ? 1000 : 400) : 160;
+        : motion === 'still' ? (clock ? (movingClock ? 150 : 1000) : nhlClock ? 1000 : 400) : 160;
       timer = setTimeout(() => nextFrame(screen, mine), delay);
     });
   };
