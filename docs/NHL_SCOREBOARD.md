@@ -10,7 +10,8 @@ visible together; it does not scroll or rotate between statistics.
 2. Open **Teams to follow**, search or browse the team list, select one or more
    teams, then tap **Done**. Save the screen and add it to your lineup or use
    **Show now**.
-3. To change an existing NHL screen, open **Customize → Scoreboard → Team logos**.
+3. Existing NHL screens use the same logo scoreboard automatically. Open
+   **Customize** to change their teams, colours or shots setting.
 
 The selected team always appears on the left, whether it plays at home or away.
 The opponent appears on the right. **SH12-9**, for example, means 12 shots for
@@ -27,9 +28,12 @@ team on the left. Close the picker to cancel; **Done** requires at least one
 team. Teams can be found by full name or abbreviation.
 
 Logos retain their team colours with the Original palette. Applying a screen
-palette tints them to match the selected palette. The older **Classic** layout
-remains available. Updating the app does not change saved screens, the lineup,
-or the pinned screen automatically.
+palette tints them to match the selected palette. The old text-only Classic
+layout has been removed. Existing screens render with logos, including screens
+saved with no layout option or `display: classic`. Their team selections,
+colours, shots setting and lineup/pin references are retained. The old
+`data-score` ID is a hidden compatibility entry that renders the new scoreboard;
+it is not offered as another gallery template.
 
 ## Live alerts
 
@@ -50,7 +54,11 @@ Tap **Done**, then **Save lineup** to apply the alert settings.
 - Alerts always use the full **Team logos** layout, including alert settings
   saved before it was introduced. The saved screen itself is not rewritten.
   **Scoreboard appearance** optionally selects an NHL screen whose colours and
-  shots setting the alert should use.
+  shots setting the alert should use. It lists **Default scoreboard** and unique
+  saved appearances; identical looks are combined even when the screens follow
+  different teams. Saved choices are labelled with their name and team codes,
+  with a variant number only if distinct looks would otherwise share a label.
+  Choosing another appearance preserves the currently followed teams.
 
 Screen and alert team lists can be configured independently. Until an alert
 has an explicit team list, it inherits the teams from its selected appearance
@@ -136,13 +144,14 @@ without it the recorded hashes describe the input PNGs instead.
   multi-game alert bookkeeping.
 - `providers.py`: background requests, game-detail enrichment and last-good data.
 - `flightboard.py`: promptly persists new NHL observations for web previews.
-- `blocks.py`: Classic and Team logos renderers shared by panel and previews.
+- `blocks.py`: the single logo scoreboard renderer shared by panel and previews.
 - `catalog.py`: NHL options, the new built-in and the Sports shelf.
 - `nhl_logos.py`: generated runtime pixels, included in `deploy-manifest.json`.
 - `web/options.js`, `web/api.js`, `web/matrix.js`: conditional shots control and
   fresh live previews.
 - `web/nhl-teams.js`: shared searchable picker with bundled team marks; used by
   Customize and Lineup live alerts.
+- `web/nhl-appearance.js`: groups equivalent saved appearances for live alerts.
 
 Regression coverage includes intermissions, stopped/running clocks, stale
 observations, overtime/shootouts/finals, missing shots, away-team orientation,

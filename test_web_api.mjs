@@ -5,6 +5,25 @@ const KEY = 'a'.repeat(64);
 const NAME = 'flightboard-key';
 let moduleNumber = 0;
 
+test('NHL appearances hide the compatibility template and combine equivalent saved looks', async () => {
+  const { nhlAppearanceChoices } = await import('./web/nhl-appearance.js');
+  const screen = (id, name, options = {}, color = '#F4F2EE') => ({ id, name,
+    slots: [{ block: 'nhl', color, options }], style: { palette: null, motion: 'still' } });
+  const normal = screen('nhl-scoreboard', 'NHL scoreboard');
+  const compatibility = { ...screen('data-score', 'NHL scoreboard'), hidden: true };
+  const first = screen('custom-1', 'NHL game', { team: 'CGY', accent: '#FF9A3D', h24: false, show_shots: true });
+  const duplicate = screen('custom-2', 'NHL game', { teams: ['EDM', 'SJS'], display: 'classic', accent: '#FF9A3D' });
+  const result = nhlAppearanceChoices([compatibility, normal], [first, duplicate], 'custom-2');
+  assert.equal(result.choices.length, 2);
+  assert.deepEqual(result.choices.map(c => c.label), ['Default scoreboard', 'Saved: NHL game · CGY']);
+  assert.equal(result.selected, 'custom-1');
+  assert.equal(nhlAppearanceChoices([compatibility, normal], [first], 'data-score').selected, 'nhl-scoreboard');
+  const changed = screen('custom-3', 'NHL game', { team: 'CGY', accent: '#FF9A3D', show_shots: false });
+  const variants = nhlAppearanceChoices([normal], [first, changed], 'custom-3');
+  assert.equal(new Set(variants.choices.map(c => c.label)).size, 3);
+  assert.equal(variants.selected, 'custom-3');
+});
+
 test('NHL team picker keeps legacy single-team choices and describes multiple teams', async () => {
   const { followedTeams, teamsLabel } = await import('./web/nhl-teams.js');
   assert.deepEqual(followedTeams({ team: 'EDM', teams: [] }), ['EDM']);

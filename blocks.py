@@ -983,31 +983,11 @@ def b_nhl(s: Slot) -> list[dict]:
     r = s.rect
     if not r.full:
         return s.placeholder([team])
-    if s.opt("display") == "logos" and game.get("state") in ("live", "final", "upcoming"):
+    if game.get("state") in ("live", "final", "upcoming"):
         return _nhl_scoreboard(s, game)
     top, bottom = r.sub(0, 0, r.w, 10), r.sub(0, 11, r.w, 10)
     accent = s.accent("#FF9A3D")
     state = game.get("state")
-    if state == "upcoming":
-        opponent = game.get("away") if game.get("home") == team else game.get("home")
-        start = s.local(game.get("start"))
-        if not start:
-            return [T(top, [f"{team} NHL"], s.color), T(bottom, ["SCHEDULE"], accent)]
-        hour = f"{start.hour:02d}" if s.opt("h24") else str(start.hour % 12 or 12)
-        suffix = "" if s.opt("h24") else ("P" if start.hour >= 12 else "A")
-        when = f"{start:%a} {hour}:{start.minute:02d}{suffix}".upper()
-        return [T(top, [f"{team} {opponent or '---'}"], s.color),
-                T(bottom, [when], accent)]
-    if state in ("live", "final"):
-        home, away = game.get("home"), game.get("away")
-        own, other = ((game.get("home_score"), game.get("away_score")) if home == team
-                      else (game.get("away_score"), game.get("home_score")))
-        opponent = away if home == team else home
-        score = lambda n: str(n) if isinstance(n, int) and not isinstance(n, bool) else "-"
-        status = nhl.game_status(game, s.ctx.now)
-        return [T(top, [f"{team} {score(own)}"], s.color),
-                T(bottom, [f"{opponent or '---'} {score(other)}"], accent),
-                T(r.sub(0, 23, r.w, 9), [status], s.accent(MUTED))]
     label = "OFFLINE" if game.get("error") else "NO GAME" if state == "none" else "LOADING"
     return [T(top, [f"{team} NHL"], s.color), T(bottom, [label], accent)]
 

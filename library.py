@@ -181,6 +181,8 @@ def validate_options(block_id: str, options) -> dict:
     _check(isinstance(options, dict), f"{what} options must be an object")
     clean = {}
     for name, value in options.items():
+        if block_id == "nhl" and name == "display" and value == "classic":
+            value = "logos"
         spec = specs.get(name)
         _check(spec is not None, f"{what} has no option named {name!r}")
         label = f"{what} option {name}"

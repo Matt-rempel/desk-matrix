@@ -12,7 +12,7 @@ PLAN_IDS = {
     "sky-follow", "sky-radar", "sky-iss", "sky-sun", "weather-now", "weather-hourly",
     "weather-rain", "weather-metar", "focus-pomodoro", "focus-countdown", "focus-streak",
     "focus-nextup", "play-message", "play-pet", "play-life", "play-fire", "play-music",
-    "data-market", "data-score", "data-transit", "data-health", "night-clock",
+    "data-market", "nhl-scoreboard", "data-transit", "data-health", "night-clock",
 }
 MDT = timezone(timedelta(hours=-6))
 
@@ -175,7 +175,8 @@ class CatalogTests(unittest.TestCase):
         self.assertTrue(set(shelved) <= set(catalog.BUILTINS))
         self.assertTrue(PLAN_IDS <= set(shelved))
         self.assertEqual(next(s["items"] for s in catalog.SHELVES if s["id"] == "sports"),
-                         ["nhl-scoreboard", "data-score"])
+                         ["nhl-scoreboard"])
+        self.assertTrue(catalog.BUILTINS["data-score"]["hidden"])
         self.assertEqual(catalog.LEGACY_IDS["clock-classic"], "time-classic")
         for target in catalog.LEGACY_IDS.values():
             self.assertIn(target, catalog.BUILTINS)

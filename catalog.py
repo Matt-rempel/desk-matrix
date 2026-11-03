@@ -185,8 +185,8 @@ BLOCKS = {
                  "label": "Team shown"},
         "teams": {"type": "teams", "default": [], "label": "Teams to follow"},
         "h24": _bool(False),
-        "display": {"type": "enum", "default": "classic", "label": "Scoreboard",
-                    "choices": ["classic", "logos"], "labels": {"classic": "Classic", "logos": "Team logos"}},
+        # Retained only to read existing screens. There is one NHL layout now.
+        "display": {"type": "enum", "default": "logos", "hidden": True, "choices": ["logos"]},
         "show_shots": {"type": "bool", "default": True, "label": "Show shots"},
         "accent": _color()}, 32, 16, ["nhl"]),
     "calendar_next": _block("Next event", "9:30", "focus", {
@@ -333,9 +333,9 @@ BUILTIN_SCREENS = [
     _screen("data-market", "Market", "full", [
         _slot("feed", "#5AE08A", feed_id=SAMPLE_FEEDS["market"], label="TSX", accent=INK)],
         "data", "Index · sparkline", "JSON feed"),
-    _screen("data-score", "NHL game", "full", [
-        _slot("nhl", INK, team="CGY", accent="#FF9A3D")],
-        "sports", "Live score · next game", "NHL"),
+    _screen("data-score", "NHL scoreboard", "full", [
+        _slot("nhl", INK, team="CGY", display="logos", show_shots=True, accent=AMBER)],
+        "sports", "Team logos · score · period · shots", "NHL"),
     _screen("nhl-scoreboard", "NHL scoreboard", "full", [
         _slot("nhl", INK, team="CGY", display="logos", show_shots=True, accent=AMBER)],
         "sports", "Team logos · score · period · shots", "NHL"),
@@ -360,6 +360,8 @@ BUILTIN_SCREENS = [
         _slot("time", "#FFFFFF"), _slot("weekday", "#FFB86C")], "clock", "Time · weekday", "Offline"),
 ]
 BUILTINS = {screen["id"]: screen for screen in BUILTIN_SCREENS}
+# Compatibility ID for old lineup/pin references; never offered as another template.
+BUILTINS["data-score"]["hidden"] = True
 
 SHELVES = [
     {"id": "time", "title": "Time", "source": "Offline",
@@ -374,7 +376,7 @@ SHELVES = [
      "items": ["weather-now", "weather-hourly", "weather-rain", "weather-metar"]},
     {"id": "sports", "title": "Sports", "source": "NHL",
      "blurb": "Follow a team and catch the next game, live score, or final.",
-     "items": ["nhl-scoreboard", "data-score"]},
+     "items": ["nhl-scoreboard"]},
     {"id": "focus", "title": "Focus", "source": "Offline",
      "blurb": "Timers and countdowns you start from your phone.",
      "items": ["focus-pomodoro", "focus-countdown", "focus-streak", "focus-nextup"]},

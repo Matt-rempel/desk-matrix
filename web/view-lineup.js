@@ -4,6 +4,7 @@ import { state, subscribe, clone, findScreen, customs, liveMomentId, act } from 
 import { screenMatrix } from './matrix.js';
 import { h, toggle, stepper, chips, sheet, toast, messageLine, confirmSheet, busy, nextId } from './ui.js';
 import { teamPicker, followedTeams, teamsLabel } from './nhl-teams.js';
+import { nhlAppearanceChoices } from './nhl-appearance.js';
 
 const DAY_LETTERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -309,13 +310,15 @@ export function render(root, { params }) {
   function interruptParams(id, cfg) {
     const refresh = () => { renderInterrupts(); syncBar(); };
     if (id === 'nhl_live') {
-      const screens = [...(state.catalog?.builtins || []), ...(state.library?.screens || [])]
-        .filter((screen) => (screen.slots || []).some((slot) => slot.block === 'nhl'));
+      const appearances = nhlAppearanceChoices(state.catalog?.builtins || [], state.library?.screens || [], cfg.screen_id);
       const inputId = nextId('nhl-screen');
-      const select = h('select', { id: inputId, class: 'input' }, screens.map((screen) => {
-        return h('option', { value: screen.id, selected: screen.id === cfg.screen_id }, screen.name);
-      }));
-      select.addEventListener('change', () => { cfg.screen_id = select.value; refresh(); });
+      const select = h('select', { id: inputId, class: 'input' }, appearances.choices.map(choice =>
+        h('option', { value: choice.id, selected: choice.id === appearances.selected }, choice.label)));
+      select.addEventListener('change', () => {
+        // Changing colours must not change inherited team choices.
+        if (!cfg.teams?.length) cfg.teams = [...teams];
+        cfg.screen_id = select.value; refresh();
+      });
       const mode = chips({ label: 'NHL alert behavior', value: cfg.mode,
         choices: [{ id: 'brief', label: 'Brief alerts' }, { id: 'game', label: 'Follow live games' }],
         onChange: (value) => { cfg.mode = value; refresh(); } });

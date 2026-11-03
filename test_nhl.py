@@ -219,20 +219,31 @@ class NHLTests(unittest.TestCase):
                    "clock": "12:34", "age_s": 20}
         ctx = blocks.RenderContext(now=NOW, data={"nhl": {"CGY": current}})
         self.assertEqual([x["s"][0] for x in blocks.render_screen(screen, ctx) if x["t"] == "text"],
-                         ["CGY 2", "EDM 1", "P3 12:34"])
+                         ["2-1", "CGY", "EDM", "SH---", "P3 12:34"])
         ctx.elapsed = 10
         self.assertEqual([x["s"][0] for x in blocks.render_screen(screen, ctx) if x["t"] == "text"],
-                         ["CGY 2", "EDM 1", "P3 12:34"])
+                         ["2-1", "CGY", "EDM", "SH---", "P3 12:34"])
         current["age_s"] = 190
-        self.assertEqual(blocks.render_screen(screen, ctx)[2]["s"], ["STALE"])
+        self.assertEqual(blocks.render_screen(screen, ctx)[-1]["s"], ["STALE"])
         current["state"] = "final"
-        self.assertEqual(blocks.render_screen(screen, ctx)[2]["s"], ["FINAL"])
+        self.assertEqual(blocks.render_screen(screen, ctx)[-1]["s"], ["FINAL"])
         current.update(state="upcoming", start="2026-10-14T02:00:00+00:00", away="VAN")
         ctx.now = NOW.astimezone(blocks.ZoneInfo("America/Edmonton"))
         self.assertEqual([x["s"][0] for x in blocks.render_screen(screen, ctx) if x["t"] == "text"],
-                         ["CGY VAN", "TUE 8:00P"])
+                         ["VS", "CGY", "VAN", "TUE 8:00P"])
         ctx.data = {"nhl": {"CGY": {"state": "none"}}}
         self.assertEqual(blocks.render_screen(screen, ctx)[1]["s"], ["NO GAME"])
+
+    def test_legacy_and_missing_layout_options_always_use_the_logo_scoreboard(self):
+        import copy
+        screen = copy.deepcopy(catalog.BUILTINS["nhl-scoreboard"])
+        ctx = blocks.RenderContext(now=NOW, data={"nhl": {"CGY": {
+            "state": "live", "home": "CGY", "away": "SJS", "home_score": 1, "away_score": 0}}})
+        expected = blocks.frame(screen, ctx)
+        for display in (None, "classic", "logos"):
+            if display is None:screen["slots"][0]["options"].pop("display", None)
+            else:screen["slots"][0]["options"]["display"] = display
+            self.assertEqual(blocks.frame(screen, ctx), expected)
 
 
 if __name__ == "__main__":

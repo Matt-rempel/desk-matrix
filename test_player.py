@@ -278,7 +278,7 @@ class InterruptTests(unittest.TestCase):
         self.assertEqual((p.tick(0, live)[1]["screen_id"], p._interrupt["name"]),
                          ("data-score", "nhl_live"))
         self.assertEqual(p._interrupt["screen"]["slots"][0]["options"]["display"], "logos")
-        self.assertNotEqual(catalog.BUILTINS["data-score"]["slots"][0]["options"].get("display"), "logos")
+        self.assertEqual(catalog.BUILTINS["data-score"]["slots"][0]["options"]["display"], "logos")
         live["nhl"]["CGY"]["clock"] = "09:01"
         self.assertEqual(p.tick(20, live)[1]["screen_id"], "time-big")
         self.assertIsNone(p.tick(30, live)[1]["interrupt"])

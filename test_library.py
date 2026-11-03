@@ -262,6 +262,20 @@ class ValidationTests(unittest.TestCase):
         saved = validate_library(legacy)["lineup"]["interrupts"]["nhl_live"]
         self.assertEqual((saved["screen_id"], saved["teams"]), ("data-score", []))
 
+    def test_retired_nhl_layout_migrates_without_changing_teams_or_references(self):
+        item = screen(layout="full", based_on="data-score", slots=[{"block": "nhl", "color": "#ABCDEF",
+                      "options": {"display": "classic", "teams": ["CGY", "EDM"], "show_shots": False}}])
+        lib = default_library()
+        lib["screens"] = [item]
+        lib["pinned"] = {"screen_id": "data-score", "until": None}
+        lib["lineup"]["always"] = [{"screen_id": "data-score", "seconds": 20}]
+        lib["lineup"]["interrupts"]["nhl_live"]["screen_id"] = "data-score"
+        clean = validate_library(lib)
+        opts = clean["screens"][0]["slots"][0]["options"]
+        self.assertEqual(opts, {"display": "logos", "teams": ["CGY", "EDM"], "show_shots": False})
+        self.assertEqual(clean["pinned"]["screen_id"], "data-score")
+        self.assertEqual(resolve_screen(clean, "data-score")["slots"][0]["options"]["display"], "logos")
+
     def test_resolve_screen(self):
         lib = validate_library({"version": 1, "screens": [screen()]})
         self.assertEqual(resolve_screen(lib, CUSTOM)["name"], "Morning glance")
