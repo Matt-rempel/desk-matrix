@@ -357,8 +357,10 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
 .field-pair .field { margin-top: 0; }
 .time-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.time-pair .input { display: block; min-width: 0; max-width: 100%; inline-size: 100%; min-inline-size: 0; padding-inline: 6px; text-align: center; -webkit-appearance: none; appearance: none; }
-.time-pair .input::-webkit-date-and-time-value { min-width: 0; text-align: center; }
+.time-pair .input { display: flex; align-items: center; justify-content: center; height: 44px; min-width: 0; max-width: 100%; inline-size: 100%; min-inline-size: 0; padding: 0 6px; line-height: normal; text-align: center; -webkit-appearance: none; appearance: none; }
+/* Safari renders the time in its own value box; centre that box as well. */
+.time-pair .input::-webkit-date-and-time-value { display: flex; align-items: center; justify-content: center; min-width: 0; min-height: 100%; margin: 0; text-align: center; }
+.time-pair .input::-webkit-datetime-edit { display: flex; flex: 1; align-items: center; justify-content: center; min-height: 100%; padding: 0; }
 .input-row { display: flex; gap: 8px; }
 .input-row .input { flex: 1; min-width: 0; }
 .inline-field { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
