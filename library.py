@@ -179,6 +179,9 @@ def validate_options(block_id: str, options) -> dict:
     specs = catalog.BLOCKS[block_id]["options"]
     what = catalog.BLOCKS[block_id]["name"]
     _check(isinstance(options, dict), f"{what} options must be an object")
+    if block_id == "clock_design" and isinstance(options.get("design"), str) and options["design"] in catalog.LEGACY_TRACKER_UNITS:
+        options = {**options, "design": "tracker",
+                   "track_unit": options.get("track_unit", catalog.LEGACY_TRACKER_UNITS[options["design"]])}
     clean = {}
     for name, value in options.items():
         if block_id == "nhl" and name == "display" and value == "classic":

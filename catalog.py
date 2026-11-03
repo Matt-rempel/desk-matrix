@@ -7,7 +7,7 @@ import copy
 from render import ICONS, WIDTH, HEIGHT, FONT_FAMILIES, FONT_SIZES, LEGACY_FONT_SETTINGS, rasterize, to_hex
 from nhl import TEAMS, TEAM_NAMES
 from nhl_logos import LOGOS as NHL_LOGOS
-from clock_faces import DESIGN_NAMES
+from clock_faces import DESIGN_NAMES, LEGACY_TRACKER_UNITS
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
 
@@ -143,6 +143,8 @@ BLOCKS = {
     "clock_design": _block("Clock design", "10:24", "time", {
         "design": {"type": "enum", "default": "platform", "choices": list(DESIGN_NAMES),
                    "labels": DESIGN_NAMES, "label": "Design", "control": "select"},
+        "track_unit": {"type": "enum", "default": "minutes", "label": "Track",
+                       "choices": ["minutes", "seconds"], "labels": {"minutes": "Minutes", "seconds": "Seconds"}},
         "h24": _bool(False),
         "show_date": {"type": "bool", "default": True, "label": "Show date"},
         "show_seconds": {"type": "bool", "default": True, "label": "Seconds indicator"},
@@ -379,15 +381,14 @@ CLOCK_TEMPLATES = [
     ("time-platform", "platform", "Split-flap time · date"),
     ("time-station", "station", "Railway dial · time · date"),
     ("time-stack", "time_stack", "Oversized hours · minutes"),
-    ("time-orbit", "orbit", "Hours · minutes · seconds rings"),
-    ("time-minute-track", "minute_track", "Time · sliding minute ruler"),
-    ("time-seconds-track", "seconds_track", "Time · sliding seconds ruler"),
-    ("time-clockwork", "clockwork", "24 dials make the time"),
     ("time-perpetual-card", "perpetual_card", "Calendar card · time"),
     ("time-week-strip", "week_strip", "Time · this week"),
-    ("time-month-map", "month_map", "A dot for every day"),
     ("time-date-poster", "date_poster", "Day · weekday · month · year"),
+    ("time-month-map", "month_map", "A dot for every day"),
+    ("time-tracker", "tracker", "Time · minutes or seconds ruler"),
+    ("time-orbit", "orbit", "Hours · minutes · seconds rings"),
     ("time-word-glow", "word_glow", "Exact time in glowing words"),
+    ("time-clockwork", "clockwork", "24 dials make the time"),
     ("time-minute-runner", "minute_runner", "A one-minute pixel lap"),
 ]
 BUILTIN_SCREENS += [
@@ -395,6 +396,13 @@ BUILTIN_SCREENS += [
             "clock_design", tag, "Offline")
     for sid, design, tag in CLOCK_TEMPLATES
 ]
+for _design, _unit in LEGACY_TRACKER_UNITS.items():
+    _compat = _screen("time-" + _design.replace("_", "-"),
+                      "Minute Track" if _unit == "minutes" else "Seconds Track", "full",
+                      [_slot("clock_design", None, design="tracker", track_unit=_unit)],
+                      "clock_design", "Time · minutes or seconds ruler", "Offline")
+    _compat["hidden"] = True
+    BUILTIN_SCREENS.append(_compat)
 BUILTINS = {screen["id"]: screen for screen in BUILTIN_SCREENS}
 # Compatibility ID for old lineup/pin references; never offered as another template.
 BUILTINS["data-score"]["hidden"] = True
@@ -402,8 +410,10 @@ BUILTINS["data-score"]["hidden"] = True
 SHELVES = [
     {"id": "time", "title": "Time", "source": "Offline",
      "blurb": "Clocks that read from across the room.",
-     "items": [sid for sid, _, _ in CLOCK_TEMPLATES] + ["time-big", "time-classic", "time-analog", "time-words", "time-world",
-               "time-world-one", "time-daybar", "night-clock"]},
+     "items": ["time-classic", "time-big", "time-analog", "time-world-one", "time-world", "night-clock",
+               "time-platform", "time-station", "time-stack", "time-perpetual-card", "time-week-strip",
+               "time-date-poster", "time-month-map", "time-daybar", "time-tracker", "time-words",
+               "time-orbit", "time-word-glow", "time-clockwork", "time-minute-runner"]},
     {"id": "sky", "title": "Sky", "source": "adsb.fi · ADSBdb",
      "blurb": "Planes, the ISS, and the sun from your spot on the map.",
      "items": ["sky-nearby", "sky-follow", "sky-radar", "sky-iss", "sky-sun"]},

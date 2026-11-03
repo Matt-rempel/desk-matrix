@@ -8,11 +8,11 @@ from render import FONT_FAMILIES, FONT_SIZES
 
 DESIGN_NAMES = {
     'platform': 'Platform', 'station': 'Station', 'time_stack': 'Time Stack',
-    'orbit': 'Orbit', 'minute_track': 'Minute Track', 'seconds_track': 'Seconds Track', 'clockwork': 'Clockwork',
     'perpetual_card': 'Perpetual Card', 'week_strip': 'Week Strip',
-    'month_map': 'Month Map', 'date_poster': 'Date Poster',
-    'word_glow': 'Word Glow', 'minute_runner': 'Minute Runner',
+    'date_poster': 'Date Poster', 'month_map': 'Month Map', 'tracker': 'Tracker',
+    'orbit': 'Orbit', 'word_glow': 'Word Glow', 'clockwork': 'Clockwork', 'minute_runner': 'Minute Runner',
 }
+LEGACY_TRACKER_UNITS = {'minute_track': 'minutes', 'seconds_track': 'seconds'}
 DESIGN_ACCENTS = {name: '#FFB34D' for name in DESIGN_NAMES}
 DESIGN_ACCENTS.update(station='#FF645B', perpetual_card='#FF645B',
                       week_strip='#59DBCD', date_poster='#B994FF', word_glow='#59DBCD')
@@ -22,7 +22,7 @@ HOURS = ('TWELVE', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT
 SMALL = ('', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
          'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN')
 TENS = ('', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY')
-SECONDS_READOUT_DESIGNS = ('platform', 'time_stack', 'minute_track', 'clockwork', 'perpetual_card', 'week_strip')
+SECONDS_READOUT_DESIGNS = ('platform', 'time_stack', 'tracker', 'clockwork', 'perpetual_card', 'week_strip')
 
 
 def week_dates(now):
@@ -73,11 +73,12 @@ DIAL_DIGITS = {
 
 class Face:
     def __init__(self, now, h24, show_date, show_seconds, animate, primary, accent, tinted, custom_accent, seconds_display,
-                 font_family, font_size):
+                 font_family, font_size, track_unit):
         self.c = Canvas()
         self.now, self.h24, self.show_date = now, h24, show_date
         self.show_seconds, self.animate = show_seconds, animate
         self.seconds_display = seconds_display
+        self.track_unit = track_unit
         self.font_family = font_family if font_family in FONT_FAMILIES else 'standard'
         self.font_size = font_size if font_size in FONT_SIZES else 'auto'
         self.primary = primary
@@ -179,6 +180,12 @@ class Face:
             self.text(f'{self.now.day:02} {self.month}', 33, 24, 31, 5, self.dim)
         else:
             self.text(self.ampm, 33, 24, 31, 5, self.dim)
+
+    def tracker(self):
+        if self.track_unit == 'seconds':
+            self.seconds_track()
+        else:
+            self.minute_track()
 
     def minute_track(self):
         self.track(self.now.minute, (1 - self.phase / .5) * 8 if self.animate and self.phase < .5 else 0)
@@ -298,11 +305,14 @@ class Face:
 
 def draw_face(design, now, *, h24=False, show_date=True, show_seconds=True, animate=True,
               primary='#F4F2EE', accent=None, tinted=False, seconds_display='off',
-              font_family='standard', font_size='auto'):
+              font_family='standard', font_size='auto', track_unit=None):
     """Return one opaque native frame. Never reads clocks, providers, files, or hardware."""
+    unit = track_unit if track_unit in ('minutes', 'seconds') else LEGACY_TRACKER_UNITS.get(design, 'minutes')
+    design = 'tracker' if design in LEGACY_TRACKER_UNITS else design
+    seconds_readout = design in SECONDS_READOUT_DESIGNS and not (design == 'tracker' and unit == 'seconds')
     face = Face(now, h24, show_date, show_seconds, animate, primary,
                 accent or DESIGN_ACCENTS.get(design, '#FFB34D'), tinted, accent is not None,
-                seconds_display if design in SECONDS_READOUT_DESIGNS and seconds_display in ('number', 'bar') else 'off',
-                font_family, font_size)
+                seconds_display if seconds_readout and seconds_display in ('number', 'bar') else 'off',
+                font_family, font_size, unit)
     getattr(face, design if design in DESIGN_NAMES else 'platform')()
     return face.c.pixels

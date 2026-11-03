@@ -268,3 +268,12 @@ test('tracker typography is offered for both rulers and hidden for fixed clock d
     }
   }
 });
+
+test('one tracker exposes its unit setting and seconds readouts only in minute mode', async () => {
+  const { optionVisible } = await import('./web/options.js');
+  assert.equal(optionVisible('clock_design', 'track_unit', { design: 'tracker' }), true);
+  assert.equal(optionVisible('clock_design', 'track_unit', { design: 'platform' }), false);
+  assert.equal(optionVisible('clock_design', 'font', { design: 'tracker' }), true);
+  assert.equal(optionVisible('clock_design', 'seconds_display', { design: 'tracker', track_unit: 'minutes' }), true);
+  assert.equal(optionVisible('clock_design', 'seconds_display', { design: 'tracker', track_unit: 'seconds' }), false);
+});

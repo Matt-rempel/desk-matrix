@@ -16,7 +16,8 @@ class ClockSecondsTest(unittest.TestCase):
     def test_seconds_track_template_and_second_rollover(self):
         self.assertIn('time-seconds-track', catalog.BUILTINS)
         item = catalog.BUILTINS['time-seconds-track']
-        self.assertIn(item['id'], next(s['items'] for s in catalog.SHELVES if s['id'] == 'time'))
+        self.assertIn('time-tracker', next(s['items'] for s in catalog.SHELVES if s['id'] == 'time'))
+        self.assertTrue(item['hidden'])
         before = draw_face('seconds_track', self.now.replace(second=59), animate=False)
         after = draw_face('seconds_track', self.now.replace(second=0), animate=False)
         self.assertNotEqual(before, after)

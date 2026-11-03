@@ -32,16 +32,23 @@ const human = (s) => String(s).replace(/[_-]+/g, ' ').replace(/^\w/, (c) => c.to
 export const optionLabel = (name, spec) => spec?.label || LABELS[name] || human(name);
 const choiceLabel = (v) => CHOICES[v] || human(v);
 
+function clockSelection(options) {
+  const legacy = { minute_track: 'minutes', seconds_track: 'seconds' }[options.design];
+  return { design: legacy ? 'tracker' : options.design || 'platform',
+    track_unit: options.track_unit ?? legacy ?? 'minutes' };
+}
+
 /** Options that only make sense for some values of a sibling option. */
 export function optionVisible(blockId, name, options) {
   if (blockId === 'clock_design') {
-    const design = options.design || 'platform';
-    if (['font', 'font_family', 'font_size'].includes(name)) return ['minute_track', 'seconds_track'].includes(design);
+    const { design, track_unit: unit } = clockSelection(options);
+    if (name === 'track_unit') return design === 'tracker';
+    if (['font', 'font_family', 'font_size'].includes(name)) return design === 'tracker';
     if (name === 'h24') return !['month_map', 'date_poster', 'word_glow'].includes(design);
-    if (name === 'show_date') return ['platform', 'station', 'time_stack', 'orbit', 'minute_track', 'seconds_track', 'clockwork', 'minute_runner'].includes(design);
+    if (name === 'show_date') return ['platform', 'station', 'time_stack', 'orbit', 'tracker', 'clockwork', 'minute_runner'].includes(design);
     if (name === 'show_seconds') return ['station', 'orbit', 'minute_runner'].includes(design);
-    if (name === 'seconds_display') return ['platform', 'time_stack', 'minute_track', 'clockwork', 'perpetual_card', 'week_strip'].includes(design);
-    if (name === 'animate') return ['platform', 'station', 'orbit', 'minute_track', 'seconds_track', 'clockwork', 'minute_runner'].includes(design);
+    if (name === 'seconds_display') return (design === 'tracker' && unit === 'minutes') || ['platform', 'time_stack', 'clockwork', 'perpetual_card', 'week_strip'].includes(design);
+    if (name === 'animate') return ['platform', 'station', 'orbit', 'tracker', 'clockwork', 'minute_runner'].includes(design);
   }
   if (name === 'callsign') return options.source === 'follow';
   if (name === 'feed_id' && 'source' in options) return options.source === 'feed';
@@ -85,7 +92,8 @@ export function optionsForm(blockId, options, onChange, cfg = {}) {
 }
 
 function optionField(blockId, name, spec, options, set) {
-  const value = options[name] ?? spec.default;
+  const value = blockId === 'clock_design' && ['design', 'track_unit'].includes(name)
+    ? clockSelection(options)[name] : options[name] ?? spec.default;
   const label = optionLabel(name, spec);
   const type = spec.type;
 
@@ -109,7 +117,7 @@ function optionField(blockId, name, spec, options, set) {
   if (type === 'enum' || (blockId === 'icon' && name === 'name')) {
     let choices = spec.choices || [];
     if (!choices.length && name === 'name') choices = state.catalog?.icons || [];
-    const reflow = name === 'source' || name === 'display' || name === 'design';
+    const reflow = name === 'source' || name === 'display' || name === 'design' || name === 'track_unit';
     // Long lists (world clock cities) read better as a dropdown with full names.
     if (choices.length > 12 || spec.control === 'select') {
       const id = nextId('opt');
