@@ -203,10 +203,10 @@ def _build_glyphs() -> dict[str, dict[str, tuple[int, ...]]]:
         cols = tuple(sum(1 << r for r in range(5) if (rows[r] >> (2 - c)) & 1) for c in range(3))
         three[char] = _trim(cols, char)
     return {"5x7": five, "3x5": three,
-            "native20": _stroke_glyphs(11, 20, 2),
-            "native14": _stroke_glyphs(8, 14, 2),
-            "native10": _stroke_glyphs(6, 10, 1),
-            "native30": _stroke_glyphs(13, 30, 3)}
+            "native20": _standard_glyphs(11, 20, 2),
+            "native14": _standard_glyphs(8, 14, 2),
+            "native10": _standard_glyphs(6, 10, 1),
+            "native30": _standard_glyphs(13, 30, 3)}
 
 
 @lru_cache(maxsize=128)
@@ -254,6 +254,96 @@ def _stroke_glyphs(width: int, height: int, stroke: int) -> dict[str, tuple[int,
     return glyphs
 
 
+@lru_cache(maxsize=128)
+def _standard_glyphs(width: int, height: int, stroke: int):
+    """Hint Standard digits to the actual grid; retain existing letter shapes."""
+    table = dict(_stroke_glyphs(width, height, stroke))
+    if width < 5 or height < 9:
+        return table
+
+    def rounded_ring(top, bottom, radius, filled=False):
+        def inside(px, py, left, upper, right, lower, r):
+            if right <= left or lower <= upper:
+                return False
+            cx, cy = (left + right) / 2, (upper + lower) / 2
+            r = max(0, min(r, (right - left) / 2, (lower - upper) / 2))
+            dx = max(abs(px - cx) - ((right - left) / 2 - r), 0)
+            dy = max(abs(py - cy) - ((lower - upper) / 2 - r), 0)
+            return dx * dx + dy * dy <= r * r + 1e-9
+        return {(x, y) for x in range(width) for y in range(height)
+                if inside(x + .5, y + .5, 0, top, width, bottom, radius)
+                and (filled or not inside(x + .5, y + .5, stroke, top + stroke,
+                                         width - stroke, bottom - stroke, radius - stroke))}
+
+    def hint(value, limit):
+        return max(stroke / 2, min(limit - stroke / 2,
+                   math.floor(value - stroke / 2 + .5) + stroke / 2))
+
+    x0, x1 = stroke / 2, width - stroke / 2
+    y0, y1 = stroke / 2, height - stroke / 2
+    cx, middle = hint(width / 2, width), hint(height / 2, height)
+    radius = min((width - stroke) / 2, (height - stroke) / 4)
+
+    def curve(start, control, end):
+        steps = max(width, height) * 2
+        return [((1 - t) ** 2 * start[0] + 2 * (1 - t) * t * control[0] + t * t * end[0],
+                 (1 - t) ** 2 * start[1] + 2 * (1 - t) * t * control[1] + t * t * end[1])
+                for t in (i / steps for i in range(steps + 1))]
+
+    def line_path(points):
+        ink = set()
+        r = stroke / 2
+        for (ax, ay), (bx, by) in zip(points, points[1:]):
+            dx, dy = bx - ax, by - ay
+            length = dx * dx + dy * dy
+            for x in range(max(0, math.floor(min(ax, bx) - r)), min(width, math.ceil(max(ax, bx) + r))):
+                for y in range(max(0, math.floor(min(ay, by) - r)), min(height, math.ceil(max(ay, by) + r))):
+                    t = max(0, min(1, ((x + .5 - ax) * dx + (y + .5 - ay) * dy) / length)) if length else 0
+                    if (x + .5 - ax - t * dx) ** 2 + (y + .5 - ay - t * dy) ** 2 < r * r + 1e-9:
+                        ink.add((x, y))
+        return ink
+
+    # Shared rounded bowls remove independent rounding errors from each side.
+    bowl_end = (height - stroke) // 2 + stroke
+    waist = (height - stroke) // 2
+    zero = rounded_ring(0, height, min(width / 2, height / 4))
+    upper = rounded_ring(0, bowl_end, min(width, bowl_end) / 2)
+    eight = upper | rounded_ring(waist, height, min(width, height - waist) / 2)
+    nine = set(upper)
+    outer = rounded_ring(0, height, min(width / 2, height / 4), filled=True)
+    upper_hole = rounded_ring(0, bowl_end, min(width, bowl_end) / 2, filled=True) - upper
+    nine |= {(x, y) for x, y in outer if x + .5 >= width / 2 and bowl_end / 2 <= y + .5 < bowl_end}
+    nine |= {(x, y) for x, y in zero if y + .5 >= bowl_end / 2
+             and (x + .5 >= width / 2 or y >= height - stroke)}
+    nine |= {(x, y) for x in range(max(1, stroke), math.ceil(width / 2))
+             for y in range(height - stroke, height)}
+    nine -= upper_hole
+    digits = {"0": zero, "8": eight, "9": nine,
+              "6": {(width - 1 - x, height - 1 - y) for x, y in nine}}
+    digits["1"] = line_path([(hint(width * .22, width), y0 + radius), (cx, y0), (cx, y1)])
+    digits["1"] |= line_path([(x0, y1), (x1, y1)])
+    digits["2"] = line_path(curve((x0, y0 + radius), (x0, y0), (cx, y0))
+                            + curve((cx, y0), (x1, y0), (x1, y0 + radius))
+                            + curve((x1, y0 + radius), (x1, middle - radius / 2), (cx, middle))
+                            + [(x0, y1), (x1, y1)])
+    digits["3"] = line_path([(x0, y0), (cx, y0)]
+                            + curve((cx, y0), (x1, y0), (x1, y0 + radius))
+                            + curve((x1, y0 + radius), (x1, middle), (cx, middle))
+                            + curve((cx, middle), (x1, middle), (x1, y1 - radius))
+                            + curve((x1, y1 - radius), (x1, y1), (cx, y1)) + [(x0, y1)])
+    digits["3"] |= line_path([(hint(width * .3, width), middle), (cx, middle)])
+    upright = hint(width * .75, width)
+    cross = hint(height * .65, height)
+    digits["4"] = line_path([(upright, y1), (upright, y0), (x0, cross), (x1, cross)])
+    digits["5"] = line_path([(x1, y0), (x0, y0), (x0, middle), (cx, middle)]
+                            + curve((cx, middle), (x1, middle), (x1, y1 - radius))
+                            + curve((x1, y1 - radius), (x1, y1), (cx, y1)) + [(x0, y1)])
+    digits["7"] = line_path([(x0, y0), (x1, y0), (hint(width * .25, width), y1)])
+    for char, ink in digits.items():
+        table[char] = tuple(sum(1 << y for y in range(height) if (x, y) in ink) for x in range(width))
+    return table
+
+
 GLYPHS = _build_glyphs()
 
 
@@ -290,7 +380,7 @@ def _max_shape(text: str, width: int, height: int):
         minimum = max(3, stroke + 1, math.ceil(h * .35))
         maximum = min(target_width, math.ceil(h * .65))
         for w in range(maximum, minimum - 1, -1):
-            shape = _shape_run(text, _stroke_glyphs(w, h, stroke), 1, h, max(2, stroke))
+            shape = _shape_run(text, _standard_glyphs(w, h, stroke), 1, h, max(2, stroke))
             if shape[1] <= target_width:
                 return shape
     return None
@@ -309,7 +399,7 @@ def _family_glyphs(family: str, width: int, height: int, stroke: int, outline_ma
             return GLYPHS["3x5"]
         if height == 7 and width == 5:
             return GLYPHS["5x7"]
-        return _stroke_glyphs(width, height, stroke)
+        return _standard_glyphs(width, height, stroke)
     if family in ("block", "outline"):
         # Scale the original pixel cells independently in each axis. A four-
         # digit Max clock can therefore use the full height without cropping.

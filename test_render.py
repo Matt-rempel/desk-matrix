@@ -11,6 +11,19 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_standard_round_digits_have_balanced_pixel_curves_at_every_native_size(self):
+        for width, height, stroke in ((6, 10, 1), (8, 14, 1), (8, 14, 2),
+                                      (11, 20, 2), (14, 21, 2), (13, 30, 3), (18, 30, 3)):
+            table = render._standard_glyphs(width, height, stroke)
+            for digit in ("0", "8"):
+                with self.subTest(size=(width, height, stroke), digit=digit):
+                    points = {(x, y) for x, col in enumerate(table[digit])
+                              for y in range(height) if col >> y & 1}
+                    self.assertEqual(points, {(width - 1 - x, y) for x, y in points})
+            six = {(x, y) for x, col in enumerate(table["6"]) for y in range(height) if col >> y & 1}
+            nine = {(x, y) for x, col in enumerate(table["9"]) for y in range(height) if col >> y & 1}
+            self.assertEqual(six, {(width - 1 - x, height - 1 - y) for x, y in nine})
+
     def test_max_outline_seven_is_one_connected_square_corner(self):
         for height in (15, 20, 32):
             with self.subTest(height=height):
@@ -81,14 +94,9 @@ class FontTests(unittest.TestCase):
             # The 4 has a continuous right stem from cap height to baseline.
             self.assertEqual(table["4"][-1], (1 << height) - 1)
 
-    def test_legacy_font_frames_remain_identical(self):
+    def test_bitmap_font_frames_remain_identical(self):
         expected = {
-            "auto": "d88586a0b1f6d089925599a8891ee074597e81e01221a3113f6e6887c51843d3",
             "block": "96793016ce9d99952f903fcb6dde89249202e130692fbd0e6c3551e9299fc073",
-            "max": "c7a6cf8bb2214225e4f2c023060b1abcb746f45261a1c9b56577320e48d43e6a",
-            "display": "d88586a0b1f6d089925599a8891ee074597e81e01221a3113f6e6887c51843d3",
-            "large": "bf1fb73780ca4adeb0e9ef47a8a16842b81b1db34d57796a5bdf8144ed76d92c",
-            "big": "640909b65619cab2440ad4cd6561a339d1cfd75ed64522686b7ab75d8b83b17e",
             "5x7": "411f6f43d133619294c113b772e50c10e698c08417a34d41596d5a51e05235ce",
             "3x5": "d2b50072424f9673cfe2a14d9ce190edd8d0b780eb95000b12dd8947e0a8f177",
         }
@@ -96,6 +104,41 @@ class FontTests(unittest.TestCase):
             pixels = rasterize([{"t": "text", "f": font, "s": "12:59", "x": 0, "y": 0,
                                  "w": 64, "h": 32, "c": "#FFFFFF"}])
             self.assertEqual(hashlib.sha256(to_hex(pixels).encode()).hexdigest(), digest, font)
+
+    def test_standard_digits_keep_open_counters_and_no_stray_holes(self):
+        for width, height, stroke in ((6, 10, 1), (8, 14, 1), (8, 14, 2),
+                                      (11, 20, 2), (14, 21, 2), (13, 30, 3), (18, 30, 3)):
+            table = render._standard_glyphs(width, height, stroke)
+            for digit in "0123456789":
+                with self.subTest(size=(width, height, stroke), digit=digit):
+                    ink = {(x, y) for x, col in enumerate(table[digit])
+                           for y in range(height) if col >> y & 1}
+                    self.assertEqual((min(y for _, y in ink), max(y for _, y in ink)), (0, height - 1))
+                    # Flood the background; remaining components are counters.
+                    blank = {(x, y) for x in range(-1, width + 1) for y in range(-1, height + 1)} - ink
+                    pending, holes = [(-1, -1)], -1
+                    blank.remove(pending[0])
+                    while True:
+                        holes += 1
+                        while pending:
+                            x, y = pending.pop()
+                            for p in ((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)):
+                                if p in blank:
+                                    blank.remove(p)
+                                    pending.append(p)
+                        if not blank:
+                            break
+                        pending = [blank.pop()]
+                    self.assertEqual(holes, {"0": 1, "4": 1, "6": 1, "8": 2, "9": 1}.get(digit, 0))
+
+    def test_standard_hinting_preserves_letters_punctuation_and_metrics(self):
+        for width, height, stroke in ((6, 10, 1), (8, 14, 2), (11, 20, 2), (13, 30, 3)):
+            original = render._stroke_glyphs(width, height, stroke)
+            refined = render._standard_glyphs(width, height, stroke)
+            self.assertEqual({key: cols for key, cols in original.items() if not key.isdigit()},
+                             {key: cols for key, cols in refined.items() if not key.isdigit()})
+            for digit in "0123456789":
+                self.assertEqual(len(original[digit]), len(refined[digit]))
 
     def test_new_families_clip_to_the_slot_and_keep_gradients_and_long_text(self):
         for face in ("standard", "block", "outline", "digital"):

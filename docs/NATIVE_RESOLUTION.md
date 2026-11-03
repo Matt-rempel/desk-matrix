@@ -30,7 +30,8 @@ the web frame contract is in `web/display.js`.
 - **Block** is an opt-in chunky font family, now with its own Max size. Outline
   and Digital provide two more styles. Independent Font and Size controls are
   available on text/value blocks in Customize and Build. Original combined
-  font values still render identically until edited. See [Fonts and sizes](FONTS.md).
+  font values keep their sizes and receive the same refined Standard digits.
+  See [Fonts and sizes](FONTS.md).
   It changes primary text while preserving smaller labels; saving retains the
   choice without changing the lineup or pin. Auto continues using the finer
   native glyphs. Existing screens default to Auto unless they saved another font.

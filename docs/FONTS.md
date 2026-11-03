@@ -5,7 +5,7 @@ shows a native 64×32 sample produced by the same renderer as the panel.
 
 | Font | Appearance |
 | --- | --- |
-| Standard | Fine stroke lettering and familiar clock digits |
+| Standard | Fine stroke lettering and pixel-aligned rounded clock digits |
 | Block | Solid, chunky pixel cells |
 | Outline | Hollow block lettering with a one-pixel border, including Max |
 | Digital | Full-height seven-segment digits, with a centered 1 and stroke letters for words and units |
@@ -35,6 +35,13 @@ Outline / Max also uses hollow, one-pixel borders on the colon dots.
 Its 7 has a continuous top bar and straight right stem, forming a square
 corner instead of a stepped diagonal.
 
+Standard digits use shared, symmetric bowl geometry and smooth curves hinted
+to each target pixel grid. The 0 and 8 have balanced left/right curves, and
+the 6 and 9 share a rotated bowl-and-tail design. Digit widths, baselines,
+letters, units and blinking-colon advances are preserved. The refinements
+also apply to saved screens using the original Display, Large, Big or Max
+Standard fonts. Small and Tiny retain their hand-drawn bitmap glyphs.
+
 Digital's vertical segments reach the same cap height and baseline as its
 horizontal segments. The 1 is a centered continuous stem, and the 4 has a
 continuous right stem, avoiding the shortened appearance of inset bars.
@@ -50,8 +57,9 @@ New choices live in the slot's `options.font_family` and `options.font_size`:
 Families are `standard`, `block`, `outline`, and `digital`. Sizes are `auto`,
 `max`, `xl`, `large`, `medium`, `small`, and `tiny`.
 
-The original `options.font` values remain accepted and retain their exact
-rendering when neither new key is present. Viewing an old screen does not
+The original `options.font` values remain accepted and retain their sizing
+when neither new key is present, including the refined Standard digits.
+Viewing an old screen does not
 rewrite it. The editor derives its current selections from `legacy_fonts`
 in the catalog; editing one axis saves both new keys and preserves other
 options. A partial API update inherits the missing axis from the legacy font.
