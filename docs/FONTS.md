@@ -35,9 +35,11 @@ Outline / Max also uses hollow, one-pixel borders on the colon dots.
 Its 7 has a continuous top bar and straight right stem, forming a square
 corner instead of a stepped diagonal.
 
-Standard digits use shared, symmetric bowl geometry and smooth curves hinted
-to each target pixel grid. The 0 and 8 have balanced left/right curves, and
-the 6 and 9 share a rotated bowl-and-tail design. Digit widths, baselines,
+Standard uses the **Soft classic** numeral design: deliberately placed corner
+pixels, a full-width diagonal on 2, and explicit counters and waist on 8.
+The 0 and 8 have balanced left/right curves, and the 6 and 9 share a rotated
+bowl-and-tail design. This is the Standard font, selected through the existing
+Font control. Digit widths, baselines,
 letters, units and blinking-colon advances are preserved. The refinements
 also apply to saved screens using the original Display, Large, Big or Max
 Standard fonts. Small and Tiny retain their hand-drawn bitmap glyphs.

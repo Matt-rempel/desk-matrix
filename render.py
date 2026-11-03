@@ -254,26 +254,107 @@ def _stroke_glyphs(width: int, height: int, stroke: int) -> dict[str, tuple[int,
     return glyphs
 
 
+def _soft_corner_profile(cut: int):
+    """Deliberate pixel runs: no flat pause followed by a late outward step."""
+    if cut <= 0:
+        return [0]
+    return {1: [1, 0], 2: [2, 1, 0], 3: [3, 1, 0],
+            4: [4, 2, 1, 0]}.get(cut, [cut, cut - 2, 1, 0])
+
+
+def _soft_classic_digits(width: int, height: int, stroke: int):
+    """Approved Soft classic bowls and full-width 2 diagonal."""
+    cut = {6: 1, 8: 2, 11: 3, 13: 4}.get(width)
+    if cut is None:
+        cut = max(1, min((width - 1) // 2, round(width * .25)))
+    outer_profile = _soft_corner_profile(cut)
+    inner_cut = max(0, cut - stroke)
+    waist = (height - stroke) // 2
+    waist_end = waist + stroke
+
+    def inset(profile, offset):
+        return profile[offset] if 0 <= offset < len(profile) else 0
+
+    def box(left, top, right, bottom, corner):
+        """Explicit row spans, mirrored for the top and bottom corners."""
+        corner = max(0, min(corner, (right - left - 1) // 2, (bottom - top - 1) // 2))
+        p = _soft_corner_profile(corner)
+        points = set()
+        for y in range(top, bottom):
+            amount = max(inset(p, y - top), inset(p, bottom - 1 - y))
+            points.update((x, y) for x in range(left + amount, right - amount))
+        return points
+
+    outer_zero = box(0, 0, width, height, cut)
+    inner_zero = box(stroke, stroke, width - stroke, height - stroke, inner_cut)
+    zero = outer_zero - inner_zero
+
+    # A single hourglass silhouette and two explicit counters. No overlapped
+    # circles, no accidental thick seams at the waist.
+    waist_cut = max(1, math.ceil(cut / 2))
+    waist_profile = _soft_corner_profile(waist_cut)
+    outer_eight = set()
+    for y in range(height):
+        cap = max(inset(outer_profile, y), inset(outer_profile, height - 1 - y))
+        if y < waist:
+            join = inset(waist_profile, waist - y)
+        elif y < waist_end:
+            join = waist_cut
+        else:
+            join = inset(waist_profile, y - waist_end + 1)
+        amount = max(cap, join)
+        outer_eight.update((x, y) for x in range(amount, width - amount))
+    upper_counter = box(stroke, stroke, width - stroke, waist, inner_cut)
+    lower_counter = box(stroke, waist_end, width - stroke, height - stroke, inner_cut)
+    eight = outer_eight - upper_counter - lower_counter
+
+    # Nine closes its bowl to a straight right side. The outer bowl's right
+    # corner does not turn in and then sprout a separate stem/ear.
+    nine_outer = set()
+    for y in range(waist_end):
+        left = max(inset(outer_profile, y), inset(outer_profile, waist_end - 1 - y))
+        right = inset(outer_profile, y)
+        nine_outer.update((x, y) for x in range(left, width - right))
+    nine = nine_outer - upper_counter
+    nine |= {(x, y) for x, y in zero if y >= waist and
+             (x >= width // 2 or y >= height - stroke)}
+    nine |= {(x, y) for x in range(stroke, math.ceil(width / 2))
+             for y in range(height - stroke, height)}
+    nine -= upper_counter
+    six = {(width - 1 - x, height - 1 - y) for x, y in nine}
+
+    # Two's slash crosses the entire ink width through the middle section,
+    # rather than traversing half a cell in the bottom half of the figure.
+    diagonal_start = max(len(outer_profile), round((height - 1) * .38))
+    diagonal_end = min(height - stroke - 1, round((height - 1) * .82))
+    two = {(x, y) for x, y in zero if y <= diagonal_start and
+           (x >= width // 2 or y < len(outer_profile) + stroke)}
+
+    def segment(ax, ay, bx, by):
+        points = set()
+        dx, dy = bx - ax, by - ay
+        denom = dx * dx + dy * dy
+        r = stroke / 2
+        for x in range(width):
+            for y in range(height):
+                t = max(0, min(1, ((x + .5 - ax) * dx + (y + .5 - ay) * dy) / denom)) if denom else 0
+                if (x + .5 - ax - t * dx) ** 2 + (y + .5 - ay - t * dy) ** 2 <= r * r + 1e-9:
+                    points.add((x, y))
+        return points
+    two |= segment(width - stroke / 2, diagonal_start + .5,
+                   stroke / 2, diagonal_end + .5)
+    two |= {(x, y) for x in range(stroke) for y in range(diagonal_end, height)}
+    two |= {(x, y) for x in range(width) for y in range(height - stroke, height)}
+
+    return {"0": zero, "2": two, "6": six, "8": eight, "9": nine}
+
+
 @lru_cache(maxsize=128)
 def _standard_glyphs(width: int, height: int, stroke: int):
     """Hint Standard digits to the actual grid; retain existing letter shapes."""
     table = dict(_stroke_glyphs(width, height, stroke))
     if width < 5 or height < 9:
         return table
-
-    def rounded_ring(top, bottom, radius, filled=False):
-        def inside(px, py, left, upper, right, lower, r):
-            if right <= left or lower <= upper:
-                return False
-            cx, cy = (left + right) / 2, (upper + lower) / 2
-            r = max(0, min(r, (right - left) / 2, (lower - upper) / 2))
-            dx = max(abs(px - cx) - ((right - left) / 2 - r), 0)
-            dy = max(abs(py - cy) - ((lower - upper) / 2 - r), 0)
-            return dx * dx + dy * dy <= r * r + 1e-9
-        return {(x, y) for x in range(width) for y in range(height)
-                if inside(x + .5, y + .5, 0, top, width, bottom, radius)
-                and (filled or not inside(x + .5, y + .5, stroke, top + stroke,
-                                         width - stroke, bottom - stroke, radius - stroke))}
 
     def hint(value, limit):
         return max(stroke / 2, min(limit - stroke / 2,
@@ -303,29 +384,9 @@ def _standard_glyphs(width: int, height: int, stroke: int):
                         ink.add((x, y))
         return ink
 
-    # Shared rounded bowls remove independent rounding errors from each side.
-    bowl_end = (height - stroke) // 2 + stroke
-    waist = (height - stroke) // 2
-    zero = rounded_ring(0, height, min(width / 2, height / 4))
-    upper = rounded_ring(0, bowl_end, min(width, bowl_end) / 2)
-    eight = upper | rounded_ring(waist, height, min(width, height - waist) / 2)
-    nine = set(upper)
-    outer = rounded_ring(0, height, min(width / 2, height / 4), filled=True)
-    upper_hole = rounded_ring(0, bowl_end, min(width, bowl_end) / 2, filled=True) - upper
-    nine |= {(x, y) for x, y in outer if x + .5 >= width / 2 and bowl_end / 2 <= y + .5 < bowl_end}
-    nine |= {(x, y) for x, y in zero if y + .5 >= bowl_end / 2
-             and (x + .5 >= width / 2 or y >= height - stroke)}
-    nine |= {(x, y) for x in range(max(1, stroke), math.ceil(width / 2))
-             for y in range(height - stroke, height)}
-    nine -= upper_hole
-    digits = {"0": zero, "8": eight, "9": nine,
-              "6": {(width - 1 - x, height - 1 - y) for x, y in nine}}
+    digits = _soft_classic_digits(width, height, stroke)
     digits["1"] = line_path([(hint(width * .22, width), y0 + radius), (cx, y0), (cx, y1)])
     digits["1"] |= line_path([(x0, y1), (x1, y1)])
-    digits["2"] = line_path(curve((x0, y0 + radius), (x0, y0), (cx, y0))
-                            + curve((cx, y0), (x1, y0), (x1, y0 + radius))
-                            + curve((x1, y0 + radius), (x1, middle - radius / 2), (cx, middle))
-                            + [(x0, y1), (x1, y1)])
     digits["3"] = line_path([(x0, y0), (cx, y0)]
                             + curve((cx, y0), (x1, y0), (x1, y0 + radius))
                             + curve((x1, y0 + radius), (x1, middle), (cx, middle))

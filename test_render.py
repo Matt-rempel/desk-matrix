@@ -1,5 +1,6 @@
 import unittest
 import hashlib
+import json
 
 import flightboard
 import render
@@ -11,6 +12,22 @@ def lit(pixels):
 
 
 class FontTests(unittest.TestCase):
+    def test_standard_matches_the_approved_soft_classic_proposal(self):
+        expected = {
+            (6, 10, 1): "d377cffd21a9012dfb1665088d14d0d981744751f6906de8b1cd49379e79d7f6",
+            (8, 14, 1): "1442fa9ab32ba5c995664ef6f4ad1d847c05ba9833ac536e630ddd920cdf1fee",
+            (8, 14, 2): "ef262bac94e47ffd25970d9c32bfaff569b7f96c00c72fe3171b9141237d6dc9",
+            (11, 20, 2): "bf6ecbe65c7ae5b6ef1d587a6ecc971a85bf95efa364cde7d98813a06bf3face",
+            (14, 21, 2): "217754d7be54792a7fb26a9bf3f21e37929031c8dd9f4276d641ac330aa80f08",
+            (13, 30, 3): "5ab4bd5a760e763349f879adcaf56938088fdb2e115e4f53bb6559b251602712",
+            (18, 30, 3): "ca74bd07b6f1d691638e7bd2aef2a18ee1e3426b965389bb82daa6a55c9269e6",
+        }
+        for dims, digest in expected.items():
+            table = render._standard_glyphs(*dims)
+            digits = {char: table[char] for char in "0123456789"}
+            self.assertEqual(hashlib.sha256(json.dumps(digits, sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                             digest, dims)
+
     def test_standard_round_digits_have_balanced_pixel_curves_at_every_native_size(self):
         for width, height, stroke in ((6, 10, 1), (8, 14, 1), (8, 14, 2),
                                       (11, 20, 2), (14, 21, 2), (13, 30, 3), (18, 30, 3)):
