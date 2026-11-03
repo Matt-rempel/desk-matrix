@@ -1,4 +1,4 @@
-"""Twelve native clock/date designs. Time is supplied by the shared player/preview context."""
+"""Native clock/date designs. Time is supplied by the shared player/preview context."""
 import calendar
 import math
 from datetime import timedelta, timezone
@@ -7,7 +7,7 @@ from clock_canvas import Canvas, shade
 
 DESIGN_NAMES = {
     'platform': 'Platform', 'station': 'Station', 'time_stack': 'Time Stack',
-    'orbit': 'Orbit', 'minute_track': 'Minute Track', 'clockwork': 'Clockwork',
+    'orbit': 'Orbit', 'minute_track': 'Minute Track', 'seconds_track': 'Seconds Track', 'clockwork': 'Clockwork',
     'perpetual_card': 'Perpetual Card', 'week_strip': 'Week Strip',
     'month_map': 'Month Map', 'date_poster': 'Date Poster',
     'word_glow': 'Word Glow', 'minute_runner': 'Minute Runner',
@@ -21,6 +21,7 @@ HOURS = ('TWELVE', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT
 SMALL = ('', 'ONE', 'TWO', 'THREE', 'FOUR', 'FIVE', 'SIX', 'SEVEN', 'EIGHT', 'NINE',
          'TEN', 'ELEVEN', 'TWELVE', 'THIRTEEN', 'FOURTEEN', 'FIFTEEN', 'SIXTEEN', 'SEVENTEEN', 'EIGHTEEN', 'NINETEEN')
 TENS = ('', '', 'TWENTY', 'THIRTY', 'FORTY', 'FIFTY')
+SECONDS_READOUT_DESIGNS = ('platform', 'time_stack', 'minute_track', 'clockwork', 'perpetual_card', 'week_strip')
 
 
 def week_dates(now):
@@ -70,10 +71,11 @@ DIAL_DIGITS = {
 
 
 class Face:
-    def __init__(self, now, h24, show_date, show_seconds, animate, primary, accent, tinted, custom_accent):
+    def __init__(self, now, h24, show_date, show_seconds, animate, primary, accent, tinted, custom_accent, seconds_display):
         self.c = Canvas()
         self.now, self.h24, self.show_date = now, h24, show_date
         self.show_seconds, self.animate = show_seconds, animate
+        self.seconds_display = seconds_display
         self.primary = primary
         self.accent = accent
         self.dim, self.faint = shade(primary, .45), shade(primary, .20)
@@ -94,8 +96,22 @@ class Face:
         self.c.text(value, x, y, w, h, self.primary if color is None else color, font, face, size, **kwargs)
 
     def footer(self):
-        if self.show_date:
+        if self.seconds_display == 'number':
+            if self.show_date: self.text(self.date, 0, 27, 50, 5, self.dim)
+            self.text(f':{self.now.second:02}', 53, 27, 11, 5, self.teal)
+        elif self.seconds_display == 'bar':
+            if self.show_date: self.text(self.date, 0, 26, 64, 5, self.dim)
+            self.seconds_bar(0, 31, 64)
+        elif self.show_date:
             self.text(self.date, 0, 27, 64, 5, self.dim)
+
+    def seconds_bar(self, x, y, width):
+        self.c.line(x, y, x + width - 1, y, self.faint)
+        filled = int(self.phase * width / 60)
+        if filled: self.c.line(x, y, x + filled - 1, y, self.teal)
+
+    def seconds_label(self):
+        return f'{self.ampm} :{self.now.second:02}'.strip() if self.seconds_display == 'number' else self.ampm
 
     def platform(self):
         old = previous_minute(self.now)
@@ -142,7 +158,8 @@ class Face:
         if self.show_date:
             self.text(self.day, 35, 0, 29, 5, self.accent)
             self.text(f'{self.month} {self.now.day:02}', 35, 6, 29, 5, self.dim)
-        self.text(self.ampm, 0, 26, 28, 5, self.dim)
+        self.text(self.seconds_label(), 0, 26, 28, 5, self.teal if self.seconds_display == 'number' else self.dim)
+        if self.seconds_display == 'bar': self.seconds_bar(0, 31, 28)
 
     def orbit(self):
         for radius, fraction, color in (
@@ -160,12 +177,19 @@ class Face:
             self.text(self.ampm, 33, 24, 31, 5, self.dim)
 
     def minute_track(self):
+        self.track(self.now.minute, (1 - self.phase / .5) * 8 if self.animate and self.phase < .5 else 0)
+
+    def seconds_track(self):
+        fraction = self.now.microsecond / 1e6
+        shift = (1 - fraction / .25) * 8 if self.animate and fraction < .25 else 0
+        self.track(self.now.second, shift)
+
+    def track(self, value, shift):
         self.text(self.time, 0, 0, 64, 14, face='standard', size='large')
         for y in range(3): self.c.line(30 + y, 15 + y, 34 - y, 15 + y, self.teal)
-        shift = (1 - self.phase / .5) * 8 if self.animate and self.phase < .5 else 0
         for delta in range(-4, 5):
             x = round(32 + delta * 8 + shift)
-            self.text(f'{(self.now.minute + delta) % 60:02}', x - 3, 18, 7, 5,
+            self.text(f'{(value + delta) % 60:02}', x - 3, 18, 7, 5,
                       self.teal if delta == 0 else self.dim)
             self.c.point(x, 24, self.teal if delta == 0 else self.dim)
         self.c.line(3, 25, 60, 25, self.faint)
@@ -194,12 +218,15 @@ class Face:
         self.text(self.day, 1, 2, 25, 5, (0, 0, 0))
         self.text(f'{self.now.day:02}', 1, 9, 25, 22, face='block', size='xl')
         self.text(self.time, 30, 1, 34, 12, face='standard', size='medium')
-        self.text(self.ampm, 30, 15, 34, 5, self.dim)
+        self.text(self.seconds_label(), 30, 15, 34, 5, self.teal if self.seconds_display == 'number' else self.dim)
+        if self.seconds_display == 'bar': self.seconds_bar(30, 21, 34)
         self.text(self.month, 30, 24, 34, 7, self.red, font='5x7')
 
     def week_strip(self):
         self.text(f'{self.month} {self.now.year}', 0, 0, 64, 5, self.dim)
-        self.text(self.time, 0, 6, 64, 12, face='standard', size='medium')
+        value = self.time + (f':{self.now.second:02}' if self.seconds_display == 'number' else '')
+        self.text(value, 0, 6, 64, 12, face='standard', size='medium')
+        if self.seconds_display == 'bar': self.seconds_bar(0, 18, 64)
         for i, day in enumerate(week_dates(self.now)):
             x, today = i * 9, day == self.now.date()
             if today: self.c.rect(x, 20, x + 8, 31, shade(self.teal, .32))
@@ -252,9 +279,10 @@ class Face:
 
 
 def draw_face(design, now, *, h24=False, show_date=True, show_seconds=True, animate=True,
-              primary='#F4F2EE', accent=None, tinted=False):
+              primary='#F4F2EE', accent=None, tinted=False, seconds_display='off'):
     """Return one opaque native frame. Never reads clocks, providers, files, or hardware."""
     face = Face(now, h24, show_date, show_seconds, animate, primary,
-                accent or DESIGN_ACCENTS.get(design, '#FFB34D'), tinted, accent is not None)
+                accent or DESIGN_ACCENTS.get(design, '#FFB34D'), tinted, accent is not None,
+                seconds_display if design in SECONDS_READOUT_DESIGNS and seconds_display in ('number', 'bar') else 'off')
     getattr(face, design if design in DESIGN_NAMES else 'platform')()
     return face.c.pixels

@@ -17,8 +17,10 @@ Text screens have independent **Font** and **Size** controls. Choose Standard,
 Block, Outline or Digital, then use **Max** for a clock that fills the panel.
 See [fonts, sizes and existing-screen compatibility](docs/FONTS.md).
 
-The Time gallery also includes twelve full-panel clock and calendar designs, from
-split-flap plates and moving dials to week/month views and a pixel runner. See
+The Time gallery also includes thirteen full-panel clock and calendar designs, from
+split-flap plates and moving dials to week/month views and a pixel runner.
+Minute Track and Seconds Track offer moving rulers; other clocks have optional
+numeric seconds, progress bars or seconds hands. See
 [clock designs and controls](docs/CLOCK_DESIGNS.md).
 
 The **NHL scoreboard** screen keeps team logos, scores, shots and the current

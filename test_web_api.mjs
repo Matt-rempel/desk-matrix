@@ -239,3 +239,20 @@ test('new clock designs use fresh frames and their controls match their purpose'
     assert.notEqual(await api.preview(screen), first);
   } finally { globalThis.fetch = previous; }
 });
+
+
+test('seconds controls appear where they fit and seconds clocks use live previews', async () => {
+  const { hasLiveClock } = await import('./web/matrix.js');
+  const { optionVisible } = await import('./web/options.js');
+  for (const design of ['platform', 'time_stack', 'minute_track', 'clockwork', 'perpetual_card', 'week_strip']) {
+    assert.equal(optionVisible('clock_design', 'seconds_display', { design }), true);
+  }
+  for (const design of ['seconds_track', 'station', 'orbit', 'minute_runner', 'word_glow', 'month_map', 'date_poster']) {
+    assert.equal(optionVisible('clock_design', 'seconds_display', { design }), false);
+  }
+  assert.equal(optionVisible('clock_design', 'animate', { design: 'seconds_track' }), true);
+  for (const block of ['time', 'world_clock', 'analog_clock']) {
+    assert.equal(hasLiveClock({ slots: [{ block, options: { show_seconds: true } }] }), true);
+    assert.equal(hasLiveClock({ slots: [{ block, options: { show_seconds: false } }] }), false);
+  }
+});

@@ -14,7 +14,7 @@ class ClockFacesTest(unittest.TestCase):
         self.assertTrue(HAS_FACES, 'Native clock collection renderer is not implemented')
         self.now = datetime(2026, 11, 3, 10, 24, 36, tzinfo=ZoneInfo('America/Edmonton'))
 
-    def test_twelve_distinct_native_designs_and_both_time_formats(self):
+    def test_distinct_native_designs_and_both_time_formats(self):
         frames = []
         for design in DESIGN_NAMES:
             for h24 in (False, True):
@@ -24,7 +24,7 @@ class ClockFacesTest(unittest.TestCase):
                     self.assertGreater(sum(any(pixel) for pixel in frame), 70)
                     self.assertTrue(all(len(p) == 3 and all(isinstance(v, int) and 0 <= v <= 255 for v in p) for p in frame))
                     if h24: frames.append(tuple(frame))
-        self.assertEqual(len(set(frames)), 12)
+        self.assertEqual(len(set(frames)), 13)
 
     def test_week_crosses_year_and_starts_monday(self):
         self.assertEqual(week_dates(datetime(2027, 1, 1)),
@@ -107,7 +107,7 @@ class ClockCollectionIntegrationTest(unittest.TestCase):
         from blocks import RenderContext, data_needs, frame, render_screen
         from library import validate_screen
         selected = ('time-platform', 'time-station', 'time-stack', 'time-orbit',
-                    'time-minute-track', 'time-clockwork', 'time-perpetual-card',
+                    'time-minute-track', 'time-seconds-track', 'time-clockwork', 'time-perpetual-card',
                     'time-week-strip', 'time-month-map', 'time-date-poster',
                     'time-word-glow', 'time-minute-runner')
         shelf = next(s for s in catalog.SHELVES if s['id'] == 'time')['items']

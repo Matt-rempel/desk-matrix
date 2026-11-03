@@ -112,7 +112,8 @@ function cacheKey(screen) {
 }
 
 function usesLiveData(screen) {
-  return (screen.slots || []).some((slot) => slot.block === 'nhl' || slot.block === 'clock_design' || slot.options?.source === 'follow');
+  return (screen.slots || []).some((slot) => slot.block === 'nhl' || slot.block === 'clock_design' || slot.options?.source === 'follow'
+    || (['time', 'world_clock', 'analog_clock'].includes(slot.block) && slot.options?.show_seconds === true));
 }
 
 function remember(k, frame) {

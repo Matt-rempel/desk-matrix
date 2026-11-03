@@ -146,10 +146,13 @@ BLOCKS = {
         "h24": _bool(False),
         "show_date": {"type": "bool", "default": True, "label": "Show date"},
         "show_seconds": {"type": "bool", "default": True, "label": "Seconds indicator"},
+        "seconds_display": {"type": "enum", "default": "off", "label": "Seconds",
+                            "choices": ["off", "number", "bar"],
+                            "labels": {"off": "Off", "number": "Number", "bar": "Progress bar"}},
         "animate": {"type": "bool", "default": True, "label": "Animate"},
         "accent": {**_color(), "label": "Accent color"}}, 64, 32),
     "time": _block("Time", "10:24", "time", {
-        "h24": _bool(True), "colon_blink": _bool(False),
+        "h24": _bool(True), "colon_blink": _bool(False), "show_seconds": _bool(False),
         "font": _enum("auto", "auto", "display", "large", "big", "5x7", "3x5")}, 17, 5),
     "date": _block("Date", "OCT 9", "time", {
         "style": _enum("long", "short", "long", "stack"), "accent": _color()}, 7, 5),
@@ -217,9 +220,9 @@ BLOCKS = {
     "world_clock": _block("World clock", "LDN", "time", {
         "city": {"type": "enum", "default": "LDN", "choices": list(CITIES),
                  "labels": {code: name for code, (name, _) in CITIES.items()}},
-        "label": _str("", 4), "h24": _bool(True), "accent": _color()}, 17, 5),
+        "label": _str("", 4), "h24": _bool(True), "show_seconds": _bool(False), "accent": _color()}, 17, 5),
     "analog_clock": _block("Analog clock", "◷", "time", {
-        "accent": _color(), "face": _color()}, 15, 15),
+        "accent": _color(), "face": _color(), "show_seconds": _bool(False)}, 15, 15),
     "fuzzy_time": _block("Time in words", "HALF", "time", {"accent": _color()}, 32, 16),
     "radar": _block("Radar", "◎", "sky", {"accent": _color()}, 15, 15, ["aircraft:nearby"]),
     "sun_arc": _block("Sun arc", "◠", "sky", {"h24": _bool(False)}, 32, 16, ["sun"]),
@@ -374,6 +377,7 @@ CLOCK_TEMPLATES = [
     ("time-stack", "time_stack", "Oversized hours · minutes"),
     ("time-orbit", "orbit", "Hours · minutes · seconds rings"),
     ("time-minute-track", "minute_track", "Time · sliding minute ruler"),
+    ("time-seconds-track", "seconds_track", "Time · sliding seconds ruler"),
     ("time-clockwork", "clockwork", "24 dials make the time"),
     ("time-perpetual-card", "perpetual_card", "Calendar card · time"),
     ("time-week-strip", "week_strip", "Time · this week"),

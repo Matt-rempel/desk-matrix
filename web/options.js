@@ -37,9 +37,10 @@ export function optionVisible(blockId, name, options) {
   if (blockId === 'clock_design') {
     const design = options.design || 'platform';
     if (name === 'h24') return !['month_map', 'date_poster', 'word_glow'].includes(design);
-    if (name === 'show_date') return ['platform', 'station', 'time_stack', 'orbit', 'minute_track', 'clockwork', 'minute_runner'].includes(design);
+    if (name === 'show_date') return ['platform', 'station', 'time_stack', 'orbit', 'minute_track', 'seconds_track', 'clockwork', 'minute_runner'].includes(design);
     if (name === 'show_seconds') return ['station', 'orbit', 'minute_runner'].includes(design);
-    if (name === 'animate') return ['platform', 'station', 'orbit', 'minute_track', 'clockwork', 'minute_runner'].includes(design);
+    if (name === 'seconds_display') return ['platform', 'time_stack', 'minute_track', 'clockwork', 'perpetual_card', 'week_strip'].includes(design);
+    if (name === 'animate') return ['platform', 'station', 'orbit', 'minute_track', 'seconds_track', 'clockwork', 'minute_runner'].includes(design);
   }
   if (name === 'callsign') return options.source === 'follow';
   if (name === 'feed_id' && 'source' in options) return options.source === 'feed';

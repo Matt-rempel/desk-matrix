@@ -324,6 +324,10 @@ export function render(root, { id, go }) {
       rows.append(toggleRow({ title: 'Blinking colon', pressed: !!(time.options.colon_blink ?? timeMeta?.options?.colon_blink?.default),
         onChange: (v) => { time.options.colon_blink = v; refresh(); } }));
     }
+    if ('show_seconds' in (timeMeta?.options || {})) {
+      rows.append(toggleRow({ title: 'Show seconds', pressed: !!time.options.show_seconds,
+        onChange: (v) => { time.options.show_seconds = v; refresh(); } }));
+    }
     const s = state.settings || {};
     const nightRow = toggleRow({
       title: 'Night look',
@@ -401,7 +405,7 @@ export function render(root, { id, go }) {
       const meta = blockOf(slot.block);
       if (!meta || slot.block === 'none') return;
       const skip = family === 'clock' && i === 0 && slot.block === 'time'
-        ? ['h24', 'colon_blink', 'font', 'font_family', 'font_size'] : [];
+        ? ['h24', 'colon_blink', 'show_seconds', 'font', 'font_family', 'font_size'] : [];
       if (family === 'clock' && i === 1 && slot.block === 'progress') skip.push('source');
       const names = Object.keys(meta.options || {}).filter((n) => !skip.includes(n));
       const where = layout?.slots[i]?.where || `Slot ${i + 1}`;

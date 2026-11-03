@@ -227,9 +227,13 @@ def rnd(i: float) -> float:
 def b_time(s: Slot) -> list[dict]:
     now, r = s.ctx.now, s.rect
     value = clock_text(now, s.opt("h24"))
+    if s.opt("show_seconds"):
+        value += f":{now.second:02}"
     if s.opt("colon_blink") and now.second % 2:
         value = value.replace(":", " ")
     font = s.opt("font")
+    if s.opt("show_seconds") and font not in ("auto", "block", "max") and measure(value, font)[0] > r.w:
+        return [T(r, [value], s.color)]
     if font in ("block", "max") or (font != "auto" and measure(value, font)[1] <= r.h):
         return [{"t": "text", "f": font, "s": value, "x": r.x, "y": r.y, "w": r.w, "h": r.h,
                  "scroll": True, **paint(s.color)}]
@@ -287,6 +291,8 @@ def b_world(s: Slot) -> list[dict]:
     there, offset = found
     label = (s.opt("label") or code).strip().upper()[:4] or code
     value = clock_text(there, s.opt("h24"))
+    if s.opt("show_seconds"):
+        value += f":{there.second:02}"
     night = there.hour < 6 or there.hour >= 20
     color = s.accent(NIGHT_BLUE) if night else s.color
     if there.date() != s.ctx.now.date():
@@ -309,6 +315,12 @@ def b_analog(s: Slot) -> list[dict]:
     face = s.opt("face") if not s.forced and s.opt("face") else dim(s.color, 0.25)
     layers = [{"t": "analog", "cx": cx, "cy": cy, "r": radius, "hr": now.hour, "mn": now.minute,
                "c": solid(face), "hc": solid(s.color), "mc": solid(s.accent(s.color))}]
+    if s.opt("show_seconds"):
+        angle = now.second / 60 * math.tau - math.pi / 2
+        layers.append({"t": "line", "x1": cx, "y1": cy,
+                       "x2": cx + round((radius - 1) * math.cos(angle)),
+                       "y2": cy + round((radius - 1) * math.sin(angle)),
+                       "c": solid(s.accent("#FF645B"))})
     side = r.sub(2 * radius + 2, 0, r.w - 2 * radius - 2, (r.h - 2) // 2)
     if wide:
         layers.append(T(side, _weekday_strings(now, side.w)[1:], s.color))
@@ -1174,7 +1186,7 @@ def b_clock_design(s: Slot) -> list[dict]:
     pixels = draw_face(s.opt("design"), s.ctx.now, h24=s.opt("h24"),
                        show_date=s.opt("show_date"), show_seconds=s.opt("show_seconds"),
                        animate=s.opt("animate") and s.ctx.animate_clock, primary=s.color,
-                       accent=s.accent(None), tinted=bool(s.palette))
+                       accent=s.accent(None), tinted=bool(s.palette), seconds_display=s.opt("seconds_display"))
     return [{"t": "pts", "p": [[i % WIDTH, i // WIDTH, pixel]
                                 for i, pixel in enumerate(pixels) if any(pixel)]}]
 
