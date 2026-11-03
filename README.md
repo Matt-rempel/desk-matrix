@@ -17,6 +17,10 @@ Text screens have independent **Font** and **Size** controls. Choose Standard,
 Block, Outline or Digital, then use **Max** for a clock that fills the panel.
 See [fonts, sizes and existing-screen compatibility](docs/FONTS.md).
 
+The **NHL scoreboard** screen keeps team logos, scores, shots and the current
+period or intermission visible together. See [NHL scoreboard options and live
+clock behaviour](docs/NHL_SCOREBOARD.md).
+
 The first installation uses WinSport in Calgary as a sample location. **Change
 the location and time zone in settings for your own desk.**
 

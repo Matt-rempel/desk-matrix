@@ -199,6 +199,25 @@ class ApiTests(ServerTestCase):
     def test_max_font_preview_and_save_use_the_same_choice(self):
         self.check_font_preview_and_save("max")
 
+    def test_nhl_logo_scoreboard_previews_and_saves_without_changing_the_pin(self):
+        self.data_path.write_text(json.dumps({"nhl": {"CGY": {
+            "team": "CGY", "state": "live", "home": "CGY", "away": "SJS", "home_score": 1,
+            "away_score": 0, "home_shots": 12, "away_shots": 9, "period": 1,
+            "period_type": "REG", "intermission": True}}}))
+        before = self.get_json("/api/library")
+        item = {**CUSTOM_SCREEN, "layout": "full", "based_on": "nhl-scoreboard",
+                "style": {"palette": None, "motion": "still"},
+                "slots": copy.deepcopy(catalog.BUILTINS["nhl-scoreboard"]["slots"])}
+        plain = copy.deepcopy(item)
+        plain["slots"][0]["options"]["show_shots"] = False
+        frames = self.post("/api/preview", {"screens": [item, plain]})["frames"]
+        self.assertNotEqual(frames[0], frames[1])
+        self.assertTrue(all(len(frame) == 12288 for frame in frames))
+        saved = self.post("/api/library", {"action": "save_screen", "screen": item})
+        self.assertEqual(saved["screens"][-1]["slots"][0]["options"]["display"], "logos")
+        self.assertTrue(saved["screens"][-1]["slots"][0]["options"]["show_shots"])
+        self.assertEqual(saved["pinned"], before["pinned"])
+
     def test_font_family_samples_preview_and_save(self):
         faces = self.get_json("/api/catalog")["font_families"]
         self.assertEqual(set(faces), {"standard", "block", "outline", "digital"})

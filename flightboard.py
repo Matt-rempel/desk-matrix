@@ -673,6 +673,12 @@ def _mtime(path: Path):
         return None
 
 
+def _nhl_revision(snapshot):
+    """Persist new game observations promptly without writing every clock tick."""
+    return {team: (game.get("updated_at"), game.get("error"))
+            for team, game in (snapshot.get("nhl") or {}).items() if isinstance(game, dict)}
+
+
 def paint_frame(canvas, pixels, scale=2):
     """Send native pixels unchanged; average 2x2 cells only for legacy hardware."""
     step = 1 if scale == 2 else 2
@@ -760,7 +766,10 @@ def run(matrix, args, *, stop_after: int | None = None, stop_event: threading.Ev
             aircraft.update(needs)
             if now >= next_snapshot:
                 next_snapshot = now + SNAPSHOT_S
-                snapshot = providers.snapshot()
+                updated_snapshot = providers.snapshot()
+                if _nhl_revision(updated_snapshot) != _nhl_revision(snapshot):
+                    next_data = now
+                snapshot = updated_snapshot
             data = dict(snapshot)
             planes = aircraft.snapshot()
             if planes is not None:

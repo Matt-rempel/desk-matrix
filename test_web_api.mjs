@@ -5,6 +5,26 @@ const KEY = 'a'.repeat(64);
 const NAME = 'flightboard-key';
 let moduleNumber = 0;
 
+test('NHL clocks opt into live previews and scores never reuse a cached frame', async () => {
+  const { hasLiveClock } = await import('./web/matrix.js');
+  const screen = { layout: 'full', slots: [{ block: 'nhl', options: { team: 'CGY', display: 'logos' } }] };
+  assert.equal(hasLiveClock(screen), true);
+  assert.equal(hasLiveClock({ slots: [{ block: 'text' }] }), false);
+  globalThis.localStorage = memoryStorage();
+  globalThis.sessionStorage = memoryStorage();
+  const api = await loadApi();api.setKey(KEY);
+  const previous = globalThis.fetch;let calls = 0;
+  globalThis.fetch = async () => ({ ok: true, status: 200,
+    json: async () => ({ frames: [(++calls === 1 ? 'a' : 'b').repeat(12288)] }) });
+  try {
+    const first = await api.preview(screen);
+    assert.equal(api.cachedPreview(screen), null);
+    const second = await api.preview(screen);
+    assert.notEqual(first, second);
+    assert.equal(calls, 2);
+  } finally { globalThis.fetch = previous; }
+});
+
 test('font and size changes preserve the other choice and legacy screen options', async () => {
   const { fontSettings, chooseFont } = await import('./web/fonts.js');
   const legacy = { display: ['standard', 'xl'], block: ['block', 'auto'], max: ['standard', 'max'],

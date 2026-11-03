@@ -9,6 +9,7 @@
     "blocks.py",
     "airline_logos.py",
     "nhl.py",
+    "nhl_logos.py",
     "providers.py",
     "library.py",
     "player.py",

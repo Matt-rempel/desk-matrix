@@ -111,8 +111,8 @@ function cacheKey(screen) {
   return JSON.stringify([screen.layout, screen.slots, screen.style || null]);
 }
 
-function followsFlight(screen) {
-  return (screen.slots || []).some((slot) => slot.options?.source === 'follow');
+function usesLiveData(screen) {
+  return (screen.slots || []).some((slot) => slot.block === 'nhl' || slot.options?.source === 'follow');
 }
 
 function remember(k, frame) {
@@ -121,13 +121,13 @@ function remember(k, frame) {
 }
 
 export function cachedPreview(screen) {
-  if (followsFlight(screen)) return null;
+  if (usesLiveData(screen)) return null;
   return cache.get(cacheKey(screen)) || null;
 }
 
 export function preview(screen) {
   const k = cacheKey(screen);
-  if (!followsFlight(screen) && cache.has(k)) return Promise.resolve(cache.get(k));
+  if (!usesLiveData(screen) && cache.has(k)) return Promise.resolve(cache.get(k));
   const pending = queue.find((item) => item.k === k);
   if (pending) return pending.promise;
   let resolve, reject;
@@ -179,7 +179,7 @@ async function flush() {
       chunk.forEach((item, n) => {
         const frame = frames[n];
         if (typeof frame === 'string' && frame.length === FRAME_HEX_LENGTH) {
-          if (!followsFlight(item.screen)) remember(item.k, frame);
+          if (!usesLiveData(item.screen)) remember(item.k, frame);
           item.resolve(frame);
         } else {
           item.reject(new ApiError('Preview unavailable', 500));

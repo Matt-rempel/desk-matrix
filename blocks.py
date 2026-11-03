@@ -11,6 +11,8 @@ from typing import Callable, NamedTuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import catalog
+import nhl
+from nhl_logos import LOGOS as NHL_LOGOS
 from airline_logos import LOGOS, airline_for
 from render import ICONS, WIDTH, HEIGHT, FONTS, fit_text, font_settings, hex_color, jround, measure, mix, rasterize
 
@@ -923,12 +925,60 @@ def b_feed(s: Slot) -> list[dict]:
     return [T(r.sub(0, 0, r.w, 9), [label], accent), long_text(r.sub(0, 11, r.w, 21), text, value_color)]
 
 
+def _nhl_mark(s: Slot, team: str, x: int, y: int) -> list[dict]:
+    logo = NHL_LOGOS.get(team)
+    if not logo:
+        return [T(Rect(x, y, 14, 14), [team or "---"], s.color, f="3x5")]
+    rows, palette = logo["rows"], logo["palette"]
+    x += (14 - len(rows[0])) // 2
+    y += (14 - len(rows)) // 2
+    points = [[x + px, y + py, solid(s.color) if s.forced else palette[int(char, 36)]]
+              for py, row in enumerate(rows) for px, char in enumerate(row) if char != "."]
+    return [{"t": "pts", "p": points}]
+
+
+def _nhl_when(s: Slot, game: dict) -> str:
+    start = s.local(game.get("start"))
+    if not start:
+        return "SCHEDULE"
+    hour = f"{start.hour:02d}" if s.opt("h24") else str(start.hour % 12 or 12)
+    suffix = "" if s.opt("h24") else ("P" if start.hour >= 12 else "A")
+    return f"{start:%a} {hour}:{start.minute:02d}{suffix}".upper()
+
+
+def _nhl_scoreboard(s: Slot, game: dict) -> list[dict]:
+    r, team = s.rect, s.opt("team")
+    home = game.get("home") == team
+    opponent = game.get("away") if home else game.get("home")
+    own, other = ("home", "away") if home else ("away", "home")
+    value = lambda n: str(n) if isinstance(n, int) and not isinstance(n, bool) and n >= 0 else "-"
+    score = f"{value(game.get(own + '_score'))}-{value(game.get(other + '_score'))}"
+    status = nhl.game_status(game, s.ctx.now)
+    if game.get("state") == "upcoming":
+        score, status = "VS", _nhl_when(s, game)
+    layers = _nhl_mark(s, team, r.x, r.y + 1) + _nhl_mark(s, opponent, r.x + 50, r.y + 1)
+    layers += [T(r.sub(16, 0, 32, 16), [score], s.color, face="standard", size="large"),
+               T(r.sub(0, 17, 14, 5), [team], s.color if s.forced else NHL_LOGOS.get(team, {}).get("color", WHITE), f="3x5"),
+               T(r.sub(50, 17, 14, 5), [opponent or "---"],
+                 s.color if s.forced else NHL_LOGOS.get(opponent, {}).get("color", WHITE), f="3x5")]
+    if s.opt("show_shots") and game.get("state") in ("live", "final"):
+        shots = f"SH{value(game.get(own + '_shots'))}-{value(game.get(other + '_shots'))}"
+        if measure(shots, "3x5")[0] > 32:
+            shots = "S" + shots[2:]
+        layers.append(T(r.sub(16, 17, 32, 5), [shots], dim(s.color, .75), f="3x5"))
+    status_color = s.accent("#FFB23F") if game.get("intermission") or game.get("state") == "upcoming" else s.color
+    layers.append(T(r.sub(0, 25, 64, 7), [status], status_color, f="5x7"))
+    return layers
+
+
 def b_nhl(s: Slot) -> list[dict]:
     """Keep both scores and game status visible together."""
     r, team = s.rect, s.opt("team")
     game = (s.source("nhl") or {}).get(team) or {}
     if not r.full:
         return s.placeholder([team])
+    if s.opt("display") == "logos" and game.get("state") in ("live", "final", "upcoming"):
+        return _nhl_scoreboard(s, game)
     top, bottom = r.sub(0, 0, r.w, 10), r.sub(0, 11, r.w, 10)
     accent = s.accent("#FF9A3D")
     state = game.get("state")
@@ -948,13 +998,7 @@ def b_nhl(s: Slot) -> list[dict]:
                       else (game.get("away_score"), game.get("home_score")))
         opponent = away if home == team else home
         score = lambda n: str(n) if isinstance(n, int) and not isinstance(n, bool) else "-"
-        status = "FINAL"
-        if state == "live":
-            kind, number = game.get("period_type"), game.get("period")
-            period = kind if kind in ("OT", "SO") else f"P{number}" if isinstance(number, int) else "LIVE"
-            status = f"{period} {game.get('clock') or ''}".strip()
-            if game.get("age_s") is not None and game["age_s"] > 180:
-                status = "STALE"
+        status = nhl.game_status(game, s.ctx.now)
         return [T(top, [f"{team} {score(own)}"], s.color),
                 T(bottom, [f"{opponent or '---'} {score(other)}"], accent),
                 T(r.sub(0, 23, r.w, 9), [status], s.accent(MUTED))]
@@ -1192,7 +1236,8 @@ def render_screen(screen: dict, ctx: RenderContext, palette: str | None = None,
             text_layers = [layer for layer in slot_layers if layer.get("t") == "text"]
             main_height = max((layer.get("h", s.rect.h) for layer in text_layers), default=0)
             if font in ("block", "max") or FONTS[font][2] <= main_height:
-                slot_layers = [{**layer, "f": font, "scroll": True}
+                slot_layers = [{**{k: v for k, v in layer.items() if k not in ("face", "size")},
+                                "f": font, "scroll": True}
                                if layer.get("t") == "text" and layer.get("h", s.rect.h) == main_height
                                else layer for layer in slot_layers]
         layers += [{**layer, "_clip": tuple(s.rect)} for layer in slot_layers]

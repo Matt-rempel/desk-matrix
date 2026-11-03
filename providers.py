@@ -822,14 +822,7 @@ class Providers:
                 return None
             previous = self._sources.get(need)
             game = previous.data if previous and isinstance(previous.data, dict) else {}
-            interval = 30 if game.get("state") == "live" else 300
-            if game.get("state") == "upcoming":
-                try:
-                    start = datetime.fromisoformat(game["start"]).timestamp()
-                    if 0 <= start - self._now() < 7200:
-                        interval = 60
-                except (KeyError, ValueError, TypeError):
-                    pass
+            interval = nhl.poll_interval(game, datetime.fromtimestamp(self._now(), timezone.utc))
             return need, interval, lambda: self._fetch_nhl(team), team
         if need == "weather":
             url = weather_url(lat, lon, tz)
@@ -866,9 +859,22 @@ class Providers:
     def _fetch_nhl(self, team: str) -> dict:
         now = datetime.fromtimestamp(self._now(), timezone.utc)
         week = nhl.parse_schedule(_nhl_json(f"{nhl.API}/club-schedule/{team}/week/now"), team, now)
-        if week["state"] != "none":
-            return week
-        return nhl.parse_schedule(_nhl_json(f"{nhl.API}/club-schedule-season/{team}/now"), team, now)
+        selected = week if week["state"] != "none" else nhl.parse_schedule(
+            _nhl_json(f"{nhl.API}/club-schedule-season/{team}/now"), team, now)
+        if selected["state"] not in ("live", "final"):
+            return selected
+        game_id = selected.get("game_id")
+        if not isinstance(game_id, int) or isinstance(game_id, bool) or game_id <= 0:
+            raise ValueError("invalid NHL game ID")
+        try:
+            detail = _nhl_json(f"{nhl.API}/gamecenter/{game_id}/landing")
+            return nhl.parse_game_detail(detail, selected, datetime.fromtimestamp(self._now(), timezone.utc))
+        except Exception:
+            # A final score from the schedule is still authoritative without
+            # optional shots. Live failures retain the provider's last good data.
+            if selected["state"] == "final":
+                return selected
+            raise
 
     def _fetch_calendar(self, url: str, tz_name: str) -> dict:
         return {"events": parse_ics(_get_text(url), _zone(tz_name))}
@@ -886,6 +892,10 @@ class Providers:
             mono = self._mono()
             if error is None:
                 source.data, source.fetched_at, source.error, source.failures = data, self._now(), None, 0
+                if source.key.startswith("nhl:"):
+                    # The first live result must not inherit a five-minute
+                    # interval calculated before its state was known.
+                    interval = nhl.poll_interval(data, datetime.fromtimestamp(self._now(), timezone.utc))
                 source.next_due = mono + interval
                 self._net_ok_at = mono
                 self._offline_since = None

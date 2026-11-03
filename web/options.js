@@ -33,6 +33,7 @@ const choiceLabel = (v) => CHOICES[v] || human(v);
 
 /** Options that only make sense for some values of a sibling option. */
 function visible(name, options) {
+  if (name === 'show_shots') return options.display === 'logos';
   if (name === 'callsign') return options.source === 'follow';
   if (name === 'feed_id' && 'source' in options) return options.source === 'feed';
   return true;
@@ -88,7 +89,7 @@ function optionField(blockId, name, spec, options, set) {
   if (type === 'enum' || (blockId === 'icon' && name === 'name')) {
     let choices = spec.choices || [];
     if (!choices.length && name === 'name') choices = state.catalog?.icons || [];
-    const reflow = name === 'source';
+    const reflow = name === 'source' || name === 'display';
     // Long lists (world clock cities) read better as a dropdown with full names.
     if (choices.length > 12) {
       const id = nextId('opt');

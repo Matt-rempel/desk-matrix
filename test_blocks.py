@@ -174,7 +174,8 @@ class CatalogTests(unittest.TestCase):
                          ["time", "sky", "weather", "sports", "focus", "play", "data", "system"])
         self.assertTrue(set(shelved) <= set(catalog.BUILTINS))
         self.assertTrue(PLAN_IDS <= set(shelved))
-        self.assertEqual(next(s["items"] for s in catalog.SHELVES if s["id"] == "sports"), ["data-score"])
+        self.assertEqual(next(s["items"] for s in catalog.SHELVES if s["id"] == "sports"),
+                         ["nhl-scoreboard", "data-score"])
         self.assertEqual(catalog.LEGACY_IDS["clock-classic"], "time-classic")
         for target in catalog.LEGACY_IDS.values():
             self.assertIn(target, catalog.BUILTINS)

@@ -401,12 +401,12 @@ class RunLoopTests(unittest.TestCase):
     def fake_load(self, path, settings):
         return self.libraries.pop(0) if len(self.libraries) > 1 else self.libraries[0]
 
-    def run_loop(self, frames, sleep=lambda _s: None, step=0.05):
+    def run_loop(self, frames, sleep=lambda _s: None, step=0.05, providers=None):
         matrix = FakeMatrix()
         aircraft = app.AircraftProvider(Settings(), executor=InlineExecutor())
         with patch("flightboard.load_library", side_effect=self.fake_load):
             app.run(matrix, self.args(), stop_after=frames, state_dir=self.dir,
-                    providers=FakeProviders(), aircraft=aircraft,
+                    providers=providers or FakeProviders(), aircraft=aircraft,
                     monotonic=Ticker(step), sleep=sleep)
         return matrix
 
@@ -452,6 +452,25 @@ class RunLoopTests(unittest.TestCase):
         self.assertIsNone(status["pinned"])
         self.assertEqual(status["flights"]["WS2231"]["state"], "found")
         self.assertEqual(status["flights"]["WS2231"]["resolved"], "WJA2231")
+
+    def test_new_nhl_observations_reach_previews_before_periodic_data_write(self):
+        class HockeyProviders(FakeProviders):
+            calls = 0
+
+            def snapshot(self):
+                self.calls += 1
+                return {"nhl": {"CGY": {"state": "live", "age_s": self.calls,
+                        "clock_seconds": 600 if self.calls < 3 else 585,
+                        "updated_at": "first" if self.calls < 3 else "second", "error": None}}}
+
+        self.libraries = [self.lineup("time-classic")]
+        provider = HockeyProviders()
+        with patch("flightboard._write_json", wraps=app._write_json) as write:
+            self.run_loop(6, step=1, providers=provider)
+        data_writes = [call for call in write.call_args_list if call.args[1].name == "data.json"]
+        self.assertEqual(len(data_writes), 2)  # observations, not age changes
+        saved = json.loads((self.dir / "data.json").read_text())
+        self.assertEqual(saved["nhl"]["CGY"]["clock_seconds"], 585)
 
     def test_editor_nearby_picker_fetches_while_a_clock_is_displayed(self):
         from flight_lookup import request_nearby

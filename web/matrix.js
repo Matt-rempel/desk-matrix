@@ -174,6 +174,11 @@ export function screenMatrix(screen, opts = {}) {
  * and ignoring responses that arrive after a newer request. The customize
  * editor opts into fresh frames for time and motion effects.
  */
+export function hasLiveClock(screen) {
+  return (screen.slots || []).some(slot => slot.block === 'nhl'
+    || (slot.block === 'time' && slot.options?.colon_blink === true));
+}
+
 export function livePreview(matrix, { onError, ms = 150, animated = false } = {}) {
   let seq = 0;
   let timer = null;
@@ -185,8 +190,7 @@ export function livePreview(matrix, { onError, ms = 150, animated = false } = {}
     timer = null;
     matrix.el.classList.remove('matrix-busy');
   };
-  const hasBlink = (screen) => (screen.slots || []).some((slot) =>
-    slot.block === 'time' && slot.options?.colon_blink === true);
+  const hasBlink = hasLiveClock;
   const isAnimated = (screen) => animated && ((screen.style?.motion || 'still') !== 'still' || hasBlink(screen));
 
   const nextFrame = (screen, mine) => {
@@ -206,9 +210,10 @@ export function livePreview(matrix, { onError, ms = 150, animated = false } = {}
       if (mine === seq && !errorReported && onError) { onError(error); errorReported = true; }
     }).finally(() => {
       if (mine !== seq) return;
+      const nhlClock = (screen.slots || []).some(slot => slot.block === 'nhl');
       const delay = errorReported ? 1000 : motion === 'slide'
         ? phase < 0.5 ? 75 : Math.min(hasBlink(screen) ? 400 : 3000, Math.max(75, (3 - phase) * 1000))
-        : motion === 'still' ? 400 : 160;
+        : motion === 'still' ? (nhlClock ? 1000 : 400) : 160;
       timer = setTimeout(() => nextFrame(screen, mine), delay);
     });
   };

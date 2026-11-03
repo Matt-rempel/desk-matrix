@@ -183,6 +183,9 @@ BLOCKS = {
                  "labels": {code: f"{name} ({code})" for code, name in TEAM_NAMES.items()},
                  "label": "Team shown"},
         "h24": _bool(False),
+        "display": {"type": "enum", "default": "classic", "label": "Scoreboard",
+                    "choices": ["classic", "logos"], "labels": {"classic": "Classic", "logos": "Team logos"}},
+        "show_shots": {"type": "bool", "default": True, "label": "Show shots"},
         "accent": _color()}, 32, 16, ["nhl"]),
     "calendar_next": _block("Next event", "9:30", "focus", {
         "field": _enum("title", "time", "title"), "h24": _bool(False),
@@ -331,6 +334,9 @@ BUILTIN_SCREENS = [
     _screen("data-score", "NHL game", "full", [
         _slot("nhl", INK, team="CGY", accent="#FF9A3D")],
         "sports", "Live score · next game", "NHL"),
+    _screen("nhl-scoreboard", "NHL scoreboard", "full", [
+        _slot("nhl", INK, team="CGY", display="logos", show_shots=True, accent=AMBER)],
+        "sports", "Team logos · score · period · shots", "NHL"),
     _screen("data-transit", "Transit", "full", [
         _slot("feed", "#5AD1A0", feed_id=SAMPLE_FEEDS["transit"], label="201", icon="bus",
               accent=INK, icon_color="#5AD1A0")], "data", "Next departure", "JSON feed"),
@@ -366,7 +372,7 @@ SHELVES = [
      "items": ["weather-now", "weather-hourly", "weather-rain", "weather-metar"]},
     {"id": "sports", "title": "Sports", "source": "NHL",
      "blurb": "Follow a team and catch the next game, live score, or final.",
-     "items": ["data-score"]},
+     "items": ["nhl-scoreboard", "data-score"]},
     {"id": "focus", "title": "Focus", "source": "Offline",
      "blurb": "Timers and countdowns you start from your phone.",
      "items": ["focus-pomodoro", "focus-countdown", "focus-streak", "focus-nextup"]},
@@ -443,6 +449,7 @@ SAMPLE_DATA = {
     },
     "nhl": {"CGY": {"team": "CGY", "state": "live", "home": "CGY", "away": "EDM",
                     "home_score": 2, "away_score": 1, "period": 3, "period_type": "REG",
+                    "home_shots": 24, "away_shots": 20,
                     "clock": "12:34", "start": "2026-10-09T15:00:00Z",
                     "updated_at": "2026-10-09T16:24:00Z", "error": None}},
     "health": {"cpu_temp_c": 48.0, "net_ok": True, "feed_age_s": 6, "under_voltage": False,
