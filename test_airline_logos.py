@@ -66,6 +66,7 @@ class AirlineLogoTests(unittest.TestCase):
         self.assertGreater(sum(row.count('.') for row in american['rows']), 100)
         self.assertEqual(american['rows'][0][-1], '.')
         flair=LOGOS['flair']
+        self.assertTrue(all(flair['rows'][y][x]=='.' for x,y in ((0,0),(-1,0),(0,-1),(-1,-1))))
         self.assertTrue(any(int(c[3:5],16)>200 and int(c[5:7],16)<180 for c in flair['palette']))
         self.assertTrue(any(max(int(c[i:i+2],16) for i in (1,3,5))<60 for c in flair['palette']))
         self.assertEqual(LOGOS['airsprint']['placement'],'wide')

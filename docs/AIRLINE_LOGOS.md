@@ -24,9 +24,10 @@ request, new API account, Pillow or CairoSVG on the Pi.
 ## Sources
 
 - Flair Airlines: `tools/logo-sources/flair.png`, the user's supplied green
-  circular Flair mark inside a charcoal app tile. The build isolates the green
-  circle and preserves its dark lettering. Numeric `FLE` and `F8` callsigns select
-  this mark.
+  circular Flair mark, prepared with the image tool to remove the charcoal app
+  tile outside the circle. The green circle and dark lettering remain opaque;
+  the exterior is transparent on the panel and in browser badges. Numeric `FLE`
+  and `F8` callsigns select this mark.
 - AirSprint: `tools/logo-sources/airsprint.png`, the user's supplied horizontal
   AirSprint Private Aviation logo, prepared with the image tool to remove its
   white background and interior white negative spaces. The navy wordmark, blue

@@ -271,6 +271,7 @@ main { padding-bottom: calc(48px + env(safe-area-inset-bottom)); outline: none; 
 .plane > button { flex-shrink: 0; }
 .airline-badge { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 56px; width: 56px; height: 40px; padding: 3px; border-radius: 9px; background: #fff; overflow: hidden; }
 .airline-badge img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.airline-badge[data-airline="flair"] { background: transparent; }
 .airline-unknown { color: var(--muted); background: var(--surface-2); font-size: 24px; }
 .flight-identity { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 14px; }
 .flight-identity small { display: block; font-family: var(--mono); color: var(--muted); font-size: 12px; }

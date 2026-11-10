@@ -59,10 +59,6 @@ for name, source in sources.items():
     elif name == 'delta':
         # Supplied vertical lockup: retain the red widget above the wordmark.
         image = image.crop((0, 0, image.width, round(image.height * .8)))
-    elif name == 'flair':
-        # Supplied app tile: isolate its green circular mark, keeping dark lettering.
-        image = image.crop((round(image.width * 57/512), round(image.height * 57/512),
-                            round(image.width * 455/512), round(image.height * 455/512)))
     logos[name] = encode(image, (64, 18) if name == 'airsprint' else (22, 22))
     if name == 'airsprint':
         logos[name]['placement'] = 'wide'
