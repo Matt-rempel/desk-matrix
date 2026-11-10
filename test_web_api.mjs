@@ -5,6 +5,18 @@ const KEY = 'a'.repeat(64);
 const NAME = 'flightboard-key';
 let moduleNumber = 0;
 
+test('browser airline matching shares catalog prefixes, handles F8 and keeps registrations neutral', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const airlines=JSON.parse(execFileSync('python3',['-c','import json,catalog;print(json.dumps(catalog.catalog_json()["airlines"]))'],{encoding:'utf8'}));
+  const { airlineFor } = await import('./web/airlines.js');
+  for (const [callsign,id] of [['FLE804','flair'],['F8 804','flair'],['ASP836','airsprint'],['WEN3304','westjet'],['ACA341','aircanada'],['UAL123','united'],['DL123','delta'],['AA123','american']]) {
+    assert.equal(airlineFor({callsign},airlines).id,id);
+  }
+  for(const callsign of ['CFMTF','CGWMB','JZA65','FLEX123','ASPIRE12','']) assert.equal(airlineFor({callsign},airlines),null);
+  assert.equal(airlineFor({callsign:'WS123',icao:'ASP836'},airlines).id,'airsprint');
+  assert.equal(airlineFor({callsign:'UNKNOWN',icon:'maple'},airlines).id,'aircanada');
+});
+
 test('NHL appearances hide the compatibility template and combine equivalent saved looks', async () => {
   const { nhlAppearanceChoices } = await import('./web/nhl-appearance.js');
   const screen = (id, name, options = {}, color = '#F4F2EE') => ({ id, name,

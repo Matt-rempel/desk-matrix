@@ -4,6 +4,16 @@ Nearby and followed-flight cards reserve a 22×22 region for airline marks.
 Callsign and route use the 40-pixel column beside it. Nearby flights retain
 distance/altitude below; followed flights retain a progress bar and remaining
 time below. Compact custom slots still show their selected text field.
+AirSprint uses a wider header (up to 64×18) for its horizontal wordmark, with
+callsign and route on the next row and distance/altitude or remaining time below.
+Followed AirSprint flights keep their progress bar.
+
+The web app also shows smooth versions of the same marks in the gallery's
+**Planes nearby** list, the **Follow one** nearby picker, and the flight identity
+beside the callsign input/lookup result. All seven known operators are supported.
+Unknown registrations keep a neutral plane symbol; a logo is not inferred solely
+from a regional/codeshare flight's marketing relationship. Badges have accessible
+airline labels and a neutral fallback if an image cannot load.
 
 These assets are rasterized from published artwork, rather than hand-drawn
 7×7 approximations. Original colour, shape and aspect ratio are preserved
@@ -12,6 +22,16 @@ pixels to soften diagonals. Logos are bundled and do not require a network
 request, new API account, Pillow or CairoSVG on the Pi.
 
 ## Sources
+
+- Flair Airlines: `tools/logo-sources/flair.png`, the user's supplied green
+  circular Flair mark inside a charcoal app tile. The build isolates the green
+  circle and preserves its dark lettering. Numeric `FLE` and `F8` callsigns select
+  this mark.
+- AirSprint: `tools/logo-sources/airsprint.png`, the user's supplied horizontal
+  AirSprint Private Aviation logo, prepared with the image tool to remove its
+  white background and interior white negative spaces. The navy wordmark, blue
+  swoosh and tagline remain. Numeric `ASP` callsigns select this artwork. Its
+  wide layout avoids squeezing the complete lockup into a 22-pixel square.
 
 - American Airlines: `tools/logo-sources/american.png`, the user's supplied
   red/blue/silver flight symbol with the white background removed using the
@@ -39,7 +59,8 @@ request, new API account, Pillow or CairoSVG on the Pi.
   identifying display. WestJet retains rights in its artwork; this is not an
   official or endorsed airline application.
 
-Source files were prepared 2026-10-31. SHA-256 hashes are included in the
+The original five sources were prepared 2026-10-31; Flair and AirSprint were
+added 2026-11-10. SHA-256 hashes are included in the
 generated `airline_logos.py` data for reproducibility. The artwork is used to
 identify the airline associated with a flight, not as application branding.
 
@@ -48,10 +69,14 @@ identify the airline associated with a flight, not as application branding.
 Build-time dependency: Pillow.
 
 ```sh
-python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png --extra delta tools/logo-sources/delta.png --extra american tools/logo-sources/american.png > /tmp/logos.json
+python tools/build_airline_logos.py tools/logo-sources/aircanada.png tools/logo-sources/westjet.png --extra united tools/logo-sources/united.png --extra delta tools/logo-sources/delta.png --extra american tools/logo-sources/american.png --extra flair tools/logo-sources/flair.png --extra airsprint tools/logo-sources/airsprint.png --web-dir web > /tmp/logos.json
 ```
 
 Use the result as `LOGOS` in `airline_logos.py`; the helper resolves ICAO and
 IATA callsigns and accepts the existing provider icon hints. Unknown airlines
 retain the generic/legacy icon fallback. Rendering and previews share the
 same asset data. New art does not alter saved screens or lineup entries.
+`--web-dir` writes bounded 128px marks and a 256px-wide AirSprint image as flat
+`web/airline-*.png` assets. `catalog_json()` publishes the shared `AIRLINES`
+identity/prefix table and image paths, so the browser and panel use the same
+operator matching rules. The Pi needs no imaging dependency at runtime.

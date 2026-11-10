@@ -541,6 +541,8 @@ def b_flight(s: Slot) -> list[dict]:
         return [T(r, strings[s.opt("field")], s.color)]
     if mode == "follow":
         return _follow_card(s, plane, strings)
+    if LOGOS.get(airline_for(plane), {}).get('placement') == 'wide':
+        return _wide_flight_card(s, plane, strings, mode)
     headline, secondary, footer = _flight_card_fields(s, strings)
     return [flight_logo(s, plane),
             T(r.sub(24, 0, r.w - 24, 10), headline, s.color),
@@ -557,15 +559,33 @@ def _flight_card_fields(s: Slot, strings: dict) -> tuple[list[str], list[str], l
 
 
 def flight_logo(s: Slot, plane: dict) -> dict:
-    """Render a source-derived airline mark in a dedicated 22x22 region."""
+    """Render square marks beside the text, or a wide wordmark above it."""
     r = s.rect
     logo = LOGOS.get(airline_for(plane))
     if not logo:
         return icon(plane.get("icon") or "plane", r.x, r.y, s.icon_color(AMBER), 22, 22)
     rows, palette = logo['rows'], logo['palette']
-    return {'t': 'px', 'x': r.x + (22 - len(rows[0])) // 2,
-            'y': r.y + (22 - len(rows)) // 2, 'rows': rows,
+    width, height = (r.w, 18) if logo.get('placement') == 'wide' else (22, 22)
+    return {'t': 'px', 'x': r.x + (width - len(rows[0])) // 2,
+            'y': r.y + (height - len(rows)) // 2, 'rows': rows,
             'pal': {format(i, 'x'): color for i, color in enumerate(palette)}}
+
+
+def _wide_flight_card(s: Slot, plane: dict, strings: dict, mode: str) -> list[dict]:
+    """Keep a horizontal wordmark legible without dropping the flight fields."""
+    r = s.rect
+    headline, secondary, footer = _flight_card_fields(s, strings)
+    headline_w = min(40, max(31, measure(headline[0], '3x5')[0]))
+    layers = [flight_logo(s, plane),
+              T(r.sub(0, 19, headline_w, 5), headline, s.color),
+              T(r.sub(headline_w + 2, 19, r.w - headline_w - 2, 5), secondary, s.accent('#8FD3FF')),
+              T(r.sub(0, 27, r.w, 5), footer, s.accent(MUTED))]
+    if mode == 'follow':
+        progress = plane.get('progress')
+        value = max(0.0, min(1.0, float(progress))) if isinstance(progress, (int, float)) else 0.0
+        layers.append({'t': 'bar', 'x': r.x, 'y': r.y + 25, 'w': r.w, 'h': 1,
+                       'v': value, 'c': s.icon_color(AMBER), 'bg': '#2A2A2E'})
+    return layers
 
 
 def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
@@ -574,6 +594,8 @@ def _follow_card(s: Slot, plane: dict, strings: dict) -> list[dict]:
     destination = str(plane.get("destination") or "").upper()
     if origin and destination:
         strings = {**strings, "route": [f"{origin}>{destination}"]}
+    if LOGOS.get(airline_for(plane), {}).get('placement') == 'wide':
+        return _wide_flight_card(s, plane, strings, 'follow')
     headline, secondary, footer = _flight_card_fields(s, strings)
     progress = plane.get("progress")
     value = max(0.0, min(1.0, float(progress))) if isinstance(progress, (int, float)) else 0.0

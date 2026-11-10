@@ -1,6 +1,7 @@
 // Nearby aircraft rows shared by the gallery and the flight editor.
 import { h } from './ui.js';
 import { api } from './api.js';
+import { airlineBadge } from './airlines.js';
 
 export function planeCredits() {
   return h('p', { class: 'credit' }, 'Positions: ',
@@ -23,7 +24,8 @@ export function planeList(planes, { distanceUnit = 'nm', action = 'Follow', onCh
       try { await onChoose(plane); } finally { button.disabled = false; }
     });
     return h('li', { class: 'plane' },
-      h('div', null, h('strong', null, plane.callsign || 'Unknown'),
+      airlineBadge(plane),
+      h('div', { class:'plane-info' }, h('strong', null, plane.callsign || 'Unknown'),
         h('small', null, `${plane.route ? plane.route + ' · ' : ''}${shownDistance} ${unit} · ${plane.altitude_ft != null ? Number(plane.altitude_ft).toLocaleString() + ' ft' : '? ft'}`)),
       button);
   }));

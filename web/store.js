@@ -132,6 +132,7 @@ export function normalizeCatalog(raw) {
   return {
     layouts, palettes, blocks, motions, transitions, icons, builtins, shelves, colors, art,
     nhlTeams: Array.isArray(c.nhl_teams) ? c.nhl_teams : [],
+    airlines: Array.isArray(c.airlines) ? c.airlines : [],
     fontFamilies: asEntries(c.font_families).map(([id, face]) => ({ id, ...face })),
     legacyFonts: c.legacy_fonts || {},
     layoutById: new Map(layouts.map((l) => [l.id, l])),

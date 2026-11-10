@@ -8,6 +8,7 @@ from render import ICONS, WIDTH, HEIGHT, FONT_FAMILIES, FONT_SIZES, LEGACY_FONT_
 from nhl import TEAMS, TEAM_NAMES
 from nhl_logos import LOGOS as NHL_LOGOS
 from clock_faces import DESIGN_NAMES, LEGACY_TRACKER_UNITS
+from airline_logos import AIRLINES
 
 INK, MUTED, FAINT, AMBER = "#F4F2EE", "#8C8A84", "#5E5C58", "#FFB23F"
 
@@ -544,6 +545,7 @@ def catalog_json() -> dict:
         "display": {"width": WIDTH, "height": HEIGHT},
         "layouts": LAYOUTS, "palettes": PALETTES, "blocks": BLOCKS,
         "nhl_teams": [{"code": team, "name": TEAM_NAMES[team], "logo": NHL_LOGOS[team]} for team in TEAMS],
+        "airlines": [{"id": key, **value, "image": f"/airline-{key}.png"} for key, value in AIRLINES.items()],
         "legacy_palettes": LEGACY_PALETTES,
         "font_families": {key: {"name": name, "sample": to_hex(rasterize([
             {"t": "text", "s": "12:34", "face": key, "size": "max", "x": 0, "y": 0,

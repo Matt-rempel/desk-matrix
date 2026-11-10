@@ -204,21 +204,107 @@ LOGOS = {
       ".............588888885"
     ],
     "source_sha256": "fc040c6957b7b49c1cc5d980e00dc2e0ef834e84b99b9e775fd42e33092b542a"
+  },
+  "flair": {
+    "palette": [
+      "#212529",
+      "#15131F",
+      "#272E2E",
+      "#699663",
+      "#8BC97E",
+      "#9FE88E",
+      "#A9FA96",
+      "#1D2026",
+      "#B3FF9E",
+      "#AEFF9B",
+      "#ACFF99",
+      "#B6FFA1",
+      "#ABFD98",
+      "#ACFE99",
+      "#AFFD9B",
+      "#425944"
+    ],
+    "rows": [
+      "0000012345665432100000",
+      "0007035889aa9885307000",
+      "00724b9ccdaadcc9b42700",
+      "0725b6daaaaaaaad6b5270",
+      "004b6aaaaaaaaaaaa6b400",
+      "13b6ccc6daaaaaccaa6b31",
+      "259cbb9b9aaaaab8aad952",
+      "38c943435e6ccc34e6cc83",
+      "4eb313314889b60fb98a84",
+      "596f24315e454534444695",
+      "68507f314f121323f17586",
+      "6c8f2837314414233746d6",
+      "5abf2b3137331323f2ba95",
+      "4e8f2b40530f24f33fec84",
+      "38c66a65c869666666ac83",
+      "25999a99ac9a999999d952",
+      "13b6daacaadadadddd6b31",
+      "004b6aaaaaaaaaaaa6b400",
+      "0725b6daaaaaaaad6b5270",
+      "00724b9ccdaadcc9b42700",
+      "0007035889aa9885307000",
+      "0000012345665432100000"
+    ],
+    "source_sha256": "5caedb5ae039572b4a52cd492ee0b25ea0f5b438d3c573c1dd140b5f772e5006"
+  },
+  "airsprint": {
+    "palette": [
+      "#00123B",
+      "#003350",
+      "#004D79",
+      "#000F20",
+      "#001844",
+      "#000E30",
+      "#000715",
+      "#000B24",
+      "#011D61",
+      "#012458"
+    ],
+    "rows": [
+      "...................01222222222213.....................",
+      "................12222114050041122225..................",
+      "..............12216..............31224................",
+      ".....5.....3734.....60445...........61567.............",
+      ".....85....98......783.687.............48..........6..",
+      "....588............87...73..............6.........58..",
+      "....4683..........786......6..76.....6........36..58..",
+      "...50.84..798.58048896...3987488034458948.0800880.4800",
+      "...4..78...48..89655888846585..5870877758.684..5860866",
+      "..7837780..08..80....6708478....8078...58..87...8.58..",
+      "..4055548..08..85.......0858....8058...58..85..68.58..",
+      ".69....685.08..80..7....5878....8658...58..85..68.58..",
+      ".47.....98.08..80..9....83786..00.08...58..85..68.58..",
+      "0846...54804855847.484047.788445.7480.64855846.6807880",
+      ".....................6....58.6......................6.",
+      "..66..6...........33..66..58.............636..36......",
+      ".5213112616131.21.026114..78...1131314625323113042013.",
+      ".516.13131.52.4113.1.114.6480.511041.1141.1.115411326."
+    ],
+    "placement": "wide",
+    "source_sha256": "cb755ef50a54458167c3a3b58dc8778a0ca35f06334f121d13f5799bb94ae472"
   }
 }
 
 
+AIRLINES = {
+    'aircanada': {'name': 'Air Canada', 'prefixes': ['ACA', 'AC'], 'hints': ['maple']},
+    'westjet': {'name': 'WestJet', 'prefixes': ['WJA', 'WEN', 'WS', 'WR'], 'hints': ['westjet']},
+    'united': {'name': 'United Airlines', 'prefixes': ['UAL', 'UA'], 'hints': []},
+    'delta': {'name': 'Delta Air Lines', 'prefixes': ['DAL', 'DL'], 'hints': ['delta']},
+    'american': {'name': 'American Airlines', 'prefixes': ['AAL', 'AA'], 'hints': []},
+    'flair': {'name': 'Flair Airlines', 'prefixes': ['FLE', 'F8'], 'hints': []},
+    'airsprint': {'name': 'AirSprint', 'prefixes': ['ASP'], 'hints': []},
+}
+
+
 def airline_for(plane):
-    """Resolve known ICAO/IATA callsigns, then the provider's legacy icon hint."""
-    code = re.sub(r'\s+', '', str(plane.get('icao') or plane.get('callsign') or '')).upper()
-    if re.match(r'^(ACA|AC)\d', code):
-        return 'aircanada'
-    if re.match(r'^(WJA|WEN|WS|WR)\d', code):
-        return 'westjet'
-    if re.match(r'^(UAL|UA)\d', code):
-        return 'united'
-    if re.match(r'^(DAL|DL)\d', code):
-        return 'delta'
-    if re.match(r'^(AAL|AA)\d', code):
-        return 'american'
-    return {'maple': 'aircanada', 'westjet': 'westjet', 'delta': 'delta'}.get(plane.get('icon'))
+    """Resolve known numeric ICAO/IATA callsigns, then a legacy provider hint."""
+    code = re.sub(r'[\s-]+', '', str(plane.get('icao') or plane.get('callsign') or '')).upper()
+    for name, airline in AIRLINES.items():
+        if any(code.startswith(prefix) and code[len(prefix):len(prefix)+1].isdigit()
+               for prefix in airline['prefixes']):
+            return name
+    return next((name for name, airline in AIRLINES.items() if plane.get('icon') in airline['hints']), None)

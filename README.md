@@ -40,8 +40,9 @@ the location and time zone in settings for your own desk.**
 
 ## Hardware
 
-Flight cards use larger, bundled Air Canada, WestJet, United, Delta and American
-Airlines artwork on the native 64×32 canvas. Nearby and followed flights share the same logo assets and
+Flight cards use larger, bundled Air Canada, WestJet, United, Delta, American,
+Flair and AirSprint artwork on the native 64×32 canvas. Airline badges also appear
+in both nearby-plane lists and the flight lookup identity. Nearby and followed flights share the same logo assets and
 previews. See [airline artwork sources and layout](docs/AIRLINE_LOGOS.md).
 
 Following a flight? Use **Check flight** in the editor to verify a live position

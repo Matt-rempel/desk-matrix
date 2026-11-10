@@ -49,9 +49,9 @@ MAX_BODY = 64 * 1024
 MAX_PREVIEW_SCREENS = 40
 MAX_PREVIEW_ART = 8
 DATA_MAX_AGE_S = 30 * 60
-STATIC_RE = re.compile(r"/([a-z0-9-]+)\.(js|css|svg)")
+STATIC_RE = re.compile(r"/([a-z0-9-]+)\.(js|css|svg|png)")
 STATIC_TYPES = {"js": "text/javascript; charset=utf-8", "css": "text/css; charset=utf-8",
-                "svg": "image/svg+xml"}
+                "svg": "image/svg+xml", "png": "image/png"}
 PWA_FILES = {
     "/manifest.webmanifest": ("manifest.webmanifest", "application/manifest+json"),
     "/apple-touch-icon.png": ("apple-touch-icon.png", "image/png"),
