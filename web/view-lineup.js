@@ -331,7 +331,7 @@ export function render(root, { params }) {
           onChange: value => { cfg.teams = value; refresh(); } })),
         h('div', { class: 'field pad-row nhl-mode-field' }, h('div', { class: 'field-label' }, 'When it appears'), mode),
         h('p', { class: 'card-note' }, cfg.mode === 'game'
-          ? 'Rotate live games every 10 seconds, including intermissions. Return to your lineup when they finish.'
+          ? 'Rotate games every 10 seconds, including intermissions. Keep final scores for 20 minutes after each game ends, then return to your lineup.'
           : 'Show each game at puck drop and when its score changes. Other alerts wait their turn.'),
         cfg.mode === 'brief' ? paramRow('Show for', stepper({ label: 'seconds', value: cfg.seconds,
           min: 5, max: 120, step: 5, format: (v) => `${v} s`, onChange: (v) => { cfg.seconds = v; refresh(); } })) : null,

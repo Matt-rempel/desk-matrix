@@ -24,6 +24,64 @@ def game(state, start, *, home="CGY", away="EDM", home_score=None, away_score=No
 
 
 class NHLTests(unittest.TestCase):
+    def test_final_observation_starts_once_and_ignores_historical_finals(self):
+        live={'state':'live','game_id':1,'clock_observed_at':NOW.isoformat()}
+        final={'state':'final','game_id':1}
+        first=nhl.with_final_observation(final,[live],NOW+timedelta(seconds=15))
+        self.assertEqual(first['final_observed_at'],(NOW+timedelta(seconds=15)).isoformat())
+        refreshed=nhl.with_final_observation(final,[first],NOW+timedelta(minutes=10))
+        self.assertEqual(refreshed['final_observed_at'],first['final_observed_at'])
+        # The other followed club in the same matchup shares the earliest observation.
+        shared=nhl.with_final_observation(final,[live,first],NOW+timedelta(seconds=25))
+        self.assertEqual(shared['final_observed_at'],first['final_observed_at'])
+        for previous in ([],[dict(live,game_id=2)],[dict(live,clock_observed_at=(NOW-timedelta(hours=1)).isoformat())]):
+            self.assertNotIn('final_observed_at',nhl.with_final_observation(final,previous,NOW))
+
+    def test_follow_games_rotates_live_and_recent_finals_until_the_exact_deadline(self):
+        hockey={'CGY':{'state':'final','game_id':1,'final_observed_at':NOW.isoformat(),'age_s':600,'error':'offline'},
+                'SJS':{'state':'final','game_id':1,'final_observed_at':NOW.isoformat()},
+                'EDM':{'state':'live','game_id':2,'age_s':10},
+                'VAN':{'state':'final','game_id':3}}
+        teams=['CGY','SJS','EDM','VAN']
+        games=lambda now:nhl.games_for_teams(hockey,teams,live_only=True,include_postgame=True,now=now)
+        self.assertEqual([t for t,_ in games(NOW+timedelta(seconds=1199))],['CGY','EDM'])
+        self.assertEqual([t for t,_ in games(NOW+timedelta(seconds=1200))],['EDM'])
+        self.assertEqual([t for t,_ in nhl.games_for_teams(hockey,teams)],['EDM'])
+        for invalid in ('bad', (NOW+timedelta(hours=1)).isoformat(), None):
+            hockey['CGY']['final_observed_at']=invalid
+            self.assertNotIn('CGY',[t for t,_ in games(NOW)])
+
+    def test_alert_context_includes_final_score_alongside_a_live_match(self):
+        import copy
+        screen=copy.deepcopy(catalog.BUILTINS['nhl-scoreboard'])
+        screen['slots'][0]['options']['teams']=['CGY','EDM']
+        hockey={'CGY':{'state':'final','game_id':1,'home':'CGY','away':'SJS','home_score':3,'away_score':2,'final_observed_at':NOW.isoformat()},
+                'EDM':{'state':'live','game_id':2,'home':'EDM','away':'VAN','home_score':1,'away_score':0}}
+        ctx=blocks.RenderContext(now=NOW,data={'nhl':hockey},nhl_postgame=True)
+        self.assertEqual(blocks.render_screen(screen,ctx)[-1]['s'],['FINAL'])
+        ctx.nhl_elapsed=10
+        self.assertNotEqual(blocks.render_screen(screen,ctx)[-1]['s'],['FINAL'])
+
+    def test_provider_completion_observation_survives_polling_and_restart_cache(self):
+        import json,tempfile
+        from pathlib import Path
+        clock=Clock(NOW.timestamp())
+        provider=providers.Providers(FakeSettings(),executor=InlineExecutor(),now_fn=lambda:clock.wall,monotonic_fn=lambda:clock.mono)
+        raw=game('LIVE','2026-10-12T18:00:00Z',home_score=2,away_score=1)
+        with mock.patch.object(providers,'_nhl_json',side_effect=[{'games':[raw]},raw]):provider.update({'nhl:CGY'})
+        clock.mono+=16;clock.wall+=16;raw['gameState']='OFF'
+        with mock.patch.object(providers,'_nhl_json',side_effect=[{'games':[raw]},raw]):provider.update({'nhl:CGY'})
+        first=provider.snapshot()['nhl']['CGY']['final_observed_at']
+        clock.mono+=301;clock.wall+=301
+        with mock.patch.object(providers,'_nhl_json',side_effect=[{'games':[raw]},raw]):provider.update({'nhl:CGY'})
+        self.assertEqual(provider.snapshot()['nhl']['CGY']['final_observed_at'],first)
+        with tempfile.TemporaryDirectory() as root:
+            Path(root,'data.json').write_text(json.dumps(provider.snapshot()))
+            restarted=providers.Providers(FakeSettings(),root,executor=InlineExecutor(),now_fn=lambda:clock.wall,monotonic_fn=lambda:clock.mono)
+            restored=restarted.snapshot()['nhl']['CGY']
+            self.assertEqual(restored['final_observed_at'],first)
+            self.assertTrue(nhl.games_for_teams({'CGY':restored},['CGY'],live_only=True,include_postgame=True,now=datetime.fromtimestamp(clock.wall,timezone.utc)))
+
     def test_multiple_teams_rotate_live_games_and_deduplicate_a_shared_matchup(self):
         import copy
         item = copy.deepcopy(catalog.BUILTINS["nhl-scoreboard"])

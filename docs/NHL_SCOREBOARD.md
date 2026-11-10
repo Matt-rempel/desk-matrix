@@ -48,9 +48,19 @@ Tap **Done**, then **Save lineup** to apply the alert settings.
   alert remain visible and can trigger another brief alert afterward.
 - **Follow live games** keeps scoreboards on the display while any selected
   game is live, rotating between unique games, including intermissions. Games
-  leave the rotation when finished, stale or unavailable. The normal lineup
-  resumes when no selected game is live. Existing timer/device alert priorities
-  and Show now pins are respected.
+  stay in the rotation showing **FINAL**, **FINAL/OT** or **FINAL/SO** for
+  **20 minutes after the feed first reports the live game as finished**.
+  Each game has its own fixed deadline; polling and score corrections do not
+  restart the countdown. Finished games rotate alongside other live games,
+  and the normal lineup resumes when all those games have expired. Known final
+  scores remain visible during a later feed failure until their deadline;
+  stale or unavailable live games still leave the rotation. Existing
+  timer/device alert priorities and Show now pins are respected.
+  The completion observation is cached with provider data, so an app restart
+  resumes the remaining window. A historical final first discovered on a cold
+  start does not launch a new 20-minute alert; a live observation within the
+  preceding 90 seconds establishes the transition (normal live polling is 15
+  seconds). **Brief alerts** retain their existing short duration.
 - Alerts always use the full **Team logos** layout, including alert settings
   saved before it was introduced. The saved screen itself is not rewritten.
   **Scoreboard appearance** optionally selects an NHL screen whose colours and

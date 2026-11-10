@@ -26,6 +26,7 @@ TEAM_NAMES = {
 }
 
 ROTATE_S = 10
+POSTGAME_S = 20 * 60
 
 
 def followed_teams(options: dict) -> list[str]:
@@ -47,7 +48,8 @@ def game_key(game: dict, team: str = "") -> tuple:
             str(game.get("start") or ""))
 
 
-def games_for_teams(hockey: dict, teams: list[str], *, live_only=False) -> list[tuple[str, dict]]:
+def games_for_teams(hockey: dict, teams: list[str], *, live_only=False,
+                    include_postgame=False, now: datetime | None = None) -> list[tuple[str, dict]]:
     """Keep each matchup once, favouring live games for regular screen rotation."""
     games, seen = [], set()
     for team in teams:
@@ -56,8 +58,12 @@ def games_for_teams(hockey: dict, teams: list[str], *, live_only=False) -> list[
             continue
         if live_only:
             age = game.get("age_s")
-            if (game.get("state") != "live" or game.get("error")
-                    or isinstance(age, (int, float)) and age > 90):
+            live = (game.get('state') == 'live' and not game.get('error')
+                    and not (isinstance(age, (int, float)) and age > 90))
+            ended = _start({'startTimeUTC': game.get('final_observed_at')})
+            recent_final = (include_postgame and game.get('state') == 'final' and ended is not None
+                            and 0 <= ((now or datetime.now(timezone.utc)) - ended).total_seconds() < POSTGAME_S)
+            if not live and not recent_final:
                 continue
         key = game_key(game, team)
         if key not in seen:
@@ -76,6 +82,26 @@ def _start(game: dict) -> datetime | None:
         return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
     except (KeyError, AttributeError, ValueError):
         return None
+
+
+def with_final_observation(game: dict, previous: list[dict], now: datetime) -> dict:
+    """Remember the first observed live→final transition without reviving old games.
+
+    Persisted in provider data, shared across both clubs, and never slid forward
+    by polling. A cold historical final has no reliable completion observation.
+    """
+    if game.get('state') != 'final':
+        return game
+    same = [p for p in previous if isinstance(p, dict) and game_key(p) == game_key(game)]
+    endings = [_start({'startTimeUTC': p.get('final_observed_at')}) for p in same if p.get('state') == 'final']
+    endings = [ended for ended in endings if ended is not None and ended <= now]
+    if endings:
+        return {**game, 'final_observed_at': min(endings).isoformat()}
+    for old in same:
+        observed = _start({'startTimeUTC': old.get('clock_observed_at')})
+        if old.get('state') == 'live' and observed is not None and 0 <= (now - observed).total_seconds() <= 90:
+            return {**game, 'final_observed_at': now.isoformat()}
+    return game
 
 
 def _belongs(game: dict, team: str) -> bool:

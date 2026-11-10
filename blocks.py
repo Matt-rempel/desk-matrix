@@ -64,6 +64,7 @@ class RenderContext:
     timers: dict = field(default_factory=dict)
     nhl_elapsed: float | None = None
     animate_clock: bool = True
+    nhl_postgame: bool = False
 
 
 def _valid_color(value) -> bool:
@@ -1012,7 +1013,8 @@ def b_nhl(s: Slot) -> list[dict]:
     """Keep both scores and game status visible together."""
     teams = nhl.followed_teams(s.options)
     hockey = s.source("nhl") or {}
-    games = nhl.games_for_teams(hockey, teams)
+    games = nhl.games_for_teams(hockey, teams, live_only=s.ctx.nhl_postgame,
+                                include_postgame=s.ctx.nhl_postgame, now=s.ctx.now)
     elapsed = s.ctx.elapsed if s.ctx.nhl_elapsed is None else s.ctx.nhl_elapsed
     team, game = games[int(max(0, elapsed) // nhl.ROTATE_S) % len(games)] if games else (teams[0], hockey.get(teams[0]) or {})
     s = replace(s, options={**s.options, "team": team})

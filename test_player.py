@@ -257,6 +257,40 @@ class EffectTests(unittest.TestCase):
 
 
 class InterruptTests(unittest.TestCase):
+    def test_nhl_final_score_stays_for_twenty_minutes_then_resumes_lineup(self):
+        clock=Clock()
+        p,_=self.make({'nhl_live':{'enabled':True,'mode':'game','seconds':20}},clock=clock)
+        live=self.nhl_data()
+        self.assertEqual(p.tick(0,live)[1]['interrupt'],'nhl_live')
+        clock.value+=10
+        final=self.nhl_data(state='final',age_s=300)
+        final['nhl']['CGY']['final_observed_at']=datetime.fromtimestamp(clock.value,UTC).isoformat()
+        self.assertEqual(p.tick(10,final)[1]['interrupt'],'nhl_live')
+        clock.value+=1199.9
+        self.assertEqual(p.tick(1209.9,final)[1]['interrupt'],'nhl_live')
+        clock.value+=.1
+        self.assertIsNone(p.tick(1210,final)[1]['interrupt'])
+        # The same final score on another refresh cannot start another window.
+        clock.value+=300;final['nhl']['CGY']['age_s']=0
+        self.assertIsNone(p.tick(1510,final)[1]['interrupt'])
+
+    def test_nhl_followed_finals_have_independent_expiry_and_brief_alerts_stay_brief(self):
+        clock=Clock()
+        cfg={'nhl_live':{'enabled':True,'teams':['CGY','EDM'],'mode':'game','seconds':20}}
+        p,_=self.make(cfg,clock=clock)
+        data=self.nhl_data(state='final')
+        data['nhl']['CGY']['final_observed_at']=datetime.fromtimestamp(clock.value-1190,UTC).isoformat()
+        data['nhl']['EDM']={**data['nhl']['CGY'],'game_id':2,'home':'EDM','away':'VAN','final_observed_at':datetime.fromtimestamp(clock.value-1100,UTC).isoformat()}
+        self.assertEqual(p.tick(0,data)[1]['interrupt'],'nhl_live')
+        self.assertEqual(p._interrupt['screen']['slots'][0]['options']['teams'],['CGY','EDM'])
+        clock.value+=10;p.tick(10,data)
+        self.assertEqual(p._interrupt['screen']['slots'][0]['options']['teams'],['EDM'])
+        clock.value+=90
+        self.assertIsNone(p.tick(100,data)[1]['interrupt'])
+        cfg['nhl_live']['mode']='brief'
+        brief,_=self.make(cfg,clock=clock)
+        self.assertIsNone(brief.tick(0,data)[1]['interrupt'])
+
     PLANE = {"callsign": "WJA123", "route": "YYC>YVR", "distance_nm": 2.0, "altitude_ft": 5000,
              "speed_kt": 200, "icon": "plane", "bearing_deg": 90.0}
     FAR = {"callsign": "ACA150", "route": None, "distance_nm": 9.0, "altitude_ft": 5000}

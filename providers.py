@@ -891,6 +891,10 @@ class Providers:
             self._net_attempted = True
             mono = self._mono()
             if error is None:
+                if source.key.startswith('nhl:'):
+                    data = nhl.with_final_observation(data,
+                        [s.data for key, s in self._sources.items() if key.startswith('nhl:')],
+                        datetime.fromtimestamp(self._now(), timezone.utc))
                 source.data, source.fetched_at, source.error, source.failures = data, self._now(), None, 0
                 if source.key.startswith("nhl:"):
                     # The first live result must not inherit a five-minute

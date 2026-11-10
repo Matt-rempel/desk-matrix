@@ -338,7 +338,9 @@ class Player:
             return None
         config, teams, screen = target
         hockey = data.get("nhl") if isinstance(data.get("nhl"), dict) else {}
-        games = nhl.games_for_teams(hockey, teams, live_only=True)
+        games = nhl.games_for_teams(hockey, teams, live_only=True,
+                                    include_postgame=config['mode'] == 'game',
+                                    now=datetime.fromtimestamp(self._now(), timezone.utc))
         return (config, screen, games) if games else None
 
     @staticmethod
@@ -595,6 +597,8 @@ class Player:
             ctx = self._context(local, now, elapsed, self._screen_data(screen, data))
             if any(slot.get("block") == "nhl" for slot in screen.get("slots") or ()):
                 ctx.nhl_elapsed = self._nhl_elapsed.get(screen_id, 0.0)
+                ctx.nhl_postgame = bool(interrupt and interrupt['name'] == 'nhl_live'
+                                       and interrupt.get('mode') == 'game')
                 self._nhl_rotation_last = (screen_id, mono)
             pixels = blocks.frame(screen, ctx, "night" if night else None)
             style = screen.get("style") if isinstance(screen.get("style"), dict) else {}
